@@ -1,0 +1,15 @@
+language: ru
+tone_voice: professional
+max_length: 1200
+forbidden_words:
+  - лучший
+  - скидка
+  - акция
+  - топ
+required_attributes:
+  - Бренд
+  - Категория
+  - Интерфейс
+  - Совместимость
+  - Длина кабеля
+  - Вес, г

@@ -1,0 +1,22 @@
+%% MarketMind AI - agent workflow
+flowchart LR
+    input["User input<br/>Telegram / CLI / file"] --> intent["Intent normalization<br/>StructuredTask"]
+    intent --> planner["Task planner<br/>TaskPlan"]
+    planner --> skills["Skill registry<br/>available / planned / missing"]
+    skills --> loop["Agent loop<br/>classify -> strategy -> execute"]
+    loop --> execution["Execution layer"]
+
+    execution --> worker["Worker<br/>progress / resumability"]
+    execution --> parser["Marketplace parser<br/>ProductData contract"]
+    execution --> cards["Card generation<br/>Ozon draft / AI enrichment"]
+    execution --> exports["Export layer<br/>CSV / XLSX / JSON / HTML"]
+
+    worker --> storage["Storage<br/>SQLite / files"]
+    parser --> storage
+    cards --> storage
+    exports --> output["User-facing output"]
+
+    storage --> telemetry["Telemetry<br/>attempts / blocks / skill runs"]
+    telemetry --> planner
+    telemetry --> recovery["Recovery decision<br/>fallback / cooldown / repair"]
+    recovery --> loop

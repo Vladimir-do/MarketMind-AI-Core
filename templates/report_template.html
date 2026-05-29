@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Отчет парсера цен - Мониторинг товаров</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #3a86ff;
+            --success: #2a9d8f;
+            --warning: #e9c46a;
+            --danger: #e76f51;
+            --dark: #264653;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 2rem 0;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            border-left: 5px solid var(--primary);
+        }
+        
+        h1 {
+            color: var(--dark);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: var(--gray);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .timestamp {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: inline-block;
+            font-size: 0.9rem;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.12);
+        }
+        
+        .card-title {
+            font-size: 1.1rem;
+            color: var(--gray);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .card-title i {
+            margin-right: 0.5rem;
+            font-size: 1.2rem;
+        }
+        
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--dark);
+        }
+        
+        .success { color: var(--success); }
+        .warning { color: var(--warning); }
+        .danger { color: var(--danger); }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        @media (max-width: 992px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+        
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .chart-subtitle {
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            margin-bottom: 2rem;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: var(--dark);
+            color: white;
+            text-align: left;
+            padding: 1rem;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .platform-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin: 0.25rem;
+        }
+        
+        .ozon {
+            background: #ff5c28;
+            color: white;
+        }
+        
+        .wildberries {
+            background: #ff6b35;
+            color: white;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-success {
+            background: var(--success);
+        }
+        
+        .status-warning {
+            background: var(--warning);
+        }
+        
+        .status-danger {
+            background: var(--danger);
+        }
+        
+        .price-change {
+            font-weight: 600;
+        }
+        
+        .price-increase {
+            color: var(--danger);
+        }
+        
+        .price-decrease {
+            color: var(--success);
+        }
+        
+        .price-stable {
+            color: var(--gray);
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+        
+        .footer-note {
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+        
+        /* Анимации */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .card, .chart-container, .table-container {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        /* Индикатор загрузки для графиков */
+        .chart-loading {
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Отчет парсера цен</h1>
+            <div class="subtitle">Мониторинг цен на маркетплейсах</div>
+            <div class="timestamp">Дата генерации: <span id="report-timestamp">{{timestamp}}</span></div>
+        </header>
+
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-title">
+                    📦 Всего товаров
+                </div>
+                <div class="card-value">{{total_products}}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">
+                    ✅ Успешно обновлено
+                </div>
+                <div class="card-value success">{{updated_products}}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">
+                    ⚠️ Временных ошибок
+                </div>
+                <div class="card-value warning">{{temp_errors}}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">
+                    ❌ Критических ошибок
+                </div>
+                <div class="card-value danger">{{critical_errors}}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">
+                    📈 Процент успеха
+                </div>
+                <div class="card-value">{{success_rate}}%</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">📊 Динамика цен</div>
+                        <div class="chart-subtitle">Изменение цен по товарам</div>
+                    </div>
+                </div>
+                <canvas id="priceChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">🌐 Распределение</div>
+                        <div class="chart-subtitle">По маркетплейсам</div>
+                    </div>
+                </div>
+                <canvas id="platformChart"></canvas>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="chart-header">
+                <div>
+                    <div class="chart-title">📋 Детали по товарам</div>
+                    <div class="chart-subtitle">Полная информация о товарах</div>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Товар</th>
+                        <th>Маркетплейс</th>
+                        <th>Текущая цена</th>
+                        <th>Изменение</th>
+                        <th>Статус</th>
+                        <th>Последнее обновление</th>
+                    </tr>
+                </thead>
+                <tbody id="products-table">
+                    {{#each products}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td>
+                            {{#each this.platforms}}
+                            <span class="platform-badge {{this.platform}}">{{this.platform}}</span>
+                            {{/each}}
+                        </td>
+                        <td><strong>{{this.current_price}} ₽</strong></td>
+                        <td>
+                            <span class="price-change price-{{this.price_change_status}}">
+                                {{#if this.price_change}}
+                                    {{this.price_change}} ₽ ({{this.price_change_percent}}%)
+                                {{else}}
+                                    Без изменений
+                                {{/if}}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-indicator status-{{this.status}}"></span>
+                            {{this.status_label}}
+                        </td>
+                        <td>{{this.last_updated}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
+
+        <footer>
+            <div>Parser Agent &copy; <span id="current-year">{{current_year}}</span></div>
+            <div class="footer-note">Сгенерировано автоматически. Все данные актуальны на момент последнего обновления.</div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Установка текущего года
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            
+            // Установка временной метки
+            document.getElementById('report-timestamp').textContent = new Date().toLocaleString('ru-RU');
+            
+            // Данные для графиков (будут заменены реальными данными)
+            const priceData = {{price_data}};
+            const platformData = {{platform_data}};
+            
+            // График динамики цен
+            const priceChartCtx = document.getElementById('priceChart').getContext('2d');
+            const priceChart = new Chart(priceChartCtx, {
+                type: 'line',
+                data: {
+                    labels: priceData.labels,
+                    datasets: [{
+                        label: 'Цены товаров',
+                        data: priceData.values,
+                        borderColor: '#3a86ff',
+                        backgroundColor: 'rgba(58, 134, 255, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#3a86ff',
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Цена: ${context.parsed.y} ₽`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Цена (₽)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' ₽';
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Товары'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // График распределения по маркетплейсам
+            const platformChartCtx = document.getElementById('platformChart').getContext('2d');
+            const platformChart = new Chart(platformChartCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: platformData.labels,
+                    datasets: [{
+                        data: platformData.values,
+                        backgroundColor: [
+                            '#ff5c28', // Ozon
+                            '#ff6b35', // Wildberries
+                            '#2a9d8f', // Другие
+                            '#e9c46a', // Другие
+                            '#e76f51'  // Другие
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+        });
+    </script>
+</body>
+</html>

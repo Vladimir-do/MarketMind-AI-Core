@@ -1,0 +1,93 @@
+schema_version: "1.0"
+generated_at: "2026-05-17"
+priority_scale:
+  critical: "Блокирует надежный production или развитие ядра."
+  high: "Сильно снижает риск или ускоряет разработку ближайших функций."
+  medium: "Нужен для расширения или удобства, но не первый шаг."
+  low: "Полезно только при появлении конкретной ветки/сценария."
+
+missing_skills:
+  - id: alembic-async-migrations
+    title: "Async SQLAlchemy migrations через Alembic"
+    priority: critical
+    reason: "Без миграций схема БД будет ломаться при любом серьезном обновлении."
+    depends_on_existing: ["database-async-sqlalchemy"]
+    first_step: "Инициализировать Alembic, добавить async env.py и первую миграцию текущей схемы."
+
+  - id: pydantic-domain-schemas
+    title: "Единые Pydantic-схемы ProductData/ProductSnapshot/AI outputs"
+    priority: critical
+    reason: "Сейчас часть pipeline использует dict, часть dataclass/Pydantic; это мешает безопасным изменениям."
+    depends_on_existing: ["parser-base-contract", "ai-json-extraction"]
+    first_step: "Сделать единый ProductSnapshot schema и адаптеры dict -> schema."
+
+  - id: bot-feature-modules
+    title: "Модульная регистрация Telegram-команд"
+    priority: high
+    reason: "parser_agent/app/bot.py слишком крупный; модульность снизит риск правок."
+    depends_on_existing: ["telegram-aiogram-fsm", "telegram-admin-allowlist"]
+    first_step: "Разделить handlers на products/cards/analytics/admin и общий register(dp)."
+
+  - id: ai-json-schema-task
+    title: "AI task = prompt + schema + validator + retry"
+    priority: high
+    reason: "AI используется в карточках и аналитике, но валидация ответа пока ручная."
+    depends_on_existing: ["ai-provider-router", "ai-json-extraction"]
+    first_step: "Описать базовый helper run_ai_json_task(schema, prompt, fallback)."
+
+  - id: structured-observability
+    title: "Structured logs и scrape metrics dashboard"
+    priority: high
+    reason: "Есть scrape_attempts, но нет единого наблюдаемого слоя по ошибкам и latency."
+    depends_on_existing: ["observability-scrape-attempts", "logging-rotating-file"]
+    first_step: "Добавить JSON logs и CLI/API summary по marketplace/source/status."
+
+  - id: persistent-circuit-breaker
+    title: "Persistent circuit breaker"
+    priority: high
+    reason: "Текущее состояние circuit breaker живет только в памяти и теряется при рестарте."
+    depends_on_existing: ["resilience-marketplace-circuit", "database-async-sqlalchemy"]
+    first_step: "Сохранять cooldown state в SQLite/Redis и читать при старте."
+
+  - id: apscheduler-periodic-price-update
+    title: "Периодическое обновление цен"
+    priority: medium
+    reason: "Полезно для UX, но можно жить с ручным /update до production hardening."
+    depends_on_existing: ["background-worker-progress"]
+    first_step: "Добавить APScheduler job с конфигом интервала и quiet notifications."
+
+  - id: systemd-docker-deploy
+    title: "VPS deploy через systemd/Docker Compose"
+    priority: medium
+    reason: "Нужно для стабильного запуска, но после миграций и модульности."
+    depends_on_existing: ["cli-argparse-modes", "config-env-loader"]
+    first_step: "Добавить service unit, .env.example.prod и health-check команду."
+
+  - id: browser-profile-pool
+    title: "Пул Playwright профилей и proxy"
+    priority: medium
+    reason: "Улучшит антиблок Ozon, но сначала нужен persistent resilience."
+    depends_on_existing: ["playwright-ozon-stealth-fetch", "network-proxy-reachability"]
+    first_step: "Описать ProfilePool с health/failure counters."
+
+  - id: distributed-task-queue
+    title: "Очередь задач для batch/update/report"
+    priority: medium
+    reason: "Нужна при росте нагрузки; пока async worker достаточен для личного бота."
+    depends_on_existing: ["background-worker-progress"]
+    first_step: "Выбрать RQ/Dramatiq/Celery или встроенную asyncio queue."
+
+  - id: selenium-driver-factory
+    title: "Selenium driver factory"
+    priority: low
+    reason: "В проекте фактически используется Playwright; Selenium нужен только если появится отдельная ветка."
+    depends_on_existing: ["network-proxy-reachability"]
+    first_step: "Добавлять только при появлении Selenium-only сайта или требования."
+
+  - id: secret-management
+    title: "Production secret management"
+    priority: medium
+    reason: ".env удобен локально, но для prod лучше cloud/VPS secrets."
+    depends_on_existing: ["config-env-loader"]
+    first_step: "Поддержать env-only режим без записи секретов в файлы."
+

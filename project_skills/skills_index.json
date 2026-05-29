@@ -1,0 +1,960 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-18",
+  "source_root": "D:\\LLM",
+  "notes": "Machine-readable skill index extracted from project_skills/skills_database.md. Markdown remains the human-readable knowledge base; this file is for search, filtering, dependency impact analysis and agent training.",
+  "maturity_levels": {
+    "prototype": "Works as a project-local idea or demo, but needs hardening before production reuse.",
+    "usable": "Works for the current project and can be reused with moderate adaptation.",
+    "production-ready": "Has clear contracts, error handling and enough operational discipline for direct production reuse."
+  },
+  "skills": [
+    {
+      "id": "config-env-loader",
+      "title": "Загрузка .env и обязательных настроек",
+      "category": "config",
+      "complexity": "beginner",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [],
+      "dependents": [
+        "logging-rotating-file",
+        "database-async-sqlalchemy",
+        "telegram-admin-allowlist",
+        "api-key-rate-limit-middleware",
+        "ai-provider-router",
+        "cli-argparse-modes",
+        "deploy-yandex-cloud-function",
+        "playwright-ozon-stealth-fetch",
+        "parser-wb-cloud-fallback",
+        "resilience-marketplace-circuit",
+        "network-proxy-reachability",
+        "memory-chat-history"
+      ],
+      "source_paths": [
+        "parser_agent/app/config.py",
+        "2026-04-23-new-chat/config.py"
+      ]
+    },
+    {
+      "id": "logging-rotating-file",
+      "title": "Ротационное логирование",
+      "category": "logging",
+      "complexity": "beginner",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "config-env-loader"
+      ],
+      "dependents": [
+        "database-async-sqlalchemy",
+        "observability-scrape-attempts",
+        "ai-provider-router"
+      ],
+      "source_paths": [
+        "parser_agent/app/config.py",
+        "autonomous-researcher-main/logger.py"
+      ]
+    },
+    {
+      "id": "database-async-sqlalchemy",
+      "title": "Async SQLAlchemy session layer",
+      "category": "database",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "config-env-loader",
+        "logging-rotating-file"
+      ],
+      "dependents": [
+        "database-url-hash-dedupe",
+        "observability-scrape-attempts",
+        "telegram-subscriber-broadcast"
+      ],
+      "source_paths": [
+        "parser_agent/app/database.py",
+        "parser_v2/app/database.py"
+      ]
+    },
+    {
+      "id": "database-url-hash-dedupe",
+      "title": "Дедупликация товара по hash URL",
+      "category": "database",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "database-async-sqlalchemy"
+      ],
+      "dependents": [
+        "database-price-history-delta"
+      ],
+      "source_paths": [
+        "parser_agent/app/database.py"
+      ]
+    },
+    {
+      "id": "database-price-history-delta",
+      "title": "История цены только при изменении",
+      "category": "database",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "database-url-hash-dedupe"
+      ],
+      "dependents": [
+        "telegram-subscriber-broadcast",
+        "background-worker-progress",
+        "export-csv-telegram-file",
+        "export-xlsx-styled",
+        "export-html-dashboard",
+        "price-analytics-forecast"
+      ],
+      "source_paths": [
+        "parser_agent/app/database.py"
+      ]
+    },
+    {
+      "id": "observability-scrape-attempts",
+      "title": "Telemetry scrape attempts",
+      "category": "logging",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "database-async-sqlalchemy",
+        "logging-rotating-file"
+      ],
+      "dependents": [
+        "parser-block-debug-dump",
+        "parser-wb-api-basket",
+        "parser-yandex-market-html-jsonld",
+        "adaptive-block-memory-strategy",
+        "parsing-craft-playbook"
+      ],
+      "source_paths": [
+        "parser_agent/app/database.py",
+        "parser_agent/app/updater.py"
+      ]
+    },
+    {
+      "id": "telegram-subscriber-broadcast",
+      "title": "Подписки и broadcast изменений",
+      "category": "telegram",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "database-async-sqlalchemy",
+        "database-price-history-delta",
+        "telegram-admin-allowlist"
+      ],
+      "dependents": [
+        "background-worker-progress"
+      ],
+      "source_paths": [
+        "parser_agent/app/bot.py",
+        "parser_agent/app/database.py"
+      ]
+    },
+    {
+      "id": "telegram-admin-allowlist",
+      "title": "Telegram access control через ADMIN_IDS",
+      "category": "telegram",
+      "complexity": "beginner",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "config-env-loader"
+      ],
+      "dependents": [
+        "telegram-subscriber-broadcast",
+        "telegram-aiogram-fsm"
+      ],
+      "source_paths": [
+        "parser_agent/app/bot.py"
+      ]
+    },
+    {
+      "id": "telegram-aiogram-fsm",
+      "title": "FSM-диалог для многошаговой команды",
+      "category": "telegram",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "telegram-admin-allowlist",
+        "background-worker-progress"
+      ],
+      "dependents": [
+        "telegram-batch-card-files"
+      ],
+      "source_paths": [
+        "parser_agent/app/bot.py",
+        "parser_v2/app/bot.py"
+      ]
+    },
+    {
+      "id": "background-worker-progress",
+      "title": "Фоновый worker с progress callback",
+      "category": "async",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "parser-marketplace-router",
+        "database-price-history-delta",
+        "telegram-subscriber-broadcast"
+      ],
+      "dependents": [
+        "telegram-aiogram-fsm",
+        "adaptive-block-memory-strategy"
+      ],
+      "source_paths": [
+        "parser_agent/app/worker.py"
+      ]
+    },
+    {
+      "id": "parser-base-contract",
+      "title": "Базовый контракт парсера",
+      "category": "architecture",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [],
+      "dependents": [
+        "parser-marketplace-router",
+        "parser-wb-api-basket",
+        "parser-yandex-market-html-jsonld",
+        "parsing-craft-playbook"
+      ],
+      "source_paths": [
+        "parser_agent/app/parsers/base.py"
+      ]
+    },
+    {
+      "id": "parser-marketplace-router",
+      "title": "Роутинг парсера по marketplace",
+      "category": "parser",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "parser-base-contract"
+      ],
+      "dependents": [
+        "background-worker-progress",
+        "telegram-natural-intent-router",
+        "task-intent-engine",
+        "parsing-craft-playbook"
+      ],
+      "source_paths": [
+        "parser_agent/app/parsers/router.py"
+      ]
+    },
+    {
+      "id": "playwright-ozon-stealth-fetch",
+      "title": "Playwright stealth fetch для Ozon",
+      "category": "playwright",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "config-env-loader",
+        "resilience-marketplace-circuit",
+        "network-proxy-reachability"
+      ],
+      "dependents": [
+        "parser-ozon-product-extraction"
+      ],
+      "source_paths": [
+        "parser_agent/app/updater.py",
+        "parser_agent/app/parsers/ozon.py"
+      ]
+    },
+    {
+      "id": "parser-ozon-product-extraction",
+      "title": "Парсинг Ozon HTML/API JSON",
+      "category": "parser",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "playwright-ozon-stealth-fetch"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/app/updater.py"
+      ]
+    },
+    {
+      "id": "parser-block-debug-dump",
+      "title": "Детекция блокировки и debug artifacts",
+      "category": "resilience",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "observability-scrape-attempts"
+      ],
+      "dependents": [
+        "adaptive-block-memory-strategy",
+        "parsing-craft-playbook"
+      ],
+      "source_paths": [
+        "parser_agent/app/updater.py",
+        "parser_agent/app/utils/error_research.py"
+      ]
+    },
+    {
+      "id": "parser-wb-api-basket",
+      "title": "Wildberries API parser с basket candidates",
+      "category": "parser",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "parser-base-contract",
+        "network-proxy-reachability",
+        "observability-scrape-attempts"
+      ],
+      "dependents": [
+        "parser-wb-cloud-fallback"
+      ],
+      "source_paths": [
+        "parser_agent/app/parsers/wildberries.py"
+      ]
+    },
+    {
+      "id": "parser-wb-cloud-fallback",
+      "title": "Cloud Function fallback для WB",
+      "category": "deploy",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "parser-wb-api-basket",
+        "config-env-loader"
+      ],
+      "dependents": [
+        "deploy-yandex-cloud-function"
+      ],
+      "source_paths": [
+        "parser_agent/cloud_wb_function.py",
+        "parser_agent/deploy_cloud.py"
+      ]
+    },
+    {
+      "id": "parser-funpay-offer",
+      "title": "FunPay offer parser",
+      "category": "parser",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "low",
+      "dependencies": [
+        "ai-provider-router"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/app/parsers/funpay.py"
+      ]
+    },
+    {
+      "id": "resilience-marketplace-circuit",
+      "title": "Marketplace rate limit + circuit breaker",
+      "category": "resilience",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "config-env-loader"
+      ],
+      "dependents": [
+        "playwright-ozon-stealth-fetch",
+        "adaptive-block-memory-strategy"
+      ],
+      "source_paths": [
+        "parser_agent/app/resilience.py"
+      ]
+    },
+    {
+      "id": "network-proxy-reachability",
+      "title": "Проверка доступности proxy",
+      "category": "network",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "config-env-loader"
+      ],
+      "dependents": [
+        "playwright-ozon-stealth-fetch",
+        "parser-wb-api-basket"
+      ],
+      "source_paths": [
+        "parser_agent/app/utils/proxy.py",
+        "parser_agent/app/config.py",
+        "parser_agent/app/bot.py"
+      ]
+    },
+    {
+      "id": "export-csv-telegram-file",
+      "title": "CSV export для Telegram",
+      "category": "export",
+      "complexity": "junior",
+      "maturity": "production-ready",
+      "priority": "medium",
+      "dependencies": [
+        "database-price-history-delta"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/app/exporter.py"
+      ]
+    },
+    {
+      "id": "export-xlsx-styled",
+      "title": "Styled Excel export",
+      "category": "export",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "database-price-history-delta",
+        "ozon-card-draft-builder"
+      ],
+      "dependents": [
+        "ozon-card-draft-builder",
+        "telegram-batch-card-files",
+        "batch-brd-verified-xlsx-enrichment"
+      ],
+      "source_paths": [
+        "parser_agent/app/exporter.py",
+        "parser_agent/app/card_filler.py"
+      ]
+    },
+    {
+      "id": "export-html-dashboard",
+      "title": "HTML отчет с embedded images",
+      "category": "export",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "database-price-history-delta",
+        "price-analytics-forecast"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/app/reporter.py"
+      ]
+    },
+    {
+      "id": "ai-provider-router",
+      "title": "AI provider abstraction",
+      "category": "ai",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "config-env-loader",
+        "logging-rotating-file"
+      ],
+      "dependents": [
+        "ai-json-extraction",
+        "price-analytics-forecast",
+        "ozon-card-ai-enhancement",
+        "parser-funpay-offer",
+        "agent-self-healing-code",
+        "telegram-voice-whisper"
+      ],
+      "source_paths": [
+        "parser_agent/app/ai_client.py"
+      ]
+    },
+    {
+      "id": "ai-json-extraction",
+      "title": "Извлечение JSON из AI-ответа",
+      "category": "ai",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "ai-provider-router"
+      ],
+      "dependents": [
+        "ozon-card-ai-enhancement"
+      ],
+      "source_paths": [
+        "parser_agent/app/card_filler.py"
+      ]
+    },
+    {
+      "id": "price-analytics-forecast",
+      "title": "Аналитика цен: stats, forecast, anomalies",
+      "category": "ai",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "database-price-history-delta",
+        "ai-provider-router"
+      ],
+      "dependents": [
+        "export-html-dashboard"
+      ],
+      "source_paths": [
+        "parser_agent/app/ai_analyzer.py",
+        "parser_agent/app/agent.py"
+      ]
+    },
+    {
+      "id": "ozon-card-draft-builder",
+      "title": "Черновик карточки Ozon из текста",
+      "category": "export",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "export-xlsx-styled"
+      ],
+      "dependents": [
+        "export-xlsx-styled",
+        "ozon-card-ai-enhancement",
+        "card-profile-yaml",
+        "telegram-batch-card-files",
+        "telegram-natural-intent-router"
+      ],
+      "source_paths": [
+        "parser_agent/app/card_filler.py"
+      ]
+    },
+    {
+      "id": "ozon-card-ai-enhancement",
+      "title": "AI-enhanced карточка с конкурентами",
+      "category": "ai",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "ozon-card-draft-builder",
+        "ai-provider-router",
+        "ai-json-extraction",
+        "card-profile-yaml"
+      ],
+      "dependents": [
+        "telegram-batch-card-files"
+      ],
+      "source_paths": [
+        "parser_agent/app/card_filler.py"
+      ]
+    },
+    {
+      "id": "card-profile-yaml",
+      "title": "YAML-профили карточек",
+      "category": "config",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "ozon-card-draft-builder"
+      ],
+      "dependents": [
+        "ozon-card-ai-enhancement"
+      ],
+      "source_paths": [
+        "parser_agent/app/card_profiles.py",
+        "parser_agent/profiles/default.yaml"
+      ]
+    },
+    {
+      "id": "telegram-batch-card-files",
+      "title": "Batch cards из текста или файла",
+      "category": "telegram",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "telegram-aiogram-fsm",
+        "ozon-card-draft-builder",
+        "ozon-card-ai-enhancement",
+        "export-xlsx-styled"
+      ],
+      "dependents": [
+        "telegram-natural-intent-router"
+      ],
+      "source_paths": [
+        "parser_agent/app/bot.py",
+        "parser_agent/app/card_filler.py"
+      ]
+    },
+    {
+      "id": "telegram-natural-intent-router",
+      "title": "Natural-language intent router в Telegram",
+      "category": "telegram",
+      "complexity": "senior",
+      "maturity": "prototype",
+      "priority": "medium",
+      "dependencies": [
+        "task-intent-engine",
+        "parser-marketplace-router",
+        "telegram-batch-card-files",
+        "ozon-card-draft-builder"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/app/bot.py"
+      ]
+    },
+    {
+      "id": "cli-argparse-modes",
+      "title": "CLI entrypoint с режимами",
+      "category": "architecture",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "config-env-loader"
+      ],
+      "dependents": [
+        "batch-brd-verified-xlsx-enrichment"
+      ],
+      "source_paths": [
+        "parser_agent/app/main.py",
+        "autonomous-researcher-main/main.py"
+      ]
+    },
+    {
+      "id": "deploy-yandex-cloud-function",
+      "title": "Yandex Cloud Function deploy script",
+      "category": "deploy",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "parser-wb-cloud-fallback",
+        "config-env-loader"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/deploy_cloud.py"
+      ]
+    },
+    {
+      "id": "api-key-rate-limit-middleware",
+      "title": "FastAPI API-key middleware + rate limit",
+      "category": "api",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "config-env-loader"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "2026-04-23-new-chat/api/middleware.py"
+      ]
+    },
+    {
+      "id": "sandbox-python-executor",
+      "title": "Sandbox execution Python code",
+      "category": "filesystem",
+      "complexity": "senior",
+      "maturity": "prototype",
+      "priority": "high",
+      "dependencies": [],
+      "dependents": [
+        "agent-self-healing-code"
+      ],
+      "source_paths": [
+        "2026-04-23-new-chat/sandbox/python_executor.py"
+      ]
+    },
+    {
+      "id": "memory-chat-history",
+      "title": "SQLite/JSONL memory для чата",
+      "category": "database",
+      "complexity": "junior",
+      "maturity": "usable",
+      "priority": "medium",
+      "dependencies": [
+        "config-env-loader"
+      ],
+      "dependents": [
+        "telegram-voice-whisper"
+      ],
+      "source_paths": [
+        "2026-04-23-new-chat/memory.py",
+        "agent3_5/memory/storage.py"
+      ]
+    },
+    {
+      "id": "telegram-voice-whisper",
+      "title": "Voice transcription в Telegram agent",
+      "category": "telegram",
+      "complexity": "middle",
+      "maturity": "prototype",
+      "priority": "low",
+      "dependencies": [
+        "memory-chat-history",
+        "ai-provider-router"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "2026-04-23-new-chat/agent.py"
+      ]
+    },
+    {
+      "id": "agent-self-healing-code",
+      "title": "Self-healing code loop",
+      "category": "ai",
+      "complexity": "senior",
+      "maturity": "prototype",
+      "priority": "medium",
+      "dependencies": [
+        "sandbox-python-executor",
+        "ai-provider-router"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "agent3_5/core/agent.py"
+      ]
+    },
+    {
+      "id": "parser-yandex-market-html-jsonld",
+      "title": "Yandex Market HTML/JSON-LD parser",
+      "category": "parser",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "parser-base-contract",
+        "observability-scrape-attempts"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/app/parsers/yandex_market.py",
+        "parser_agent/app/parsers/router.py",
+        "parser_agent/app/worker.py",
+        "parser_agent/app/bot.py"
+      ]
+    },
+    {
+      "id": "batch-brd-verified-xlsx-enrichment",
+      "title": "Verified BRD/XLSX enrichment workflow",
+      "category": "export",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "cli-argparse-modes",
+        "export-xlsx-styled"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/app/brd_enricher.py",
+        "parser_agent/app/batch_enricher.py",
+        "parser_agent/app/main.py",
+        "parser_agent/tests/test_brd_enricher.py"
+      ]
+    },
+    {
+      "id": "agent-skillpack-operational-loop",
+      "title": "Skillpack-first agent workflow",
+      "category": "architecture",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [],
+      "dependents": [
+        "parser-agent-training-playbook",
+        "project-self-healing-repair-loop"
+      ],
+      "source_paths": [
+        "parser_agent/AGENTS.md",
+        "parser_agent/project_skills/SKILLPACK.md",
+        "parser_agent/project_skills/SESSION_UPDATE_PROTOCOL.md",
+        "parser_agent/project_skills/SKILL_TRIGGERS.md"
+      ]
+    },
+    {
+      "id": "task-intent-engine",
+      "title": "Task Intent Engine",
+      "category": "architecture",
+      "complexity": "senior",
+      "maturity": "prototype",
+      "priority": "high",
+      "dependencies": [
+        "parser-marketplace-router"
+      ],
+      "dependents": [
+        "telegram-natural-intent-router",
+        "task-planner-skill-registry",
+        "skill-manifest-graph-execution-fsm",
+        "parser-agent-training-playbook",
+        "project-self-healing-repair-loop"
+      ],
+      "source_paths": [
+        "parser_agent/app/task_intents.py",
+        "parser_agent/app/bot.py",
+        "parser_agent/tests/test_task_intents.py"
+      ]
+    },
+    {
+      "id": "task-planner-skill-registry",
+      "title": "Task Planner Skill Registry",
+      "category": "architecture",
+      "complexity": "senior",
+      "maturity": "prototype",
+      "priority": "high",
+      "dependencies": [
+        "task-intent-engine"
+      ],
+      "dependents": [
+        "skill-manifest-graph-execution-fsm",
+        "parser-agent-training-playbook",
+        "project-self-healing-repair-loop"
+      ],
+      "source_paths": [
+        "parser_agent/app/task_planner.py",
+        "parser_agent/app/bot.py",
+        "parser_agent/tests/test_task_planner.py"
+      ]
+    },
+    {
+      "id": "skill-manifest-graph-execution-fsm",
+      "title": "Skill Manifest Graph and Execution FSM",
+      "category": "architecture",
+      "complexity": "senior",
+      "maturity": "prototype",
+      "priority": "high",
+      "dependencies": [
+        "task-intent-engine",
+        "task-planner-skill-registry"
+      ],
+      "dependents": [
+        "parser-agent-training-playbook",
+        "project-self-healing-repair-loop"
+      ],
+      "source_paths": [
+        "parser_agent/app/skill_manifest.py",
+        "parser_agent/app/skill_telemetry.py",
+        "parser_agent/app/execution_state.py",
+        "parser_agent/app/task_planner.py",
+        "parser_agent/app/agent_loop.py",
+        "parser_agent/app/bot.py",
+        "parser_agent/project_skills/skill_manifests/core.yaml",
+        "parser_agent/project_skills/skill_manifests/marketplace.yaml",
+        "parser_agent/tests/test_skill_manifest.py",
+        "parser_agent/tests/test_skill_telemetry.py",
+        "parser_agent/tests/test_execution_state.py",
+        "parser_agent/tests/test_task_planner.py",
+        "parser_agent/tests/test_agent_loop.py"
+      ]
+    },
+    {
+      "id": "adaptive-block-memory-strategy",
+      "title": "Adaptive Block Memory and Strategy Selector",
+      "category": "resilience",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "observability-scrape-attempts",
+        "resilience-marketplace-circuit",
+        "background-worker-progress",
+        "parser-block-debug-dump"
+      ],
+      "dependents": [
+        "parsing-craft-playbook",
+        "project-self-healing-repair-loop"
+      ],
+      "source_paths": [
+        "parser_agent/app/database.py",
+        "parser_agent/app/updater.py",
+        "parser_agent/app/worker.py",
+        "parser_agent/app/main.py",
+        "parser_agent/tests/test_database.py",
+        "parser_agent/tests/test_parsers.py",
+        "parser_agent/tests/test_worker.py",
+        "parser_agent/tests/test_cli.py"
+      ]
+    },
+    {
+      "id": "parser-agent-training-playbook",
+      "title": "Parser Agent Training Playbook",
+      "category": "architecture",
+      "complexity": "middle",
+      "maturity": "usable",
+      "priority": "high",
+      "dependencies": [
+        "agent-skillpack-operational-loop",
+        "task-intent-engine",
+        "task-planner-skill-registry",
+        "skill-manifest-graph-execution-fsm"
+      ],
+      "dependents": [
+        "parsing-craft-playbook",
+        "project-self-healing-repair-loop"
+      ],
+      "source_paths": [
+        "parser_agent/docs/AGENT_TRAINING_PLAYBOOK.md",
+        "parser_agent/AGENTS.md"
+      ]
+    },
+    {
+      "id": "project-self-healing-repair-loop",
+      "title": "Project Self-Healing Repair Loop",
+      "category": "architecture",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "agent-skillpack-operational-loop",
+        "task-intent-engine",
+        "task-planner-skill-registry",
+        "skill-manifest-graph-execution-fsm",
+        "parser-agent-training-playbook",
+        "parsing-craft-playbook",
+        "adaptive-block-memory-strategy"
+      ],
+      "dependents": [],
+      "source_paths": [
+        "parser_agent/docs/SELF_HEALING_PLAYBOOK.md",
+        "parser_agent/docs/AGENT_TRAINING_PLAYBOOK.md",
+        "parser_agent/app/task_intents.py",
+        "parser_agent/app/task_planner.py",
+        "parser_agent/app/agent_loop.py",
+        "parser_agent/project_skills/skill_manifests/core.yaml",
+        "parser_agent/tests/test_task_intents.py",
+        "parser_agent/tests/test_task_planner.py",
+        "parser_agent/tests/test_agent_loop.py"
+      ]
+    },
+    {
+      "id": "parsing-craft-playbook",
+      "title": "Parsing Craft Playbook",
+      "category": "parser",
+      "complexity": "senior",
+      "maturity": "usable",
+      "priority": "critical",
+      "dependencies": [
+        "parser-base-contract",
+        "parser-marketplace-router",
+        "observability-scrape-attempts",
+        "parser-block-debug-dump",
+        "adaptive-block-memory-strategy",
+        "parser-agent-training-playbook"
+      ],
+      "dependents": [
+        "project-self-healing-repair-loop"
+      ],
+      "source_paths": [
+        "parser_agent/docs/PARSING_CRAFT_PLAYBOOK.md",
+        "parser_agent/AGENTS.md"
+      ]
+    }
+  ]
+}

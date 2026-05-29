@@ -1,0 +1,57 @@
+MarketMind AI Source-Available License
+
+Copyright (c) 2026 MarketMind AI authors.
+
+This software and associated documentation files (the "Software") are made
+available for viewing, evaluation, research, and private non-commercial review
+only, subject to the terms below.
+
+1. Permission Granted
+
+You may:
+
+- view and read the source code;
+- clone or download the repository for private, non-commercial evaluation;
+- run the Software locally for personal testing and review;
+- study the architecture, documentation, and implementation ideas.
+
+2. Restrictions
+
+You may not, without prior written permission from the copyright holder:
+
+- use the Software, in whole or in part, for commercial purposes;
+- sell, resell, sublicense, rent, lease, or otherwise monetize the Software;
+- offer the Software, or a derivative work based on it, as a hosted service,
+  SaaS product, API service, managed automation service, or white-label product;
+- use the Software to provide paid consulting, scraping, marketplace automation,
+  marketplace analytics, card generation, data enrichment, or similar services;
+- incorporate the Software into a commercial product or internal business system;
+- remove or alter copyright, license, or attribution notices;
+- publish or distribute modified versions in a way that implies permission for
+  commercial use.
+
+3. Derivative Works
+
+Derivative works, forks, ports, rewrites, or substantially similar systems based
+on the Software are subject to the same restrictions unless a separate written
+license agreement is granted by the copyright holder.
+
+4. Commercial Licensing
+
+Commercial use, resale, SaaS use, white-label use, enterprise deployment, paid
+service delivery, and production use require a separate written license from the
+copyright holder.
+
+5. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+6. Reservation of Rights
+
+All rights not expressly granted in this license are reserved by the copyright
+holder.
