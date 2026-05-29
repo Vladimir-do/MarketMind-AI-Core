@@ -1,8 +1,19 @@
-# Test Diagram
+## Agent Workflow
 
 ```mermaid
 flowchart TD
-    A[Test] --> B[Works]
+    A[User Input] --> B[Intent Detection]
+    B --> C[Task Planner]
+    C --> D[Skill Registry]
+    D --> E[Execution]
+    E --> F[Marketplace Action]
+    F --> G[Telemetry]
+    G --> H{Success?}
+
+    H -->|Yes| I[Save Result]
+    H -->|No| J[Recovery Strategy]
+
+    J --> C
 ```
 # MarketMind AI
 
