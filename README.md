@@ -1,3 +1,9 @@
+# Test Diagram
+
+```mermaid
+flowchart TD
+    A[Test] --> B[Works]
+```
 # MarketMind AI
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
