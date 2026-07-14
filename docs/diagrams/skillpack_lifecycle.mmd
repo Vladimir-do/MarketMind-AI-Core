@@ -1,0 +1,21 @@
+%% MarketMind AI - skillpack lifecycle
+flowchart TD
+    trigger["Trigger<br/>architecture / parser / agent / skill request"] --> check["Check .skillscheck"]
+    check --> read_pack["Read SKILLPACK.md<br/>and SKILL_TRIGGERS.md"]
+    read_pack --> index["Search skills_index.json"]
+    index --> select["Select relevant skill IDs"]
+    select --> database["Read recipes<br/>skills_database.md"]
+    database --> implement["Use existing project contracts"]
+
+    implement --> verify["Verify<br/>focused tests / docs validation"]
+    verify --> session_close["Session update protocol"]
+
+    session_close --> decision{"Reusable lesson?"}
+    decision -->|yes| update_skill["Update existing skill<br/>or add new skill"]
+    decision -->|partial| pending["Create pending proposal<br/>session_updates/"]
+    decision -->|no| unchanged["Leave skillpack unchanged"]
+
+    update_skill --> validate["Run validate_skills.py"]
+    pending --> final["Report pending proposal"]
+    unchanged --> final["Report no reusable skill"]
+    validate --> final["Report validation signal"]

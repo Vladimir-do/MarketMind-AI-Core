@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Панель — MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Панель управления</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Всего товаров</div>
+    <div class="text-3xl font-bold" id="total-products">{{ total }}</div>
+  </div>
+  {% for mp, count in by_marketplace.items() %}
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">{{ mp }}</div>
+    <div class="text-3xl font-bold">{{ count }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<h2 class="text-lg font-semibold mb-3">Быстрые действия</h2>
+<div class="flex gap-3">
+  <a href="/import" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Импорт</a>
+  <a href="/products" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Товары</a>
+</div>
+{% endblock %}

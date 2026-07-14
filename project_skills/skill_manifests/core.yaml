@@ -1,0 +1,378 @@
+- skill_id: html.fetch
+  name: HTML Fetch
+  category: scraping
+  status: missing
+  fallback_to:
+    - browser.fetch
+  provides:
+    - html
+  quality:
+    reliability: 0.62
+    speed: 0.82
+    reuse: 0.91
+    complexity: 0.28
+    cost: 0.18
+    token_usage: 0.05
+    risk: 0.44
+  anti_patterns:
+    - no_timeout
+    - no_user_agent
+
+- skill_id: browser.fetch
+  name: Browser Fetch Fallback
+  category: scraping
+  status: planned
+  provides:
+    - rendered_html
+  quality:
+    reliability: 0.78
+    speed: 0.38
+    reuse: 0.82
+    complexity: 0.65
+    cost: 0.52
+    token_usage: 0.12
+    risk: 0.34
+  anti_patterns:
+    - browser_leak
+    - no_debug_artifact
+
+- skill_id: html.parse
+  name: HTML Parse
+  category: scraping
+  status: missing
+  requires:
+    - html.fetch
+  provides:
+    - records
+  quality:
+    reliability: 0.64
+    speed: 0.75
+    reuse: 0.86
+    complexity: 0.48
+    cost: 0.16
+    token_usage: 0.04
+    risk: 0.38
+
+- skill_id: pagination.detect
+  name: Pagination Detector
+  category: scraping
+  status: available
+  requires:
+    - html.fetch
+  provides:
+    - pagination_strategy
+  quality:
+    reliability: 0.55
+    speed: 0.70
+    reuse: 0.80
+    complexity: 0.45
+    cost: 0.14
+    token_usage: 0.04
+    risk: 0.46
+
+- skill_id: scraping.website
+  name: Generic Website Scraping Pipeline
+  category: scraping
+  status: missing
+  requires:
+    - html.fetch
+    - html.parse
+    - pagination.detect
+  fallback_to:
+    - scraping.manual_plan
+  provides:
+    - scraped_records
+  quality:
+    reliability: 0.50
+    speed: 0.52
+    reuse: 0.90
+    complexity: 0.72
+    cost: 0.30
+    token_usage: 0.10
+    risk: 0.55
+  anti_patterns:
+    - hardcoded_selectors_without_validation
+    - no_delay
+  tests:
+    - test_scraping_plan_selects_missing_scraper_and_self_critic
+
+- skill_id: scraping.generic
+  name: Generic Website Scraper
+  category: scraping
+  status: missing
+  fallback_to:
+    - scraping.manual_plan
+  provides:
+    - scraped_records
+  quality:
+    reliability: 0.50
+    speed: 0.52
+    reuse: 0.90
+    complexity: 0.72
+    cost: 0.30
+    token_usage: 0.10
+    risk: 0.55
+
+- skill_id: scraping.manual_plan
+  name: Manual Scraping Plan
+  category: scraping
+  status: available
+  requires:
+    - quality.self_critic
+  provides:
+    - execution_plan
+  quality:
+    reliability: 0.88
+    speed: 0.72
+    reuse: 0.95
+    complexity: 0.30
+    cost: 0.08
+    token_usage: 0.08
+    risk: 0.18
+
+- skill_id: scraping.fetch_pages
+  name: Fetch Scraping Pages
+  category: scraping
+  status: available
+  provides:
+    - html_pages
+  quality:
+    reliability: 0.76
+    speed: 0.72
+    reuse: 0.88
+    complexity: 0.36
+    cost: 0.10
+    token_usage: 0.03
+    risk: 0.28
+
+- skill_id: scraping.extract_products
+  name: Extract Product Records
+  category: scraping
+  status: available
+  requires:
+    - scraping.fetch_pages
+  provides:
+    - product_records
+  quality:
+    reliability: 0.70
+    speed: 0.70
+    reuse: 0.84
+    complexity: 0.48
+    cost: 0.12
+    token_usage: 0.04
+    risk: 0.36
+
+- skill_id: scraping.validate_result
+  name: Validate Scraped Result
+  category: scraping
+  status: available
+  requires:
+    - scraping.extract_products
+  provides:
+    - validation_report
+  quality:
+    reliability: 0.86
+    speed: 0.88
+    reuse: 0.90
+    complexity: 0.22
+    cost: 0.06
+    token_usage: 0.02
+    risk: 0.16
+
+- skill_id: csv.export
+  name: CSV Export
+  category: export
+  status: available
+  provides:
+    - csv
+  quality:
+    reliability: 0.80
+    speed: 0.87
+    reuse: 0.92
+    complexity: 0.24
+    cost: 0.05
+    token_usage: 0.02
+    risk: 0.12
+
+- skill_id: xlsx.export
+  name: XLSX Export
+  category: export
+  status: available
+  provides:
+    - xlsx
+  quality:
+    reliability: 0.90
+    speed: 0.68
+    reuse: 0.88
+    complexity: 0.42
+    cost: 0.10
+    token_usage: 0.04
+    risk: 0.16
+
+- skill_id: json.export
+  name: JSON Export
+  category: export
+  status: available
+  provides:
+    - json
+  quality:
+    reliability: 0.91
+    speed: 0.92
+    reuse: 0.86
+    complexity: 0.20
+    cost: 0.04
+    token_usage: 0.02
+    risk: 0.12
+
+- skill_id: html.export
+  name: HTML Export
+  category: export
+  status: planned
+  provides:
+    - html
+  quality:
+    reliability: 0.70
+    speed: 0.74
+    reuse: 0.70
+    complexity: 0.35
+    cost: 0.08
+    token_usage: 0.03
+    risk: 0.18
+
+- skill_id: quality.self_critic
+  name: Self-Critic Checklist
+  category: quality
+  status: available
+  provides:
+    - validation_checklist
+  quality:
+    reliability: 0.94
+    speed: 0.95
+    reuse: 0.98
+    complexity: 0.18
+    cost: 0.04
+    token_usage: 0.05
+    risk: 0.08
+
+- skill_id: page.classification.training
+  name: Page Classification Training
+  category: training
+  status: available
+  provides:
+    - page_classification
+  quality:
+    reliability: 0.88
+    speed: 0.82
+    reuse: 0.90
+    complexity: 0.24
+    cost: 0.06
+    token_usage: 0.03
+    risk: 0.12
+
+- skill_id: repair.reproduce
+  name: Repair Failure Reproduction
+  category: repair
+  status: available
+  provides:
+    - failure_signal
+  quality:
+    reliability: 0.86
+    speed: 0.70
+    reuse: 0.92
+    complexity: 0.36
+    cost: 0.08
+    token_usage: 0.04
+    risk: 0.18
+
+- skill_id: repair.classify
+  name: Repair Failure Classification
+  category: repair
+  status: available
+  requires:
+    - repair.reproduce
+  provides:
+    - failure_area
+    - severity
+    - evidence_types
+    - blast_radius
+    - safety_gates
+    - verification_scope
+  quality:
+    reliability: 0.82
+    speed: 0.84
+    reuse: 0.90
+    complexity: 0.28
+    cost: 0.05
+    token_usage: 0.03
+    risk: 0.16
+
+- skill_id: repair.regression_test
+  name: Repair Regression Test
+  category: repair
+  status: available
+  requires:
+    - repair.classify
+  provides:
+    - regression_test
+  quality:
+    reliability: 0.90
+    speed: 0.68
+    reuse: 0.94
+    complexity: 0.44
+    cost: 0.08
+    token_usage: 0.04
+    risk: 0.14
+
+- skill_id: repair.implement_fix
+  name: Repair Implementation
+  category: repair
+  status: available
+  requires:
+    - repair.regression_test
+  provides:
+    - code_fix
+  quality:
+    reliability: 0.80
+    speed: 0.62
+    reuse: 0.78
+    complexity: 0.58
+    cost: 0.10
+    token_usage: 0.05
+    risk: 0.32
+
+- skill_id: repair.verify
+  name: Repair Verification
+  category: repair
+  status: available
+  requires:
+    - repair.implement_fix
+  provides:
+    - verification_signal
+    - focused_tests
+    - full_suite_decision
+    - smoke_check_decision
+  quality:
+    reliability: 0.92
+    speed: 0.70
+    reuse: 0.94
+    complexity: 0.32
+    cost: 0.07
+    token_usage: 0.03
+    risk: 0.12
+
+- skill_id: repair.skillpack_update
+  name: Repair Skillpack Feedback
+  category: repair
+  status: available
+  requires:
+    - repair.verify
+  provides:
+    - reusable_lesson
+  quality:
+    reliability: 0.88
+    speed: 0.74
+    reuse: 0.98
+    complexity: 0.30
+    cost: 0.05
+    token_usage: 0.04
+    risk: 0.10

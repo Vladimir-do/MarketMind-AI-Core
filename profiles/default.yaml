@@ -1,0 +1,14 @@
+language: ru
+tone_voice: professional
+max_length: 1500
+forbidden_words:
+  - лучший
+  - скидка
+  - акция
+required_attributes:
+  - Бренд
+  - Категория
+  - Вес, г
+  - Ширина, мм
+  - Высота, мм
+  - Глубина, мм
