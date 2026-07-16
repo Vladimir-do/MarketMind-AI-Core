@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Отчёты — MarketMind AI{% endblock %}
+{% block content %}
+<div class="flex items-start justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">Клиентский отчёт</h1>
+    <p class="text-gray-600 mt-1">Сводка по качеству каталога, проблемам и AI-предложениям.</p>
+  </div>
+  <span class="px-3 py-1 rounded text-sm {% if report.status == 'good' %}bg-green-100 text-green-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+    {% if report.status == 'good' %}Состояние хорошее{% else %}Требует внимания{% endif %}
+  </span>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Товаров</div>
+    <div class="text-3xl font-bold">{{ report.summary.total_products }}</div>
+  </div>
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Средний Quality Score</div>
+    <div class="text-3xl font-bold">{{ report.summary.average_score }}</div>
+  </div>
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Ниже порога</div>
+    <div class="text-3xl font-bold">{{ report.summary.products_below_threshold }}</div>
+  </div>
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">AI ожидают решения</div>
+    <div class="text-3xl font-bold">{{ report.suggestions.pending }}</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+  <section class="bg-white rounded-lg shadow p-5">
+    <h2 class="text-lg font-semibold mb-4">Топ проблем</h2>
+    {% if report.top_issues %}
+    <div class="space-y-3">
+      {% for issue in report.top_issues %}
+      <div class="border rounded p-3">
+        <div class="flex justify-between gap-3">
+          <div class="font-medium">{{ issue.field }} · {{ issue.rule }}</div>
+          <span class="text-sm text-gray-500">{{ issue.count }} раз</span>
+        </div>
+        <div class="text-sm text-gray-600 mt-1">{{ issue.category }} · {{ issue.severity }} · товаров: {{ issue.affected_products }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-500">Проблемы не найдены.</p>
+    {% endif %}
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5">
+    <h2 class="text-lg font-semibold mb-4">Рекомендуемые действия</h2>
+    <ol class="list-decimal list-inside space-y-2 text-gray-700">
+      {% for action in report.recommended_actions %}
+      <li>{{ action }}</li>
+      {% endfor %}
+    </ol>
+
+    <h3 class="font-semibold mt-6 mb-3">AI-предложения</h3>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <div class="bg-gray-50 rounded p-3">Всего: <b>{{ report.suggestions.total }}</b></div>
+      <div class="bg-amber-50 rounded p-3">Ожидают: <b>{{ report.suggestions.pending }}</b></div>
+      <div class="bg-green-50 rounded p-3">Принято: <b>{{ report.suggestions.approved }}</b></div>
+      <div class="bg-red-50 rounded p-3">Отклонено: <b>{{ report.suggestions.rejected }}</b></div>
+    </div>
+  </section>
+</div>
+
+<section class="bg-white rounded-lg shadow p-5 mb-6">
+  <h2 class="text-lg font-semibold mb-4">Товары, требующие внимания</h2>
+  {% if report.attention_products %}
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="py-2 pr-4">Товар</th>
+          <th class="py-2 pr-4">Маркетплейс</th>
+          <th class="py-2 pr-4">Score</th>
+          <th class="py-2 pr-4">Критичные проблемы</th>
+          <th class="py-2 pr-4">Цена</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in report.attention_products %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="py-2 pr-4"><a class="text-blue-700 hover:underline" href="/products/{{ item.product_id }}">{{ item.name or 'Без названия' }}</a></td>
+          <td class="py-2 pr-4">{{ item.marketplace }}</td>
+          <td class="py-2 pr-4 font-semibold">{{ item.score }}</td>
+          <td class="py-2 pr-4">{{ item.critical_findings|length }}</td>
+          <td class="py-2 pr-4">{% if item.last_price %}{{ item.last_price }} ₽{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-gray-500">Нет товаров с низкой оценкой качества.</p>
+  {% endif %}
+</section>
+
+<section class="bg-white rounded-lg shadow p-5">
+  <h2 class="text-lg font-semibold mb-4">Маркетплейсы</h2>
+  {% if report.marketplaces %}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {% for mp in report.marketplaces %}
+    <div class="border rounded p-4">
+      <div class="font-semibold">{{ mp.marketplace }}</div>
+      <div class="text-sm text-gray-600 mt-1">Товаров: {{ mp.total_products }}</div>
+      <div class="text-sm text-gray-600">Средний Score: {{ mp.average_score }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-gray-500">Нет данных для сравнения маркетплейсов.</p>
+  {% endif %}
+</section>
+{% endblock %}

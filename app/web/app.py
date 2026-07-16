@@ -47,6 +47,7 @@ def create_app() -> FastAPI:
     from app.web.routes.suggestions import router as suggestions_router
     from app.web.routes.product_detail import router as product_detail_router
     from app.analytics.routes import router as analytics_router
+    from app.web.routes.reports import router as reports_router
 
     app.include_router(dashboard_router)
     app.include_router(products_router)
@@ -54,5 +55,6 @@ def create_app() -> FastAPI:
     app.include_router(suggestions_router)
     app.include_router(product_detail_router)
     app.include_router(analytics_router)
+    app.include_router(reports_router)
 
     return app
