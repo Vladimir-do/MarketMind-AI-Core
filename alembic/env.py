@@ -26,7 +26,7 @@ from app.config import DATABASE_URL  # noqa: E402
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Import all models so they are registered with Base.metadata
-from app.database import Base, Product, PriceHistory, ScrapeAttempt, BlockedPattern, Subscriber  # noqa: E402
+from app.database import Base, Product, PriceHistory, ScrapeAttempt, BlockedPattern, Subscriber, ApprovalRecord  # noqa: E402
 
 target_metadata = Base.metadata
 

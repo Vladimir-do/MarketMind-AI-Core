@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import declarative_base, relationship
 
 from app.config import BLOCK_PATTERNS_JSONL, DATABASE_URL, SCRAPE_ATTEMPTS_JSONL, logger
+from app.compat.aiosqlite_patch import apply_aiosqlite_future_poll_patch
+
+apply_aiosqlite_future_poll_patch()
 from app.utils.proxy import mask_proxy_url
 
 Base = declarative_base()
@@ -113,6 +116,36 @@ class Subscriber(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, unique=True, nullable=False, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class ApprovalRecord(Base):
+    __tablename__ = "approval_records"
+
+    id              = Column(Integer, primary_key=True)
+    approval_id     = Column(String(32), unique=True, nullable=False)
+    product_id      = Column(String(128), nullable=False)
+    field           = Column(String(64), nullable=False)
+    suggestion_type = Column(String(32), nullable=False)
+    before_value    = Column(Text)
+    after_value     = Column(Text, nullable=False)
+    reason          = Column(Text, nullable=False)
+    confidence      = Column(Float, nullable=False)
+    source_finding  = Column(String(128))
+    metadata_json   = Column(Text)  # JSON: suggestion metadata (product_name, etc.)
+    status          = Column(String(16), nullable=False, default="pending")
+    reject_reason   = Column(Text)
+    snapshot_before = Column(Text)  # JSON: value before apply
+    snapshot_after  = Column(Text)  # JSON: value after apply
+    created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    reviewed_at     = Column(DateTime)
+    applied_at      = Column(DateTime)
+    rolled_back_at  = Column(DateTime)
+
+    __table_args__ = (
+        Index("ix_approval_records_status", "status"),
+        Index("ix_approval_records_product_id", "product_id"),
+        Index("ix_approval_records_created_at", "created_at"),
+    )
 
 
 # ── Вспомогательные функции ───────────────────────────────────────────────────

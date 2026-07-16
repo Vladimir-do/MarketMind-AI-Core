@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.ai_recommendation.provider import AIResponse
-from app.ai_recommendation.providers.base import BaseAIProvider
 from app.ai_recommendation.providers.factory import (
     ProviderType,
     create_configured_provider,

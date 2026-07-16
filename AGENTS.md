@@ -1,129 +1,144 @@
-# Agent Instructions
+# MarketMind AI Development Rules
 
-## Quick Start
+## Role
 
-```bash
-# Install
-python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium && playwright install-deps chromium
-cp .env.example .env  # fill BOT_TOKEN and ADMIN_IDS minimum
+Codex works as a Senior Software Engineer for MarketMind AI.
+Codex implements technical tasks and stabilizes the project, but does not own the product architecture.
+Do not change the project direction without an explicit task.
 
-# Run
-python -m app.main --telegram     # Telegram bot
-python -m app.main --update       # one-shot price update
-python -m app.main --metrics 20   # last scrape attempts
-python -m app.main --blocks 20    # block/timeout diagnostics
-python -m app.main --report --embed-images  # HTML report
-```
+## Main Rules
 
-## Test, Lint, Typecheck
-
-```bash
-# Tests (unittest-based, run via pytest)
-pytest tests/ -v
-pytest tests/ -v -m "not slow"    # skip integration/slow tests
-pytest tests/ --cov=app --cov-report=term-missing
-
-# Lint + format (Ruff, line-length=120, Python 3.11)
-ruff check .
-ruff format --check .   # CI checks format without writing
-ruff format .           # auto-fix
-
-# Typecheck (mypy, non-strict — disallow_untyped_defs=false)
-mypy app/
-```
-
-CI order: lint and test run in parallel; Docker build depends on both passing.
+1. Never perform mass refactoring without prior analysis.
+2. Before architecture changes, create and explain a plan.
+3. Do not delete working features.
+4. Keep backward compatibility unless the task explicitly says otherwise.
+5. Always run focused tests after changes.
+6. Run the full test suite after changes touching shared routing, database, imports, Telegram, parsers, pipeline, exports, or UI.
+7. Do not use `git reset`, `git checkout`, or `git clean` to remove user work unless the user explicitly asks for that exact operation.
+8. Do not push without explicit user request.
 
 ## Architecture
 
-**MarketMind AI** — Python 3.11+ marketplace automation: parsers (Ozon/WB/Yandex), Ozon card generation, Telegram bot (35 commands), agent loop with skill registry, telemetry-backed recovery.
+The project is layered:
 
-### Entrypoints
+```text
+Import Layer
+↓
+Product Pipeline
+↓
+Validation
+↓
+Enrichment
+↓
+Product Intelligence
+↓
+AI Recommendation Layer
+↓
+AI Providers
+↓
+UI Layer
+```
 
-| File | Role |
-|---|---|
-| `app/main.py` | CLI: `--telegram`, `--update`, `--metrics`, `--blocks`, `--enrich`, `--report`, `--deploy-wb`, `--ozon-login` |
-| `app/bot.py` | Telegram commands and natural-language routing |
-| `app/config.py` | All env vars, proxy normalization, runtime path resolution |
-| `app/database.py` | SQLAlchemy async models (Product, PriceHistory, ScrapeAttempt) |
-| `cloud_wb_function.py` | Wildberries cloud fallback (Yandex Cloud Functions) |
+Do not mix responsibilities between these layers.
+Prefer existing module patterns over introducing new architecture.
 
-### Key Modules
+## Current Product Shape
 
-| Directory | Purpose |
-|---|---|
-| `app/parsers/` | Ozon, Wildberries, Yandex Market, FunPay parsers. Contract: return `ProductData` |
-| `app/adapters/` | Marketplace API adapters (higher-level than parsers) |
-| `app/universal_parsing_core/` | Generic page classification/extraction |
-| `app/card_filler.py` | Ozon card draft + AI enhancement + JSON/XLSX export |
-| `app/card_profiles.py` | YAML card generation profiles in `profiles/` |
-| `app/task_intents.py` | Natural-language intent → `StructuredTask` |
-| `app/task_planner.py` | `StructuredTask` → `TaskPlan` via skill registry |
-| `app/agent_loop.py` | classify → strategy → execute → evaluate → recover |
-| `app/skill_manifest.py` | Skill graph, dependency resolution |
-| `app/worker.py` | Background add/update orchestration |
-| `app/updater.py` | Marketplace update pipeline with retries |
-| `app/resilience.py` | Rate limiter + circuit breaker |
-| `app/exporter.py` | CSV/XLSX exports |
+MarketMind AI is a Python 3.12-compatible marketplace automation core with:
 
-### Runtime Data
+- CSV/XLSX import;
+- `UnifiedProduct`;
+- product validation;
+- enrichment strategies;
+- product intelligence and quality score;
+- AI recommendation abstraction;
+- approval workflow for AI suggestions;
+- FastAPI + Jinja2 + HTMX web UI;
+- Telegram/CLI legacy workflows;
+- SQLite via SQLAlchemy async storage.
 
-`MARKETMIND_DATA_DIR` (default `app/data`, fallback `/tmp/marketmind`) holds: SQLite DB, logs, scrape attempts JSONL, block patterns JSONL, Ozon browser profile, reports, debug output. Override individual paths via `DATABASE_URL`, `LOG_FILE`, `SCRAPE_ATTEMPTS_JSONL`, etc.
+## Security
 
-### Proxy Hierarchy
+Forbidden:
 
-`COMMON_PROXY` → `PARSER_PROXY` (or legacy `PROXY`) for parsers; `COMMON_PROXY` → `TELEGRAM_API_PROXY` (or `TELEGRAM_PROXY`) for Telegram. Each can be http or socks5.
+- storing real API keys in source code;
+- printing tokens or secrets;
+- committing `.env`;
+- logging full proxy credentials;
+- changing `.env` without explicit need;
+- automatically applying AI suggestions without user confirmation.
 
-## Dependency Pinning Gotchas
+`.env.example` must contain placeholders only.
 
-- **aiogram 3.4.1 requires aiohttp~=3.9.0** — do not upgrade aiohttp independently
-- aiohttp-socks==0.8.4 is pinned to avoid pulling a newer aiohttp
-- playwright==1.42.0 — Playwright chromium version must match
-- anthropic, openpyxl, pandas, PyYAML have upper bounds — check requirements.txt before updating
+## Cross-Platform Requirements
 
-## Testing Quirks
+Code must work on:
 
-- Tests use `unittest.TestCase`, not pytest fixtures/async. Run via `pytest` (not `python -m unittest`).
-- `tests/helpers.py` has `reload_app_modules(database_url)` — reloads `app.config` and `app.database` to inject a test-specific DATABASE_URL. Use this when you need DB isolation.
-- Integration/parser tests that hit real marketplaces should be marked `@pytest.mark.slow`.
-- Tests mock external calls (HTTP, Telegram API, Playwright) — they should be deterministic with no network.
-- `pytest cache_dir` is `/tmp/marketmind_pytest_cache` (configured in pyproject.toml).
+- Linux;
+- Windows.
+
+Use:
+
+- `pathlib` for paths;
+- safe runtime directories;
+- explicit resource cleanup;
+- no hardcoded platform-only paths;
+- no POSIX-only assumptions in product code unless guarded.
+
+## Runtime Data
+
+Runtime artifacts must not be committed:
+
+- `.env`;
+- `.venv/`;
+- `.pytest_cache/`;
+- `.ruff_cache/`;
+- `__pycache__/`;
+- `app/data/`;
+- `graphify-out/`;
+- logs and local databases.
+
+## Testing And Linting
+
+Use the project virtual environment:
+
+```bash
+.venv/bin/python -m pytest -q
+RUFF_CACHE_DIR=/tmp/marketmind-ai-core-ruff .venv/bin/python -m ruff check app tests --select F821,F401,F841
+```
+
+`RUFF_CACHE_DIR` is required in restricted/sandboxed environments where the project directory may be read-only for cache creation.
+
+Ruff full-style cleanup is not automatic. Do not run broad `ruff --fix` outside the requested rule set without a separate reason.
 
 ## Skillpack
 
-This project uses an active local skillpack at `project_skills/`. Before writing code, reading code, or reviewing:
+The local skillpack is active at `project_skills/`.
 
-1. Read `project_skills/SKILLPACK.md` and `project_skills/SKILL_TRIGGERS.md`
-2. Search `project_skills/skills_index.json` for relevant skills
-3. Prefer existing skill patterns over inventing new ones
-4. If a file contains `@skills:`, read those skill IDs before editing
+Before substantial implementation, review:
 
-After each session, follow `project_skills/SESSION_UPDATE_PROTOCOL.md`. Run `python project_skills/validate_skills.py` after skill changes.
+- `project_skills/SKILLPACK.md`;
+- `project_skills/SKILL_TRIGGERS.md`;
+- relevant entries in `project_skills/skills_database.md`.
 
-## graphify
+If a file contains `@skills:`, read the referenced skill cards before editing that file.
 
-Knowledge graph at `graphify-out/`. When the user types `/graphify`:
+After skillpack changes run:
 
-- `graphify query "<question>"` for codebase questions (scoped subgraph)
-- `graphify path "<A>" "<B>"` for relationships
-- `graphify explain "<concept>"` for focused concepts
-- `graphify update .` after code changes (AST-only, no API cost)
-- Use `graphify-out/wiki/index.md` for broad navigation
+```bash
+.venv/bin/python project_skills/validate_skills.py
+```
 
-## Code Style
+## Before Any Task
 
-- Python 3.11+ (match/case, type hints, walrus operator)
-- `snake_case` variables/functions, `PascalCase` classes, `UPPER_SNAKE_CASE` constants
-- Ruff enforces: E, F, W, I, N, UP, B, A, C4, SIM, TCH (line-length=120, E501 ignored)
-- Imports grouped: stdlib → third-party → `app.*` (Ruff sorts automatically)
-- Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+1. Inspect the current code and docs.
+2. Identify affected files.
+3. Prefer the smallest safe change.
+4. Preserve existing behavior unless the task requires changing it.
+5. Run verification.
+6. Report exact test/lint results.
 
-## Verification Protocol
+## Human-In-The-Loop AI Rule
 
-Before final response after code changes:
-
-1. Run focused tests for the changed area
-2. Run full test suite when blast radius touches shared routing, workers, database, Telegram, parser contracts, CLI, exports, or skillpack
-3. Report exact verification signal: e.g. `102 tests OK`, `status=ok`, `ruff: no issues`
+AI may suggest changes, classify text, and draft content.
+AI must not silently publish, export, overwrite, or apply product-card changes without a user-visible approval workflow.

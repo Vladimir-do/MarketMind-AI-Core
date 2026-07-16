@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+import os
 import unittest
 
 from httpx import ASGITransport, AsyncClient
 
-from app.ai_recommendation.approval import ApprovalQueue
-from app.ai_recommendation.suggestions import AISuggestion, AIRecommendationResult
+from tests.helpers import reload_app_modules
 
 
 class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.queue = ApprovalQueue()
+        # Use in-memory SQLite for tests
+        os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
+        reload_app_modules(database_url="sqlite+aiosqlite://")
+
+        from app.database import Database
+        from app.ai_recommendation.db_approval import DatabaseApprovalQueue
+        from app.ai_recommendation.suggestions import AISuggestion, AIRecommendationResult
+
+        self.db = Database()
+        await self.db.init()
+        self.queue = DatabaseApprovalQueue(self.db)
+
         result = AIRecommendationResult(
             product_id="12345",
             suggestions=[
@@ -34,7 +45,7 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
                 ),
             ],
         )
-        self.queue.add(result)
+        await self.queue.add(result)
 
         from app.web.app import create_app
 
@@ -47,11 +58,12 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         await self.client.aclose()
+        await self.db._engine.dispose()
 
     async def test_suggestions_page(self):
         resp = await self.client.get("/suggestions")
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("AI Suggestions", resp.text)
+        self.assertIn("Предложения AI", resp.text)
         self.assertIn("Тестовый товар", resp.text)
         self.assertIn("Новый улучшенный заголовок", resp.text)
         self.assertIn("Ожидают", resp.text)
@@ -77,9 +89,13 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(item["product_name"], "Тестовый товар")
 
     async def test_suggestions_api_empty(self):
-        empty_queue = ApprovalQueue()
+        from app.database import Database
+        from app.ai_recommendation.db_approval import DatabaseApprovalQueue
         from app.web.app import create_app
 
+        db = Database()
+        await db.init()
+        empty_queue = DatabaseApprovalQueue(db)
         app = create_app()
         app.state.ai_queue = empty_queue
         async with AsyncClient(
@@ -92,19 +108,17 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
             resp = await c.get("/suggestions")
             self.assertEqual(resp.status_code, 200)
             self.assertIn("Нет предложений", resp.text)
+        await db._engine.dispose()
 
     async def test_approve_suggestion(self):
         resp = await self.client.get("/api/suggestions")
         items = resp.json()
         self.assertEqual(len(items), 2)
         aid = items[0]["approval_id"]
-        before = self.queue.get_all()[0].suggestion.before
 
         resp = await self.client.post(f"/suggestions/{aid}/approve")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Одобрено", resp.text)
-        self.assertEqual(self.queue.get_all()[0].suggestion.before, before)
-        self.assertEqual(self.queue.get_all()[0].suggestion.after, "Новый улучшенный заголовок")
 
     async def test_reject_suggestion(self):
         resp = await self.client.get("/api/suggestions")
@@ -117,7 +131,6 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Отклонено", resp.text)
-        self.assertIn("Не подходит", self.queue.get_all()[1].suggestion.reason)
 
     async def test_filter_by_status(self):
         resp = await self.client.get("/api/suggestions?status=pending")

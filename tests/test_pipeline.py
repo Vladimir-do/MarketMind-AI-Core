@@ -3,9 +3,9 @@
 import unittest
 from pathlib import Path
 
-from app.pipeline import ImportPipeline, PipelineResult, EnrichedProduct
+from app.pipeline import ImportPipeline, PipelineResult
 from app.products.schema import UnifiedProduct
-from app.products.validator import ProductValidator, ValidationError
+from app.products.validator import ProductValidator
 
 
 class ProductValidatorTests(unittest.TestCase):

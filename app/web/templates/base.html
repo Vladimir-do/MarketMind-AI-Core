@@ -11,10 +11,10 @@
   <div class="flex min-h-screen">
     <nav class="w-56 bg-gray-900 text-white p-4 flex flex-col gap-1">
       <div class="text-lg font-bold mb-4 px-2">MarketMind AI</div>
-      <a href="/" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'dashboard' %}bg-gray-700{% endif %}">Панель</a>
+      <a href="/" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'dashboard' %}bg-gray-700{% endif %}">Панель управления</a>
       <a href="/products" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'products' %}bg-gray-700{% endif %}">Товары</a>
       <a href="/import" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'import' %}bg-gray-700{% endif %}">Импорт</a>
-      <a href="/suggestions" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'suggestions' %}bg-gray-700{% endif %}">AI Suggestions</a>
+      <a href="/suggestions" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'suggestions' %}bg-gray-700{% endif %}">Предложения AI</a>
     </nav>
     <main class="flex-1 p-6">
       {% block content %}{% endblock %}

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from app.enrichers import EnrichmentResult, EnrichmentStrategy
+from app.enrichers import EnrichmentStrategy
 from app.enrichers.ozon_enricher import OzonEnrichmentStrategy
 from app.importers.base import ImportResult, ImportRowError
 from app.importers.registry import import_file, import_string

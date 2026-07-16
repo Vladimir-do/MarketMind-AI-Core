@@ -3,7 +3,6 @@ import re
 import socket
 import ssl
 import time
-from urllib.parse import urlparse
 
 import certifi
 

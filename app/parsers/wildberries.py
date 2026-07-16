@@ -3,7 +3,6 @@ wildberries.py — парсер Wildberries через API.
 Поддерживает несколько версий API с автофоллбэком.
 """
 import asyncio
-import json
 import re
 from time import perf_counter
 from typing import Awaitable, Callable

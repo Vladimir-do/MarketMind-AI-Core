@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
-import pytest
 
 from app.importers.csv_importer import CsvImporter
 from app.importers.registry import import_file
@@ -136,3 +134,93 @@ class TestRegistry:
         result = import_file(csv_file)
         assert len(result.products) == 1
         assert result.metadata["source"] == str(csv_file)
+
+
+SAMPLES_DIR = Path(__file__).resolve().parents[1] / "samples"
+
+
+class TestDemoFiles:
+    """Validate that demo sample files exist and are importable."""
+
+    def test_demo_csv_exists_and_imports(self) -> None:
+        csv_path = SAMPLES_DIR / "products_demo.csv"
+        assert csv_path.exists(), f"Demo CSV not found: {csv_path}"
+        result = import_file(csv_path)
+        assert len(result.products) >= 20, f"Expected >=20 products, got {len(result.products)}"
+        assert len(result.errors) == 0, f"Import errors: {result.errors}"
+        for p in result.products:
+            assert p.name, "All products must have a name"
+            assert p.price is not None, f"Product '{p.name}' must have a price"
+
+    def test_demo_xlsx_exists_and_imports(self) -> None:
+        xlsx_path = SAMPLES_DIR / "products_demo.xlsx"
+        assert xlsx_path.exists(), f"Demo XLSX not found: {xlsx_path}"
+        from app.importers.excel_importer import ExcelImporter
+
+        imp = ExcelImporter()
+        result = imp.import_data(xlsx_path)
+        assert len(result.products) >= 20, f"Expected >=20 products, got {len(result.products)}"
+        assert len(result.errors) == 0, f"Import errors: {result.errors}"
+
+    def test_demo_csv_and_xlsx_match(self) -> None:
+        csv_result = import_file(SAMPLES_DIR / "products_demo.csv")
+        from app.importers.excel_importer import ExcelImporter
+
+        xlsx_result = ExcelImporter().import_data(SAMPLES_DIR / "products_demo.xlsx")
+        csv_names = sorted(p.name for p in csv_result.products)
+        xlsx_names = sorted(p.name for p in xlsx_result.products)
+        assert csv_names == xlsx_names, "CSV and XLSX demo files must contain the same products"
+
+
+class TestWebImportRoutes:
+    """Test the web-facing import endpoints (templates + demo)."""
+
+    def test_download_csv_template(self) -> None:
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from app.web.routes.import_ import router
+
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+
+        resp = client.get("/api/import/template/csv")
+        assert resp.status_code == 200
+        assert "text/csv" in resp.headers["content-type"]
+        lines = resp.text.strip().split("\n")
+        assert len(lines) >= 1, "Template must have at least a header row"
+        header = lines[0]
+        assert "название" in header
+        assert "цена" in header
+
+    def test_download_xlsx_template(self) -> None:
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from app.web.routes.import_ import router
+
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+
+        resp = client.get("/api/import/template/xlsx")
+        assert resp.status_code == 200
+        assert "spreadsheetml" in resp.headers["content-type"]
+
+    def test_import_page_renders(self) -> None:
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from app.web.routes.import_ import router
+
+        app = FastAPI()
+        app.include_router(router)
+        client = TestClient(app)
+
+        resp = client.get("/import")
+        assert resp.status_code == 200
+        assert "Импорт товаров" in resp.text
+        assert "/api/import/template/csv" in resp.text
+        assert "/api/import/template/xlsx" in resp.text
+        assert "/api/import/demo" in resp.text

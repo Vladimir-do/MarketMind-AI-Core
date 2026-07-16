@@ -1,10 +1,9 @@
 # @skills: telegram-aiogram-fsm, telegram-natural-intent-router, telegram-batch-card-files, cross-marketplace-search
 import asyncio
 import html
-import io
 import re
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 
 from aiogram import Bot, Dispatcher, types, F
@@ -27,12 +26,9 @@ from app.telegram_url_utils import (
 )
 from app.parsers.router import search_all_marketplaces
 from app.telegram_marketplace_utils import (
-    MARKETPLACE_LABELS,
     _first_marketplace_product,
-    _flatten_competitor_results,
     _format_cross_marketplace_results,
     _marketplace_result_count,
-    _search_competitors_with_fallback,
 )
 from app.worker import worker_add_urls, worker_update_all
 from app.resilience import resilience
@@ -42,7 +38,6 @@ from app.task_intents import (
     ContextSession,
     StructuredTask,
     TaskType,
-    _looks_like_page_classification_training,
     detect_task_intent,
 )
 from app.task_planner import TaskPlanner
@@ -78,75 +73,62 @@ from app.telegram_ai_reports import (
 from app.telegram_card_handlers import (
     generate_ozon_card_files,
     generate_ozon_batch_card_files,
-    _split_batch_card_sources,
     _read_text_document,
     _build_card_task_from_product_data,
 )
 from app.telegram_card_research import build_card_research_message
 from app.telegram_card_tasks import (
     build_card_task_from_product as _build_card_task_from_product,
-    build_card_task_from_url as _build_card_task_from_url,
 )
 from app.telegram_runtime import run_telegram_polling, telegram_reconnect_delay
 from app.telegram_scraping import (
-    ScrapingPreflightDecision,
-    build_repair_diagnostic_report,
-    build_scraping_preflight_decision,
     classify_page_before_parsing,
-    fetch_html,
-    format_scraping_preflight_decision,
-    format_structured_task_plan,
     handle_repair_task,
     handle_scraping_task,
 )
 from app.telegram_conversation import (
-    _CONVERSATION_PATTERNS,
     _conversation_response,
     _is_conversation,
 )
 from app.telegram_text_utils import (
-    _TECHNICAL_SPEC_FIELD_NAMES,
-    _TECHNICAL_SPEC_MARKERS,
-    _TRAINING_BLOCK_MARKERS,
     _build_card_task_from_combined_request,
     _clean_marketplace_search_query,
     _clean_natural_payload,
     _clean_product_search_query,
-    _collect_batch_card_sources_from_tasks,
-    _extract_natural_price,
     _extract_wildberries_card_search_query,
     _is_meta_task_instruction,
     _is_training_protocol_fragment,
     _is_vague_product_reference,
-    _looks_like_single_technical_spec,
-    _looks_like_training_prompt,
     _mentions_card,
     _mentions_wildberries,
     _split_card_and_other_tasks,
     split_natural_tasks,
 )
+# Backward-compatible helper re-exports used by tests and older callers.
+from app.telegram_card_handlers import _split_batch_card_sources  # noqa: F401
+from app.telegram_card_tasks import build_card_task_from_url as _build_card_task_from_url  # noqa: F401
+from app.telegram_scraping import (  # noqa: F401
+    build_repair_diagnostic_report,
+    build_scraping_preflight_decision,
+    fetch_html,
+    format_scraping_preflight_decision,
+    format_structured_task_plan,
+)
+from app.telegram_text_utils import _collect_batch_card_sources_from_tasks  # noqa: F401
+
 from app.telegram_humanize import (
     access_denied as _h_access,
-    add_finished as _h_add_done,
-    add_started as _h_add_start,
     analyzing as _h_analyzing,
-    card_generating as _h_card_gen,
-    card_ready as _h_card_ready,
     empty_database as _h_empty_db,
-    error_message as _h_error,
-    greeting as _h_greeting,
     help_text as _h_help,
     network_check as _h_network,
     no_blocks as _h_no_blocks,
-    no_health as _h_no_health,
     no_metrics as _h_no_metrics,
-    nothing_found as _h_not_found,
     parser_busy as _h_busy,
     report_generating as _h_report,
     search_started as _h_search_start,
     subscribe_ok as _h_sub_ok,
     unsubscribe_ok as _h_unsub_ok,
-    update_finished as _h_update_done,
     update_started as _h_update_start,
 )
 
@@ -418,7 +400,7 @@ async def handle_funpay_offer_search(message: types.Message, url: str):
             )
         lines.append("\n💡 Чтобы добавить найденный товар в мониторинг, используйте /add и ссылку Ozon.")
         await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка обработки FunPay-ссылки")
         await message.answer("❌ Не удалось разобрать FunPay-ссылку. Попробуйте позже.")
     finally:
@@ -786,7 +768,7 @@ async def run_search_query(message: types.Message, state: FSMContext, query: str
 
         await state.set_state(Form.waiting_search_results)
         await state.update_data(search_results=results)
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка поиска")
         await message.answer("❌ Ошибка поиска. Попробуйте позже.")
     finally:
@@ -1082,7 +1064,6 @@ async def cmd_list(message: types.Message):
     if not products:
         return await message.answer(_h_empty_db())
 
-    lines = [f"<b>Отслеживаю {len(products)} товаров:</b>\n"]
     product_ids = [p.id for p in products]
     latest_at = (
         select(
@@ -1338,7 +1319,7 @@ async def handle_compare(message: types.Message, state: FSMContext):
             parse_mode="HTML",
             disable_web_page_preview=True,
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка сравнения цен")
         await message.answer("❌ Ошибка сравнения цен. Попробуйте позже.")
 
@@ -1413,7 +1394,7 @@ async def handle_reviews_choice(message: types.Message, state: FSMContext):
 
         result = await agent.analyze_reviews(reviews, product.name or product.url)
         await message.answer(result, parse_mode="HTML", disable_web_page_preview=True)
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка анализа отзывов")
         await message.answer("❌ Ошибка анализа отзывов. Попробуйте позже.")
 

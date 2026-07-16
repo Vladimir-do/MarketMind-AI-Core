@@ -7,10 +7,9 @@ import re
 from typing import Optional
 from dataclasses import dataclass
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 from app.parsers.base import BaseParser, ProductData
-from app.config import logger
 
 
 @dataclass

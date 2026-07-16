@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from app.enrichers.ozon_enricher import OzonEnrichmentStrategy
-from app.pipeline import ImportPipeline, EnrichedProduct, PipelineResult
+from app.pipeline import ImportPipeline, PipelineResult
 from app.products.schema import UnifiedProduct
 
 
@@ -254,7 +254,6 @@ class PluggableStrategyTests(unittest.TestCase):
         self.assertEqual(result.enriched[0].quality_score, 42)
 
     def test_none_strategy_skips_enrichment(self):
-        product = UnifiedProduct(name="X", source_id="1", source_type="test", price=100)
         pipeline = ImportPipeline(strategy=None)
         # strategy=None triggers default OzonEnrichmentStrategy
         self.assertIsNotNone(pipeline.strategy)

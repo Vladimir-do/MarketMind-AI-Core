@@ -12,7 +12,6 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from sqlalchemy import and_, func, select
 
-from app.config import logger
 from app.database import Database, Product, PriceHistory
 
 MARKETPLACE_COLORS = {

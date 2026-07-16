@@ -147,7 +147,7 @@ def main():
             from playwright.async_api import async_playwright
 
             from app.config import OZON_PROFILE_DIR
-            from app.updater import BROWSER_INIT_SCRIPT, USER_AGENTS, VIEWPORTS
+            from app.updater import BROWSER_INIT_SCRIPT, USER_AGENTS
 
             profile_dir = os.getenv("OZON_PROFILE_DIR", "").strip()
             if not profile_dir:

@@ -22,7 +22,7 @@
   <tbody>
     {% for p in products %}
     <tr class="border-b hover:bg-gray-50">
-      <td class="p-3"><a href="{{ p.url }}" class="text-blue-600 hover:underline" target="_blank">{{ p.name }}</a></td>
+      <td class="p-3"><a href="/products/{{ p.id }}" class="text-blue-600 hover:underline">{{ p.name }}</a></td>
       <td class="p-3">{{ p.marketplace }}</td>
       <td class="p-3 text-right">{% if p.current_price is not none %}{{ p.current_price }} ₽{% else %}—{% endif %}</td>
       <td class="p-3">{{ p.availability }}</td>

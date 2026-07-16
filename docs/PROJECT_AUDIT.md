@@ -163,6 +163,9 @@
 | P2.4 — Real AI Providers | ✅ APPROVE | 2026-07-14 | 410 passed |
 | P3 — User Interface Layer (MVP) | ✅ APPROVE | 2026-07-14 | 417 passed |
 | P3.2 — AI Suggestions UI | ✅ APPROVE | 2026-07-14 | 422 passed |
+| P3.3 — Approval Workflow with Rollback | ✅ APPROVE | 2026-07-14 | 436 passed |
+| P3.4 — Product Detail (Карточка товара) | ✅ APPROVE | 2026-07-14 | 443 passed |
+| P3.5 — Store Analytics (Анализ магазина) | ✅ APPROVE | 2026-07-14 | 451 passed |
 
 ## 4. Неработающие и незавершённые функции
 

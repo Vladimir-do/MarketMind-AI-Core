@@ -6,16 +6,14 @@ import aiohttp
 import asyncio
 import json
 import random
-from time import perf_counter
 from urllib.parse import quote, urlparse
 
-from app.config import logger, DELAY_MIN, DELAY_MAX, RETRY_ATTEMPTS, PROXY
+from app.config import logger, RETRY_ATTEMPTS, PROXY
 from app.parsers.base import BaseParser, ProductData
 from app.updater import (
     USER_AGENTS,
     VIEWPORTS,
     BROWSER_INIT_SCRIPT,
-    _image_from_img_tag,
     parse_ozon_api_json,
     parse_ozon_html,
     _is_ozon_blocked_text,
@@ -85,14 +83,12 @@ class OzonParser(BaseParser):
 
         async with aiohttp.ClientSession(headers=headers) as session:
             for api_url in _ozon_api_urls(url):
-                t0 = perf_counter()
                 try:
                     async with session.get(
                         api_url,
                         timeout=aiohttp.ClientTimeout(total=15),
                         proxy=request_proxy,
                     ) as resp:
-                        latency_ms = int((perf_counter() - t0) * 1000)
                         if resp.status != 200:
                             logger.debug(f"Ozon API {api_url}: status {resp.status}")
                             continue

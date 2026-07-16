@@ -6,7 +6,7 @@ import asyncio
 import json
 import unittest
 
-from app.ai_recommendation.approval import ApprovalQueue, PendingApproval
+from app.ai_recommendation.approval import ApprovalQueue
 from app.ai_recommendation.engine import AIRecommendationEngine
 from app.ai_recommendation.mock_provider import MockAIProvider
 from app.ai_recommendation.provider import AIResponse

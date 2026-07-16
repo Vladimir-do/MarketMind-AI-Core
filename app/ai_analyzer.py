@@ -6,7 +6,6 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, desc
 
 from app.ai_client import ai_is_available, ai_missing_message, ask_ai
-from app.config import logger
 from app.database import Database, Product, PriceHistory
 
 

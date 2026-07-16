@@ -20,12 +20,12 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from app.database import Database
-        from app.ai_recommendation.approval import ApprovalQueue
+        from app.ai_recommendation.db_approval import DatabaseApprovalQueue
 
         db = Database()
         await db.init()
         app.state.db = db
-        app.state.ai_queue = ApprovalQueue()
+        app.state.ai_queue = DatabaseApprovalQueue(db)
         yield
         await db._engine.dispose()
 
@@ -45,10 +45,14 @@ def create_app() -> FastAPI:
     from app.web.routes.products import router as products_router
     from app.web.routes.import_ import router as import_router
     from app.web.routes.suggestions import router as suggestions_router
+    from app.web.routes.product_detail import router as product_detail_router
+    from app.analytics.routes import router as analytics_router
 
     app.include_router(dashboard_router)
     app.include_router(products_router)
     app.include_router(import_router)
     app.include_router(suggestions_router)
+    app.include_router(product_detail_router)
+    app.include_router(analytics_router)
 
     return app

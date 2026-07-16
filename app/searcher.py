@@ -10,7 +10,7 @@ from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
-from app.config import logger, DELAY_MIN, DELAY_MAX
+from app.config import logger
 from app.updater import USER_AGENTS, VIEWPORTS, BROWSER_INIT_SCRIPT, _is_ozon_blocked_text
 import random
 

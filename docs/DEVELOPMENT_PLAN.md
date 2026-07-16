@@ -79,8 +79,11 @@
 - P2.4 — Real AI Providers (APPROVE): OpenAI/DeepSeek/MiMo/Ollama providers, factory, fallback;
 - P3 — User Interface Layer MVP (APPROVE): FastAPI + Jinja2/HTMX, dashboard, products, import;
 - P3.2 — AI Suggestions UI (APPROVE): approve/reject через HTMX, фильтры, модальное окно;
-- 422/422 тестов проходят (278 существующих + 144 новых), 0 regressions;
-- следующий этап — P3.3 (Product Detail страница).
+- P3.3 — Approval Workflow with Rollback (APPROVE): DB-backed queue, rollback с snapshot, история;
+- P3.4 — Product Detail / Карточка товара (APPROVE): данные, оценка, проблемы, AI, история, график цен;
+- P3.5 — Store Analytics / Анализ магазина (APPROVE): 7 API endpoints, распределение оценок, топ-проблемы;
+- 451/451 тестов проходят (278 существующих + 173 новых), 0 regressions;
+- следующий этап — P3.6 (Reports generation из UI).
 
 ---
 

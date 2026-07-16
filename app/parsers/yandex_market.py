@@ -2,7 +2,7 @@ import json
 import re
 from time import perf_counter
 from typing import Awaitable, Callable
-from urllib.parse import quote_plus, urljoin, urlparse
+from urllib.parse import quote_plus, urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup

@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from app.pipeline import ImportPipeline, EnrichedProduct, PipelineResult
+from app.pipeline import ImportPipeline
 from app.products.findings import AnalysisResult, BatchAnalysisResult
 from app.products.schema import UnifiedProduct
 

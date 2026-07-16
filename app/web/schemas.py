@@ -58,5 +58,18 @@ class SuggestionStats(BaseModel):
     rejected: int
 
 
+class ProductDetailResponse(BaseModel):
+    id: int
+    name: str | None
+    url: str
+    image_url: str | None
+    marketplace: str
+    marketplace_name: str
+    current_price: int | None
+    availability: str
+    first_seen: str | None
+    last_check: str | None
+
+
 class RejectRequest(BaseModel):
     reason: str = ""

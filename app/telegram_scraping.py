@@ -7,7 +7,6 @@ imports from app.bot at call time so that tests patching bot_module.* still work
 import csv
 import html
 import io
-import logging
 from dataclasses import dataclass
 
 from aiogram import types
@@ -408,7 +407,7 @@ async def _handle_ozon_scraping(message: types.Message, task: StructuredTask) ->
     try:
         query = task.parameters.get("query", "")
         if not query:
-            from urllib.parse import parse_qs, urlparse
+            from urllib.parse import urlparse
             parsed = urlparse(task.target_url)
             path_parts = parsed.path.strip("/").split("/")
             if "product" in path_parts:

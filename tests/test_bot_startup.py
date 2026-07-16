@@ -62,7 +62,6 @@ class BotStartupTests(unittest.TestCase):
         self.assertIsNone(bot_module.bot)
 
     def test_telegram_reconnect_delay_caps_at_sixty_seconds(self):
-        import app.bot as bot_module
         import app.telegram_runtime as runtime
 
         delays = [runtime.telegram_reconnect_delay(attempt) for attempt in range(1, 9)]

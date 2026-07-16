@@ -1,7 +1,6 @@
 import os
 import tempfile
 import unittest
-import asyncio
 from pathlib import Path
 
 from tests.helpers import reload_app_modules
