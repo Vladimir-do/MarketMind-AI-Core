@@ -10,6 +10,13 @@ def reload_app_modules(database_url: str | None = None):
     for name in [
         "app.config",
         "app.database",
+        "app.workspace.files",
+        "app.projects.imports",
+        "app.projects.service",
+        "app.effective_card.service",
+        "app.exports.service",
+        "app.reports.service",
+        "app.web.routes.projects",
         "app.exporter",
         "app.reporter",
         "app.agent",
@@ -23,4 +30,3 @@ def reload_app_modules(database_url: str | None = None):
     import app.database
 
     return app.config, app.database
-
