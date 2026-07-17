@@ -18,7 +18,9 @@
 | Загрузка файла | `/projects/{project_id}/import` | VERIFIED | `project_import.html` |
 | Preview файла | `POST /api/projects/{project_id}/imports/preview` | VERIFIED | `project_import_preview.html` |
 | Mapping колонок | HTMX partial selects | VERIFIED | `project_import_preview.html` |
+| Presets mapping | Save/select/delete controls | VERIFIED | `test_mapping_presets_can_be_saved_suggested_and_deleted` |
 | Подтверждение warnings/duplicate | Required checkboxes | VERIFIED | `test_uncertain_csv_delimiter_requires_operator_confirmation`, `test_duplicate_import_requires_explicit_confirmation` |
+| Фильтрация ошибок | Preview filters + CSV report | VERIFIED | `test_import_error_report_csv_is_downloadable_and_sanitized` |
 | Результат импорта | `project_import_result.html` | VERIFIED | HTMX target |
 | Список товаров | `/projects/{project_id}/products` | VERIFIED | `test_project_manual_edit_ui_pages_render_safe_workflow` |
 | Effective Card | `/projects/{project_id}/products/{product_id}` | VERIFIED | `project_product_detail.html` |
@@ -68,8 +70,16 @@
   - project rollback tests;
   - export/report tests.
 
+## L1.1 update
+
+- Добавлено сохранение, выбор и удаление presets сопоставления колонок.
+- Добавлен suggested preset по fingerprint заголовков.
+- Добавлены фильтры ошибок: все, ошибки, предупреждения, код, колонка, строка, текстовый поиск.
+- Добавлена выгрузка CSV отчёта ошибок с защитой от formula injection.
+- Добавлен demo-сценарий `scripts/l1_acceptance_demo.py`.
+- Добавлена инструкция владельца `docs/L1_MANUAL_ACCEPTANCE.md`.
+
 ## Remaining UI limitations
 
-- Error filtering пока базовый: ошибки показаны списком; отдельного интерактивного фильтра по типам ошибок нет.
-- Mapping UI не сохраняет пользовательские presets колонок между импортами.
-- Download route реализован и проверен route ownership; полноценный TCP-download smoke заблокирован namespace ограничением окружения.
+- Полная пользовательская приёмка через реальный браузер ожидает владельца: `AWAITING_OWNER_ACCEPTANCE`.
+- Download route проверен route-level и artifact-level; полноценное открытие браузера из Codex окружения не выполнялось.

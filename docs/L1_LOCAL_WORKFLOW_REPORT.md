@@ -43,6 +43,12 @@ Remote не настроен, push не выполнялся.
 - Добавлена защита от ZIP-bomb и слишком большого числа колонок.
 - Добавлены безопасные download routes для экспортов и отчётов.
 - AI prompt теперь явно маркирует данные товара как недоверенный клиентский текст.
+- L1.1: добавлены presets сопоставления колонок.
+- L1.1: добавлена безопасная поддержка Windows-1251 с обязательным подтверждением.
+- L1.1: preview показывает фильтры ошибок и CSV-отчёт ошибок.
+- L1.1: строки с нечисловыми числовыми полями не импортируются как корректные товары.
+- L1.1: числовой остаток нормализуется в `in_stock/out_of_stock`, исходное число остаётся характеристикой.
+- L1.1: добавлен воспроизводимый demo fixture и script для ручной приёмки владельцем.
 
 ## Изменённые файлы
 
@@ -50,6 +56,7 @@ Remote не настроен, push не выполнялся.
 - `app/database.py`
 - `app/projects/imports.py`
 - `app/projects/service.py`
+- `alembic/versions/c3d4e5f6a7b8_add_import_mapping_presets.py`
 - `app/workspace/files.py`
 - `app/effective_card/service.py`
 - `app/exports/safety.py`
@@ -66,26 +73,33 @@ Remote не настроен, push не выполнялся.
 - `app/web/templates/project_exports.html`
 - `app/web/templates/project_reports.html`
 - `tests/test_client_projects.py`
+- `tests/test_l1_1_final_acceptance.py`
+- `tests/fixtures/l1_demo_products.csv`
 - `tests/helpers.py`
+- `scripts/l1_acceptance_demo.py`
 - `app/ai_recommendation/engine.py`
 - `docs/L1_LOCAL_WORKFLOW_AUDIT.md`
 - `docs/L1_LOCAL_WORKFLOW_IMPLEMENTATION_PLAN.md`
 - `docs/L1_LOCAL_WORKFLOW_REPORT.md`
 - `docs/L1_REQUIREMENTS_TRACEABILITY.md`
 - `docs/L1_UI_ACCEPTANCE_REPORT.md`
+- `docs/L1_MANUAL_ACCEPTANCE.md`
+- `docs/LEGACY_RUFF_BACKLOG.md`
+- `docs/L1_1_FINAL_ACCEPTANCE_REPORT.md`
 
 ## Миграции
 
 Добавлена миграция:
 
 - `alembic/versions/b2c3d4e5f6a7_add_l1_workflow_metadata.py`
+- `alembic/versions/c3d4e5f6a7b8_add_import_mapping_presets.py`
 
 Она расширяет:
 
 - `client_project_files`;
 - `project_exports`.
 
-Новые таблицы не создавались.
+L1.1 создаёт локальную таблицу `import_mapping_presets` для project-scoped presets сопоставления колонок.
 
 ## Архитектурные решения
 
@@ -102,14 +116,18 @@ Remote не настроен, push не выполнялся.
 |---|---|
 | Baseline full pytest до правок | 514 passed, 24 warnings, 14 subtests passed |
 | Focused P4/P5/P6/L1 после gap fixes | 72 passed |
+| Focused P4/P5/P6/L1/L1.1 после final acceptance fixes | 81 passed |
 | `tests/test_client_projects.py` | 23 passed |
 | Full pytest после gap fixes | 530 passed, 24 warnings, 14 subtests passed |
+| Full pytest после L1.1 | 537 passed, 24 warnings, 14 subtests passed |
 | Ruff по новым/изменённым L1/P6 файлам | All checks passed |
 | Full Ruff diagnostic | 267 legacy errors |
 | `git diff --check` | passed |
 | Alembic upgrade -> downgrade -> upgrade на временной SQLite | passed |
 | Skill validation | passed |
 | UI TCP smoke | BLOCKED by execution namespace; ASGI route workflow passed |
+| L1.1 focused tests | 7 passed |
+| `tests/test_client_projects.py` после L1.1 | 23 passed |
 
 ## Happy path
 
@@ -133,12 +151,12 @@ Remote не настроен, push не выполнялся.
 
 ## Известные ограничения
 
-- UI mapping реализован как per-column select в preview. Presets mapping между импортами пока не сохраняются.
-- Фильтр ошибок в UI пока базовый: ошибки показаны списком, отдельного интерактивного фильтра нет.
+- Presets mapping сохраняются локально в рамках проекта. Межпроектный перенос preset намеренно не автоматизирован.
+- Фильтры ошибок реализованы на preview-странице; полная ручная браузерная приёмка владельцем ожидается.
 - Официальные шаблоны Ozon/Wildberries/Яндекс Маркет не реализованы. Текущие профили являются подготовительными.
 - Full Ruff backlog остаётся legacy-долгом и не исправлялся массово.
 - Внешний LLM не получает файл автоматически; prompt-injection строка проверена как недоверенный текст товара.
-- Полноценный TCP smoke через запущенный Uvicorn заблокирован namespace ограничением среды; route workflow проверен через ASGI tests.
+- Полноценный TCP/browser smoke из Codex окружения ограничен; подготовлен `scripts/l1_acceptance_demo.py` и инструкция `docs/L1_MANUAL_ACCEPTANCE.md`.
 
 ## Что специально не делалось
 

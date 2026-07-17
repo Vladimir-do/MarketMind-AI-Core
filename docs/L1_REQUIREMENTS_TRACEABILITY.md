@@ -8,11 +8,11 @@
 
 | Статус | Количество |
 |---|---:|
-| VERIFIED | 70 |
-| PARTIAL | 5 |
+| VERIFIED | 74 |
+| PARTIAL | 2 |
 | NOT_IMPLEMENTED | 0 |
 | BLOCKED | 0 |
-| NOT_APPLICABLE | 3 |
+| NOT_APPLICABLE | 1 |
 
 ## Matrix
 
@@ -29,7 +29,7 @@
 | L1-IMP-05 | Перенос строки внутри кавычек | Да | `csv.DictReader(io.StringIO(...))` | `test_import_preview_supports_bom_semicolon_multiline_and_mapping` | Preview table | VERIFIED | Нет |
 | L1-IMP-06 | Кавычки внутри значений | Да | Python `csv` parser | `test_csv_quotes_inside_values_are_preserved` | Import result | VERIFIED | Нет |
 | L1-IMP-07 | Неуверенный разделитель | Да | `_detect_delimiter` warning | `test_uncertain_csv_delimiter_requires_operator_confirmation` | Preview warnings | VERIFIED | Нет |
-| L1-IMP-08 | Неуверенная кодировка | Частично | UTF-8/BOM accepted, invalid encoding rejected | `test_invalid_encoding_and_content_mismatch_are_rejected` | Русская ошибка 422 | PARTIAL | Автоопределение не-UTF кодировок требует отдельной библиотеки/этапа |
+| L1-IMP-08 | Неуверенная кодировка | Да | UTF-8/BOM accepted; Windows-1251 detected with warning; corrupt CSV rejected | `test_windows_1251_requires_confirmation_and_imports_after_approval`, `test_utf8_bom_ascii_and_corrupt_csv_encoding_paths` | Preview требует подтверждения Windows-1251 | VERIFIED | Нет |
 | L1-IMP-09 | Подтверждение сомнительного определения | Да | `preview.requires_confirmation`, `confirm_warnings` | `test_uncertain_csv_delimiter_requires_operator_confirmation` | Checkbox in `project_import_preview.html` | VERIFIED | Нет |
 | L1-IMP-10 | XLSX несколько листов | Да | `_analyze_excel`, `workbook.sheetnames` | `test_xlsx_preview_lists_sheets_and_hidden_sheet_warning` | Preview lists sheets | VERIFIED | Нет |
 | L1-IMP-11 | Выбор листа | Да | `selected_sheet` in route/template | `test_xlsx_preview_lists_sheets_and_hidden_sheet_warning` | Select in preview form | VERIFIED | Нет |
@@ -61,7 +61,9 @@
 | L1-UI-04 | Mapping | Да | `project_import_preview.html` | L1 tests/manual | Selects per column | VERIFIED | Нет |
 | L1-UI-05 | Подтверждение импорта | Да | `confirm_warnings`, `confirm_duplicate` | L1 tests | Required checkboxes | VERIFIED | Нет |
 | L1-UI-06 | Результаты импорта | Да | `project_import_result.html` | L1 tests | Result partial | VERIFIED | Нет |
-| L1-UI-07 | Фильтрация ошибок | Частично | Errors shown in preview; no separate filter UI | Code trace | Manual UI | PARTIAL | Добавить интерактивный фильтр при большом количестве ошибок |
+| L1-UI-07 | Фильтрация ошибок | Да | `project_import_preview.html` содержит фильтры severity/code/column/row/search и ограничивает вывод 50 строками | `test_import_error_report_csv_is_downloadable_and_sanitized` | Preview page | VERIFIED | Нет |
+| L1-UI-14 | Сохранение presets mapping | Да | `ImportMappingPreset`, `ProjectService.save_mapping_preset`, `project_import_preview.html` | `test_mapping_presets_can_be_saved_suggested_and_deleted` | UI: сохранить/выбрать/удалить сопоставление | VERIFIED | Нет |
+| L1-UI-15 | CSV отчёт ошибок импорта | Да | `api_project_import_error_report`, `_error_csv_response` | `test_import_error_report_csv_is_downloadable_and_sanitized` | Кнопка «Скачать CSV с ошибками» | VERIFIED | Нет |
 | L1-UI-08 | Просмотр товаров | Да | `/projects/{id}/products` | `test_project_manual_edit_ui_pages_render_safe_workflow` | Table | VERIFIED | Нет |
 | L1-UI-09 | Effective Product Card | Да | `/projects/{id}/products/{product_id}` | UI route test | Detail page | VERIFIED | Нет |
 | L1-UI-10 | Ручная правка | Да | `/projects/{id}/products/{product_id}/edit` | UI route test | Edit form | VERIFIED | Нет |
@@ -92,10 +94,19 @@
 | L1-RUFF-01 | New files Ruff clean | Да | targeted Ruff | Final check | All checks passed | VERIFIED | Нет |
 | L1-RUFF-02 | Full legacy Ruff | Частично | 268 legacy diagnostics | Diagnostic check | Not fixed by scope | PARTIAL | Separate cleanup plan |
 | L1-DOC-01 | Docs updated | Да | L1 audit/plan/report/traceability/UI report | File existence | Docs in repo | VERIFIED | Нет |
+| L1-DOC-02 | Инструкция ручной приёмки владельцем | Да | `docs/L1_MANUAL_ACCEPTANCE.md`, `scripts/l1_acceptance_demo.py` | `test_demo_fixture_full_local_workflow` | AWAITING_OWNER_ACCEPTANCE | VERIFIED | Ожидается фактический проход владельцем |
 
 ## Remaining partials
 
-1. Encoding uncertainty: no heuristic non-UTF detector is included; unsupported encodings fail with a clear Russian error.
-2. Duplicate unique key does not include schema version at DB constraint level because the existing SQLite unique constraint is `project_id + sha256`; current schema version is stored and checked at workflow level.
-3. Error filtering UI is minimal: errors are shown, but no interactive filter widget yet.
-4. Full Ruff legacy backlog remains outside L1.
+1. Duplicate unique key does not include schema version at DB constraint level because the existing SQLite unique constraint is `project_id + sha256`; current schema version is stored and checked at workflow level.
+2. Full Ruff legacy backlog remains outside L1.1 and documented separately.
+
+## L1.1 Partial Closure Table
+
+| PARTIAL ID | причина | влияние на оператора | обязательность | решение |
+|---|---|---|---|---|
+| L1-IMP-08 | Не было безопасной поддержки Windows-1251 | Российские CSV могли отклоняться | Обязательно | Закрыто: Windows-1251 определяется, требует подтверждение, сохраняется в metadata |
+| L1-IMP-25 | Unique constraint не включает schema_version | Повтор того же файла с новой схемой всё ещё считается duplicate на уровне БД | Некритично для оператора L1.1 | Оставить PARTIAL до отдельной миграции constraints |
+| L1-UI-07 | Не было фильтров ошибок | Большой preview было трудно проверять | Обязательно | Закрыто: добавлены фильтры и ограничение вывода |
+| L1-RUFF-02 | Legacy Ruff backlog | Не влияет на workflow, но мешает full lint clean | Не входит в L1.1 | Оставить PARTIAL, backlog вынесен в `docs/LEGACY_RUFF_BACKLOG.md` |
+| L1-UI-14 | Не было presets mapping | Оператору приходилось заново сопоставлять одинаковые файлы | Обязательно | Закрыто: save/select/delete/suggested preset в UI |
