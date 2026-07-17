@@ -26,6 +26,7 @@ Remote не настроен, push не выполнялся.
 
 - Добавлен безопасный import preview для CSV/XLSX/XLSM.
 - Добавлено сопоставление колонок через JSON mapping.
+- Добавлено сопоставление колонок через web-интерфейс.
 - CSV preview определяет UTF-8 BOM и разделитель `,`/`;`.
 - CSV корректно читает quoted multiline values через стандартный `csv`.
 - Excel preview показывает листы, выбранный лист и предупреждает о hidden sheets.
@@ -34,10 +35,14 @@ Remote не настроен, push не выполнялся.
 - Unknown columns сохраняются в `attributes`.
 - Добавлены structured row errors с русскими сообщениями.
 - Добавлен project-aware rollback endpoint.
+- Добавлены project-aware страницы карточки, ручной правки и версий.
 - Effective Card возвращает per-field provenance.
 - Export manifest и checksum сохраняются в `ProjectExport`.
 - Formula injection защита сохраняет отрицательные числа как числа.
 - Ограничение размера файла применяется до записи в workspace.
+- Добавлена защита от ZIP-bomb и слишком большого числа колонок.
+- Добавлены безопасные download routes для экспортов и отчётов.
+- AI prompt теперь явно маркирует данные товара как недоверенный клиентский текст.
 
 ## Изменённые файлы
 
@@ -51,10 +56,23 @@ Remote не настроен, push не выполнялся.
 - `app/exports/service.py`
 - `app/web/routes/projects.py`
 - `app/web/templates/project_import.html`
+- `app/web/templates/project_import_preview.html`
+- `app/web/templates/project_import_result.html`
+- `app/web/templates/project_product_detail.html`
+- `app/web/templates/project_product_edit.html`
+- `app/web/templates/project_manual_edit_preview.html`
+- `app/web/templates/project_action_result.html`
+- `app/web/templates/project_product_versions.html`
+- `app/web/templates/project_exports.html`
+- `app/web/templates/project_reports.html`
 - `tests/test_client_projects.py`
+- `tests/helpers.py`
+- `app/ai_recommendation/engine.py`
 - `docs/L1_LOCAL_WORKFLOW_AUDIT.md`
 - `docs/L1_LOCAL_WORKFLOW_IMPLEMENTATION_PLAN.md`
 - `docs/L1_LOCAL_WORKFLOW_REPORT.md`
+- `docs/L1_REQUIREMENTS_TRACEABILITY.md`
+- `docs/L1_UI_ACCEPTANCE_REPORT.md`
 
 ## Миграции
 
@@ -83,37 +101,44 @@ Remote не настроен, push не выполнялся.
 | Проверка | Результат |
 |---|---|
 | Baseline full pytest до правок | 514 passed, 24 warnings, 14 subtests passed |
-| Focused P4/P5/P6 после правок | 60 passed |
-| `tests/test_client_projects.py` | 11 passed |
-| Full pytest после правок | 518 passed, 24 warnings, 14 subtests passed |
+| Focused P4/P5/P6/L1 после gap fixes | 72 passed |
+| `tests/test_client_projects.py` | 23 passed |
+| Full pytest после gap fixes | 530 passed, 24 warnings, 14 subtests passed |
 | Ruff по новым/изменённым L1/P6 файлам | All checks passed |
-| Full Ruff diagnostic | 268 legacy errors |
+| Full Ruff diagnostic | 267 legacy errors |
 | `git diff --check` | passed |
 | Alembic upgrade -> downgrade -> upgrade на временной SQLite | passed |
 | Skill validation | passed |
+| UI TCP smoke | BLOCKED by execution namespace; ASGI route workflow passed |
 
 ## Happy path
 
 Покрыт тестами:
 
 1. создать проект;
-2. загрузить CSV;
+2. загрузить CSV/XLSX/XLSM;
 3. получить preview;
-4. применить mapping;
-5. импортировать товар;
-6. открыть Effective Card;
-7. создать и применить черновик;
-8. выполнить project-aware rollback;
-9. экспортировать результат;
-10. получить export manifest;
-11. сформировать отчёт.
+4. выбрать mapping в UI;
+5. подтвердить warnings/duplicate;
+6. импортировать товар;
+7. открыть Effective Card;
+8. открыть ручной редактор;
+9. увидеть diff перед применением;
+10. применить правку;
+11. открыть версии;
+12. выполнить project-aware rollback;
+13. экспортировать CSV/JSON/XLSX;
+14. получить export manifest/checksum;
+15. сформировать отчёт.
 
 ## Известные ограничения
 
-- UI mapping пока минимальный: подробное интерактивное сопоставление колонок доступно через JSON API, а HTML-страница показывает preview и быстрый импорт.
+- UI mapping реализован как per-column select в preview. Presets mapping между импортами пока не сохраняются.
+- Фильтр ошибок в UI пока базовый: ошибки показаны списком, отдельного интерактивного фильтра нет.
 - Официальные шаблоны Ozon/Wildberries/Яндекс Маркет не реализованы. Текущие профили являются подготовительными.
 - Full Ruff backlog остаётся legacy-долгом и не исправлялся массово.
-- Внешний LLM не получает файл автоматически; отдельный расширенный тест prompt injection оставлен для следующего AI-safety этапа.
+- Внешний LLM не получает файл автоматически; prompt-injection строка проверена как недоверенный текст товара.
+- Полноценный TCP smoke через запущенный Uvicorn заблокирован namespace ограничением среды; route workflow проверен через ASGI tests.
 
 ## Что специально не делалось
 
@@ -124,8 +149,8 @@ Remote не настроен, push не выполнялся.
 
 ## Следующие действия
 
-1. Сделать полноценную HTML-форму mapping колонок без JSON-ручного ввода.
-2. Добавить экран детального результата импорта с row-level errors.
+1. Добавить сохранение presets mapping между импортами.
+2. Добавить интерактивный фильтр ошибок/предупреждений в большом preview.
 3. Завести отдельный этап официальных marketplace export adapters.
 4. Разобрать legacy Ruff backlog отдельным планом.
 
@@ -134,3 +159,6 @@ Remote не настроен, push не выполнялся.
 - `cd165f5 feat: add local workflow metadata schema`
 - `05b4a2f feat: strengthen local project import and exports`
 - `25685aa test: cover local workflow import and rollback`
+- `60b195d feat: close local workflow UI and safety gaps`
+- `2bf3dca test: verify local workflow requirement gaps`
+- Документационный gap-audit commit создаётся после обновления отчётов.
