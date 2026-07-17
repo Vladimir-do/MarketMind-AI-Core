@@ -1,0 +1,73 @@
+<div class="space-y-4" id="product-history">
+  <div class="flex flex-wrap gap-2">
+    {% for item in history_filters %}
+    <button
+      hx-get="/products/{{ product.id }}/history?event_type={{ item.value }}"
+      hx-target="#product-history"
+      hx-swap="outerHTML"
+      class="px-3 py-1 rounded border text-sm
+        {% if history_filter == item.value %}
+        bg-blue-600 text-white border-blue-600
+        {% else %}
+        bg-white text-gray-700 border-gray-200 hover:bg-gray-50
+        {% endif %}">
+      {{ item.label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  {% if history_events %}
+  <div class="space-y-3">
+    {% for event in history_events %}
+    <div class="border rounded-lg p-4 bg-white">
+      <div class="flex items-start gap-3">
+        <span class="px-2 py-0.5 rounded text-xs font-medium shrink-0
+          {% if event.event_group == 'import' %}bg-blue-100 text-blue-700
+          {% elif event.event_group == 'price' %}bg-emerald-100 text-emerald-700
+          {% elif event.event_group == 'stock' %}bg-cyan-100 text-cyan-700
+          {% elif event.event_group == 'ai' %}bg-violet-100 text-violet-700
+          {% elif event.event_group == 'decision' and event.status == 'rejected' %}bg-red-100 text-red-700
+          {% elif event.event_group == 'decision' %}bg-green-100 text-green-700
+          {% else %}bg-gray-100 text-gray-700{% endif %}">
+          {{ event.event_group_label }}
+        </span>
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="font-semibold text-gray-900">{{ event.event_type_label }}</div>
+            <div class="text-xs text-gray-400">
+              {{ event.occurred_at.strftime('%d.%m.%Y %H:%M') if event.occurred_at else '—' }}
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-3 mt-3 text-sm">
+            <div class="bg-gray-50 border border-gray-100 rounded px-3 py-2">
+              <div class="text-xs text-gray-500 mb-1">Было</div>
+              <div class="text-gray-800 break-words">{{ event.old_value if event.old_value is not none else '—' }}</div>
+            </div>
+            <div class="bg-gray-50 border border-gray-100 rounded px-3 py-2">
+              <div class="text-xs text-gray-500 mb-1">Стало</div>
+              <div class="text-gray-800 break-words">{{ event.new_value if event.new_value is not none else '—' }}</div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-3 gap-2 mt-3 text-xs text-gray-500">
+            <div>Источник: <span class="font-medium text-gray-700">{{ event.source_label }}</span></div>
+            <div>Статус: <span class="font-medium text-gray-700">{{ event.status_label }}</span></div>
+            {% if event.confidence is not none %}
+            <div>Уверенность: <span class="font-medium text-gray-700">{{ (event.confidence * 100)|int }}%</span></div>
+            {% endif %}
+          </div>
+          {% if event.reason or event.comment %}
+          <div class="mt-2 text-sm text-gray-600">
+            Причина: {{ event.comment or event.reason }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="border rounded-lg p-4 bg-gray-50 text-sm text-gray-500">
+    Истории по выбранному фильтру пока нет.
+  </div>
+  {% endif %}
+</div>

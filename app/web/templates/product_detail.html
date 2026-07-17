@@ -27,6 +27,9 @@
         <div class="text-sm text-gray-500">
           <a href="{{ product.url }}" target="_blank" class="text-blue-600 hover:underline">Открыть на маркетплейсе &rarr;</a>
         </div>
+        <div class="text-sm text-gray-500">
+          <a href="/products/{{ product.id }}/versions" class="text-blue-600 hover:underline">Посмотреть версии карточки &rarr;</a>
+        </div>
       </div>
     </div>
   </div>
@@ -135,31 +138,10 @@
   {% endif %}
 
   {# ── История изменений ───────────────────────────────────────────── #}
-  {% if approval_records %}
   <div class="bg-white rounded-lg shadow p-6">
     <h2 class="text-xl font-bold mb-3">История изменений</h2>
-    <div class="space-y-2">
-      {% for r in approval_records %}
-      <div class="flex items-center gap-3 text-sm border-b pb-2 last:border-0">
-        <span class="px-2 py-0.5 rounded text-xs font-medium shrink-0
-          {% if r.status == 'approved' %}bg-green-100 text-green-700
-          {% elif r.status == 'rejected' %}bg-red-100 text-red-700
-          {% elif r.status == 'pending' %}bg-yellow-100 text-yellow-700
-          {% else %}bg-gray-100 text-gray-600{% endif %}">
-          {% if r.status == 'approved' %}Принято
-          {% elif r.status == 'rejected' %}Отклонено
-          {% elif r.status == 'pending' %}Ожидает
-          {% else %}{{ r.status }}{% endif %}
-        </span>
-        <span class="font-medium text-gray-700">{{ r.field }}</span>
-        <span class="text-gray-400">&rarr;</span>
-        <span class="text-gray-600">{{ r.after_value[:80] }}</span>
-        <span class="text-gray-400 ml-auto">{{ r.created_at[:16] if r.created_at else '' }}</span>
-      </div>
-      {% endfor %}
-    </div>
+    {% include "product_history.html" %}
   </div>
-  {% endif %}
 
   {# ── История цены ────────────────────────────────────────────────── #}
   {% if price_history %}

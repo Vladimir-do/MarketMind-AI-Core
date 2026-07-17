@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import desc, select
 
 from app.database import ApprovalRecord, PriceHistory, Product
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
+from app.products.versioning import ProductVersion, ProductVersionBuilder
+from app.timeline.repository import TimelineRepository
+from app.timeline.schemas import ProductHistoryEvent
+from app.timeline.service import TimelineService
 from app.web.app import templates
 
 router = APIRouter()
@@ -19,6 +24,21 @@ _MARKETPLACE_NAMES = {
     "wildberries": "Wildberries",
     "yandex_market": "Яндекс Маркет",
 }
+
+_HISTORY_FILTERS = [
+    {"value": "all", "label": "Все события"},
+    {"value": "import", "label": "Импорт"},
+    {"value": "price", "label": "Цена"},
+    {"value": "stock", "label": "Остатки"},
+    {"value": "ai", "label": "AI-рекомендации"},
+    {"value": "decision", "label": "Одобрения и отклонения"},
+    {"value": "manual", "label": "Ручные изменения"},
+]
+
+_TIMELINE_DEFAULT_LIMIT = 50
+_TIMELINE_MAX_LIMIT = 200
+_VERSION_DEFAULT_LIMIT = 50
+_VERSION_MAX_LIMIT = 200
 
 
 def _detect_marketplace(url: str) -> str:
@@ -53,7 +73,49 @@ async def _get_price_history(request: Request, product_id: int) -> list[PriceHis
         return list(result.scalars().all())
 
 
+async def _get_price_history_for_timeline(
+    request: Request,
+    product_id: int,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source_limit: int = 500,
+) -> list[PriceHistory]:
+    db = request.app.state.db
+    async with db.session() as s:
+        stmt = select(PriceHistory).where(PriceHistory.product_id == product_id)
+        if date_from is not None:
+            stmt = stmt.where(PriceHistory.recorded_at >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(PriceHistory.recorded_at <= date_to)
+        result = await s.execute(
+            stmt.order_by(desc(PriceHistory.recorded_at)).limit(source_limit)
+        )
+        return list(result.scalars().all())
+
+
 async def _get_approval_records(request: Request, product_id: int) -> list[dict]:
+    records = await _get_approval_record_models(request, product_id)
+    return [
+        {
+            "approval_id": r.approval_id,
+            "field": r.field,
+            "suggestion_type": r.suggestion_type,
+            "before_value": r.before_value,
+            "after_value": r.after_value,
+            "reason": r.reason,
+            "confidence": r.confidence,
+            "status": r.status,
+            "reject_reason": r.reject_reason,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
+            "applied_at": r.applied_at.isoformat() if r.applied_at else None,
+        }
+        for r in records
+    ]
+
+
+async def _get_approval_record_models(request: Request, product_id: int) -> list[ApprovalRecord]:
     db = request.app.state.db
     async with db.session() as s:
         result = await s.execute(
@@ -62,24 +124,28 @@ async def _get_approval_records(request: Request, product_id: int) -> list[dict]
             .order_by(desc(ApprovalRecord.created_at))
             .limit(50)
         )
-        records = result.scalars().all()
-        return [
-            {
-                "approval_id": r.approval_id,
-                "field": r.field,
-                "suggestion_type": r.suggestion_type,
-                "before_value": r.before_value,
-                "after_value": r.after_value,
-                "reason": r.reason,
-                "confidence": r.confidence,
-                "status": r.status,
-                "reject_reason": r.reject_reason,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
-                "applied_at": r.applied_at.isoformat() if r.applied_at else None,
-            }
-            for r in records
-        ]
+        return list(result.scalars().all())
+
+
+async def _get_approval_record_models_for_timeline(
+    request: Request,
+    product_id: int,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    source_limit: int = 500,
+) -> list[ApprovalRecord]:
+    db = request.app.state.db
+    async with db.session() as s:
+        stmt = select(ApprovalRecord).where(ApprovalRecord.product_id == str(product_id))
+        if date_from is not None:
+            stmt = stmt.where(ApprovalRecord.created_at >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(ApprovalRecord.created_at <= date_to)
+        result = await s.execute(
+            stmt.order_by(desc(ApprovalRecord.created_at)).limit(source_limit)
+        )
+        return list(result.scalars().all())
 
 
 def _build_unified(product: Product, last_price) -> UnifiedProduct:
@@ -124,6 +190,107 @@ def _analysis_to_dict(analysis):
     }
 
 
+async def _get_product_history_events(
+    request: Request,
+    product: Product,
+    *,
+    event_filter: str = "all",
+    limit: int = _TIMELINE_DEFAULT_LIMIT,
+    offset: int = 0,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    sort: str = "newest_first",
+) -> list[ProductHistoryEvent]:
+    timeline = await _timeline_service(request).build_timeline(
+        product=product,
+        event_type=event_filter,
+        limit=limit,
+        offset=offset,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+    )
+    return timeline.items
+
+
+def _timeline_service(request: Request) -> TimelineService:
+    return TimelineService(TimelineRepository(request.app.state.db))
+
+
+def _parse_history_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as exc:
+        logger.info("Invalid timeline datetime filter: %s", value)
+        raise HTTPException(status_code=422, detail="Некорректная дата фильтра истории") from exc
+
+
+def _normalize_timeline_limit(limit: int) -> int:
+    return max(1, min(limit, _TIMELINE_MAX_LIMIT))
+
+
+def _normalize_timeline_offset(offset: int) -> int:
+    return max(offset, 0)
+
+
+def _normalize_timeline_sort(sort: str) -> str:
+    if sort not in {"newest_first", "oldest_first"}:
+        raise HTTPException(status_code=422, detail="Некорректная сортировка истории")
+    return sort
+
+
+async def _get_product_versions(
+    request: Request,
+    product: Product,
+    *,
+    limit: int = _VERSION_DEFAULT_LIMIT,
+    offset: int = 0,
+    version_type: str = "all",
+    sort: str = "newest_first",
+) -> list[ProductVersion]:
+    last_price = await db_get_last_price(request, product.id)
+    unified = _build_unified(product, last_price)
+    analysis = ProductAnalyzer().analyze(unified)
+    events = await _get_product_history_events(
+        request,
+        product,
+        limit=max(_VERSION_MAX_LIMIT, offset + limit + 50),
+        sort="oldest_first",
+    )
+    builder = ProductVersionBuilder()
+    return builder.build(
+        product=product,
+        timeline_events=events,
+        quality_score=analysis.score,
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        version_type=version_type,
+    )
+
+
+def _normalize_version_limit(limit: int) -> int:
+    return max(1, min(limit, _VERSION_MAX_LIMIT))
+
+
+def _normalize_version_offset(offset: int) -> int:
+    return max(offset, 0)
+
+
+def _normalize_version_sort(sort: str) -> str:
+    if sort not in {"newest_first", "oldest_first"}:
+        raise HTTPException(status_code=422, detail="Некорректная сортировка версий")
+    return sort
+
+
+def _normalize_version_number(value: int) -> int:
+    if value < 1:
+        raise HTTPException(status_code=404, detail="Версия не найдена")
+    return value
+
+
 # ── HTML routes ─────────────────────────────────────────────────────────
 
 @router.get("/products/{product_id}", response_class=HTMLResponse)
@@ -132,6 +299,7 @@ async def product_detail_page(product_id: int, request: Request):
     last_price = await db_get_last_price(request, product_id)
     price_history = await _get_price_history(request, product_id)
     approval_records = await _get_approval_records(request, product_id)
+    history_events = await _get_product_history_events(request, product)
 
     marketplace = _detect_marketplace(product.url)
     unified = _build_unified(product, last_price)
@@ -153,6 +321,9 @@ async def product_detail_page(product_id: int, request: Request):
             "analysis_dict": _analysis_to_dict(analysis),
             "suggestions": suggestions,
             "approval_records": approval_records,
+            "history_events": history_events,
+            "history_filters": _HISTORY_FILTERS,
+            "history_filter": "all",
             "price_history": price_history,
             "active": "products",
         },
@@ -215,6 +386,195 @@ async def api_product_suggestions(product_id: int, request: Request):
 async def api_product_history(product_id: int, request: Request):
     await _get_product(request, product_id)
     return await _get_approval_records(request, product_id)
+
+
+@router.get("/api/products/{product_id}/timeline")
+async def api_product_timeline(
+    product_id: int,
+    request: Request,
+    event_type: str = "all",
+    source: str = "all",
+    limit: int = Query(_TIMELINE_DEFAULT_LIMIT, ge=1, le=_TIMELINE_MAX_LIMIT),
+    offset: int = Query(0, ge=0),
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: str = "newest_first",
+):
+    product = await _get_product(request, product_id)
+    safe_limit = _normalize_timeline_limit(limit)
+    safe_offset = _normalize_timeline_offset(offset)
+    safe_sort = _normalize_timeline_sort(sort)
+    parsed_from = _parse_history_datetime(date_from)
+    parsed_to = _parse_history_datetime(date_to)
+    timeline = await _timeline_service(request).build_timeline(
+        product=product,
+        event_type=event_type,
+        source=source,
+        limit=safe_limit,
+        offset=safe_offset,
+        date_from=parsed_from,
+        date_to=parsed_to,
+        sort=safe_sort,
+    )
+    return timeline.to_dict()
+
+
+@router.get("/products/{product_id}/history", response_class=HTMLResponse)
+async def product_history_partial(
+    product_id: int,
+    request: Request,
+    event_type: str = "all",
+):
+    product = await _get_product(request, product_id)
+    events = await _get_product_history_events(
+        request,
+        product,
+        event_filter=event_type,
+        limit=_TIMELINE_DEFAULT_LIMIT,
+    )
+    return templates.TemplateResponse(
+        request,
+        "product_history.html",
+        {
+            "product": product,
+            "history_events": events,
+            "history_filters": _HISTORY_FILTERS,
+            "history_filter": event_type,
+        },
+    )
+
+
+@router.get("/products/{product_id}/versions", response_class=HTMLResponse)
+async def product_versions_page(product_id: int, request: Request):
+    product = await _get_product(request, product_id)
+    versions = await _get_product_versions(request, product)
+    return templates.TemplateResponse(
+        request,
+        "product_versions.html",
+        {
+            "product": product,
+            "versions": versions,
+            "active": "products",
+        },
+    )
+
+
+@router.get("/products/{product_id}/compare", response_class=HTMLResponse)
+async def product_compare_page(
+    product_id: int,
+    request: Request,
+    from_version: int = Query(..., alias="from"),
+    to_version: int = Query(..., alias="to"),
+):
+    product = await _get_product(request, product_id)
+    versions = await _get_product_versions(
+        request,
+        product,
+        limit=_VERSION_MAX_LIMIT,
+        sort="oldest_first",
+    )
+    builder = ProductVersionBuilder()
+    source = builder.get_version(versions, _normalize_version_number(from_version))
+    target = builder.get_version(versions, _normalize_version_number(to_version))
+    if source is None or target is None:
+        raise HTTPException(status_code=404, detail="Версия не найдена")
+    comparison = builder.compare(
+        product_id=product.id,
+        from_version=source,
+        to_version=target,
+    )
+    return templates.TemplateResponse(
+        request,
+        "product_version_compare.html",
+        {
+            "product": product,
+            "from_version": source,
+            "to_version": target,
+            "comparison": comparison,
+            "active": "products",
+        },
+    )
+
+
+@router.get("/api/products/{product_id}/versions")
+async def api_product_versions(
+    product_id: int,
+    request: Request,
+    limit: int = Query(_VERSION_DEFAULT_LIMIT, ge=1, le=_VERSION_MAX_LIMIT),
+    offset: int = Query(0, ge=0),
+    version_type: str = "all",
+    sort: str = "newest_first",
+):
+    product = await _get_product(request, product_id)
+    safe_limit = _normalize_version_limit(limit)
+    safe_offset = _normalize_version_offset(offset)
+    safe_sort = _normalize_version_sort(sort)
+    versions = await _get_product_versions(
+        request,
+        product,
+        limit=safe_limit + 1,
+        offset=safe_offset,
+        version_type=version_type,
+        sort=safe_sort,
+    )
+    visible_versions = versions[:safe_limit]
+    has_more = len(versions) > safe_limit
+    return {
+        "product_id": product.id,
+        "items": [version.to_dict() for version in visible_versions],
+        "pagination": {
+            "limit": safe_limit,
+            "offset": safe_offset,
+            "next_offset": safe_offset + safe_limit if has_more else None,
+            "total_returned": len(visible_versions),
+            "has_more": has_more,
+            "sort": safe_sort,
+        },
+    }
+
+
+@router.get("/api/products/{product_id}/versions/{version_number}")
+async def api_product_version_detail(product_id: int, version_number: int, request: Request):
+    product = await _get_product(request, product_id)
+    versions = await _get_product_versions(
+        request,
+        product,
+        limit=_VERSION_MAX_LIMIT,
+        sort="oldest_first",
+    )
+    version = ProductVersionBuilder().get_version(
+        versions,
+        _normalize_version_number(version_number),
+    )
+    if version is None:
+        raise HTTPException(status_code=404, detail="Версия не найдена")
+    return version.to_dict()
+
+
+@router.get("/api/products/{product_id}/compare")
+async def api_product_version_compare(
+    product_id: int,
+    request: Request,
+    from_version: int = Query(..., alias="from"),
+    to_version: int = Query(..., alias="to"),
+):
+    product = await _get_product(request, product_id)
+    versions = await _get_product_versions(
+        request,
+        product,
+        limit=_VERSION_MAX_LIMIT,
+        sort="oldest_first",
+    )
+    builder = ProductVersionBuilder()
+    source = builder.get_version(versions, _normalize_version_number(from_version))
+    target = builder.get_version(versions, _normalize_version_number(to_version))
+    if source is None or target is None:
+        raise HTTPException(status_code=404, detail="Версия не найдена")
+    return builder.compare(
+        product_id=product.id,
+        from_version=source,
+        to_version=target,
+    ).to_dict()
 
 
 async def db_get_last_price(request: Request, product_id: int):

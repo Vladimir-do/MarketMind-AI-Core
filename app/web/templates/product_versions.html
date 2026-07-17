@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Версии — {{ product.name or 'Товар' }} — MarketMind AI{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <div class="flex items-center gap-3">
+    <a href="/products/{{ product.id }}" class="text-blue-600 hover:underline text-sm">&larr; К карточке товара</a>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-6">
+    <h1 class="text-2xl font-bold mb-2">Версии карточки товара</h1>
+    <div class="text-sm text-gray-500">{{ product.name or 'Без названия' }}</div>
+  </div>
+
+  <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+    Версии построены из уже сохранённых событий. Описание, бренд, характеристики и полный набор изображений
+    могут быть недоступны для старых версий, если они не сохранялись исторически.
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-6">
+    {% if versions %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b text-left text-gray-500">
+          <th class="p-2">Версия</th>
+          <th class="p-2">Дата</th>
+          <th class="p-2">Источник</th>
+          <th class="p-2">Тип</th>
+          <th class="p-2">Quality Score</th>
+          <th class="p-2">Изменения</th>
+          <th class="p-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for version in versions %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-2 font-medium">№{{ version.version_number }}</td>
+          <td class="p-2 text-gray-600">{{ version.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td class="p-2">{{ version.source }}</td>
+          <td class="p-2">{{ version.version_type_label }}</td>
+          <td class="p-2">{{ version.quality_score if version.quality_score is not none else '—' }}</td>
+          <td class="p-2">
+            {% for change in version.changes %}
+            <div>{{ change.field_label }}: {{ change.old_value if change.old_value is not none else '—' }} → {{ change.new_value if change.new_value is not none else '—' }}</div>
+            {% endfor %}
+          </td>
+          <td class="p-2 text-right">
+            {% if not loop.first %}
+            <a href="/products/{{ product.id }}/compare?from={{ version.version_number }}&to={{ versions[loop.index0 - 1].version_number }}"
+               class="text-blue-600 hover:underline">Сравнить</a>
+            {% else %}
+            <span class="text-gray-400">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-sm text-gray-500">Версий пока нет.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
