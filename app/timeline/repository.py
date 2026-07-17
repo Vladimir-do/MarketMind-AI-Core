@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import desc, or_, select
 
 from app.database import ApprovalRecord, Database, PriceHistory, Product
+from app.domain.events.models import AggregateType
+from app.domain.events.repository import DomainEventRepository
 from app.domain.events.time import to_legacy_utc_naive
 
 if TYPE_CHECKING:
@@ -90,3 +92,12 @@ class TimelineRepository:
                 stmt = stmt.limit(limit)
             result = await session.execute(stmt)
             return list(result.scalars().all())
+
+    async def get_persisted_events(self, product_id: int, *, limit: int = 1000, offset: int = 0):
+        async with self._db.session() as session:
+            return await DomainEventRepository(session).list_by_aggregate(
+                AggregateType.PRODUCT.value,
+                str(product_id),
+                limit=limit,
+                offset=offset,
+            )

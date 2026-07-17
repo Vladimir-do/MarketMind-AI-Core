@@ -44,6 +44,8 @@ class TimelineEventMapper:
             "approval.rejected": self._approval_rejected,
             "approval.applied": self._approval_applied,
             "approval.rolled_back": self._approval_rolled_back,
+            "product.manual_change_applied": self._manual_change_applied,
+            "product.version_rolled_back": self._version_rolled_back,
         }
         handler = mapping.get(event.event_type)
         if handler is None:
@@ -162,6 +164,44 @@ class TimelineEventMapper:
             source=TimelineSource.USER,
             status=TimelineStatus.ROLLED_BACK,
             reason="Пользователь отменил ранее принятое решение",
+        )
+
+    def _manual_change_applied(self, event: DomainEvent) -> ProductHistoryEvent:
+        changes = event.payload.get("changes") or []
+        first = changes[0] if changes else {}
+        return self._event(
+            event,
+            event_id=event.event_id,
+            product_id=int(event.aggregate_id),
+            event_type=TimelineEventType.MANUAL_FIELD_CHANGED,
+            event_group=TimelineEventGroup.MANUAL,
+            source=TimelineSource.USER,
+            field=first.get("field"),
+            old_value=self._empty_dash(first.get("old_value")),
+            new_value=self._empty_dash(first.get("new_value")),
+            status=TimelineStatus.APPLIED,
+            reason=event.payload.get("comment") or "Пользователь применил изменения карточки",
+            related_entity_type="product_card_version",
+            related_entity_id=str(event.payload.get("version_id") or ""),
+        )
+
+    def _version_rolled_back(self, event: DomainEvent) -> ProductHistoryEvent:
+        changes = event.payload.get("changes") or []
+        first = changes[0] if changes else {}
+        return self._event(
+            event,
+            event_id=event.event_id,
+            product_id=int(event.aggregate_id),
+            event_type=TimelineEventType.AI_SUGGESTION_ROLLED_BACK,
+            event_group=TimelineEventGroup.DECISION,
+            source=TimelineSource.ROLLBACK,
+            field=first.get("field"),
+            old_value=self._empty_dash(first.get("old_value")),
+            new_value=self._empty_dash(first.get("new_value")),
+            status=TimelineStatus.ROLLED_BACK,
+            reason=event.payload.get("reason") or "Пользователь откатил карточку к выбранной версии",
+            related_entity_type="product_card_version",
+            related_entity_id=str(event.payload.get("version_id") or ""),
         )
 
     def _approval_event(

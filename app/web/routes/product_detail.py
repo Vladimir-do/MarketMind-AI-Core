@@ -9,9 +9,10 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import desc, select
 
 from app.database import ApprovalRecord, PriceHistory, Product
+from app.editor.service import ProductCardEditorService
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
-from app.products.versioning import ProductVersion, ProductVersionBuilder
+from app.products.versioning import ProductVersion, ProductVersionBuilder, persisted_record_to_version
 from app.timeline.repository import TimelineRepository
 from app.timeline.service import TimelineService
 from app.web.app import templates
@@ -253,6 +254,12 @@ async def _get_product_versions(
     version_type: str = "all",
     sort: str = "newest_first",
 ) -> list[ProductVersion]:
+    persisted_records = await ProductCardEditorService(request.app.state.db).list_persisted_versions(
+        product.id,
+        limit=max(_VERSION_MAX_LIMIT, offset + limit + 50),
+        offset=0,
+    )
+    persisted_versions = [persisted_record_to_version(record) for record in persisted_records]
     last_price = await db_get_last_price(request, product.id)
     unified = _build_unified(product, last_price)
     analysis = ProductAnalyzer().analyze(unified)
@@ -263,15 +270,20 @@ async def _get_product_versions(
         sort="oldest_first",
     )
     builder = ProductVersionBuilder()
-    return builder.build(
+    derived_versions = builder.build(
         product=product,
         timeline_events=events,
         quality_score=analysis.score,
-        limit=limit,
-        offset=offset,
+        limit=max(_VERSION_MAX_LIMIT, offset + limit + 50),
+        offset=0,
         sort=sort,
         version_type=version_type,
     )
+    versions = persisted_versions + derived_versions
+    if version_type != "all":
+        versions = [version for version in versions if version.version_type == version_type]
+    versions.sort(key=lambda version: version.version_number, reverse=sort != "oldest_first")
+    return versions[offset : offset + limit]
 
 
 def _normalize_version_limit(limit: int) -> int:

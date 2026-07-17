@@ -54,6 +54,7 @@ class TimelineService:
             date_from=date_from,
             date_to=date_to,
         )
+        persisted_events = await self._repository.get_persisted_events(product.id)
 
         filters = TimelineFilter(
             event_type=event_type,
@@ -72,6 +73,7 @@ class TimelineService:
             approval_records=approval_records,
             filters=filters,
             pagination=pagination,
+            persisted_events=persisted_events,
         )
         visible_events = events[:safe_limit]
         has_more = len(events) > safe_limit

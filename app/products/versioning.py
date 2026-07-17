@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from app.database import Product
+    from app.database import ProductCardVersion as ProductCardVersionRecord
     from app.timeline.schemas import ProductHistoryEvent
 
 
@@ -39,6 +41,7 @@ _VERSION_TYPE_LABELS = {
     "price": "Цена",
     "stock": "Остатки",
     "ai_applied": "AI применено",
+    "manual": "Ручное изменение",
     "rollback": "Откат",
 }
 
@@ -327,3 +330,43 @@ class ProductVersionBuilder:
                 continue
             known.append(field_name)
         return sorted(known)
+
+
+def persisted_record_to_version(record: ProductCardVersionRecord) -> ProductVersion:
+    """Convert a persisted complete snapshot to the public ProductVersion read model."""
+    data = json.loads(record.snapshot_json)
+    version_type = "rollback" if record.source == "rollback" else "manual"
+    snapshot = ProductVersionSnapshot(
+        name=data.get("title"),
+        description=data.get("description"),
+        brand=data.get("brand"),
+        price=str(data["price"]) if data.get("price") is not None else None,
+        availability=data.get("availability"),
+        image_url=(data.get("image_urls") or [None])[0],
+        image_urls=list(data.get("image_urls") or []),
+        attributes=dict(data.get("attributes") or {}),
+        ai_status=None,
+    )
+    known_fields = ProductVersionBuilder._known_fields(snapshot)
+    return ProductVersion(
+        version_id=record.version_id,
+        product_id=record.product_id,
+        version_number=record.version_number,
+        created_at=record.created_at,
+        created_by=record.actor_id,
+        source="Пользователь" if record.source == "manual" else "Откат",
+        version_type=version_type,
+        version_type_label=_VERSION_TYPE_LABELS[version_type],
+        title="Полная версия карточки",
+        changes=[],
+        snapshot=snapshot,
+        quality_score=None,
+        comment=record.comment,
+        timeline_event_ids=[record.trigger_event_id] if record.trigger_event_id else [],
+        is_derived=False,
+        snapshot_completeness="complete",
+        known_fields=known_fields,
+        unknown_fields=[],
+        source_event_ids=[record.trigger_event_id] if record.trigger_event_id else [],
+        quality_score_is_historical=False,
+    )

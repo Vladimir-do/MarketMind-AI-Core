@@ -49,6 +49,7 @@ class ProductHistoryBuilder:
         product: Product,
         price_history: list[PriceHistory],
         approval_records: list[ApprovalRecord],
+        persisted_events: list[DomainEvent] | None = None,
         event_filter: str = "all",
         limit: int = 100,
         offset: int = 0,
@@ -70,6 +71,7 @@ class ProductHistoryBuilder:
             product=product,
             price_history=price_history,
             approval_records=approval_records,
+            persisted_events=persisted_events or [],
             filters=filters,
             pagination=pagination,
         )
@@ -83,11 +85,13 @@ class ProductHistoryBuilder:
         approval_records: list[ApprovalRecord],
         filters: TimelineFilter,
         pagination: TimelinePagination,
+        persisted_events: list[DomainEvent] | None = None,
     ) -> tuple[list[ProductHistoryEvent], list[str]]:
         domain_events = self._domain_events(
             product=product,
             price_history=price_history,
             approval_records=approval_records,
+            persisted_events=persisted_events or [],
         )
         history_events = self._mapper.to_history_events(domain_events)
         history_events, warnings = self._deduplicate_events(history_events)
@@ -101,10 +105,12 @@ class ProductHistoryBuilder:
         product: Product,
         price_history: list[PriceHistory],
         approval_records: list[ApprovalRecord],
+        persisted_events: list[DomainEvent],
     ) -> list[DomainEvent]:
         events: list[DomainEvent] = []
         events.extend(self._product_builder.build_product_events(product, price_history))
         events.extend(self._approval_builder.build_approval_events(approval_records))
+        events.extend(persisted_events)
         return events
 
     def _filter_events(
