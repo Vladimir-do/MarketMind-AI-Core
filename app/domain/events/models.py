@@ -7,9 +7,13 @@ fields belong to timeline/read models, not to this contract.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from app.domain.events.time import normalize_event_datetime
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class AggregateType(StrEnum):
@@ -81,6 +85,7 @@ class DomainEvent:
             raise ValueError("source is required")
         if self.version < 1:
             raise ValueError("version must be positive")
+        object.__setattr__(self, "occurred_at", normalize_event_datetime(self.occurred_at))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -90,14 +95,8 @@ class DomainEvent:
             "event_type": self.event_type,
             "source": self.source,
             "actor": self.actor.to_dict() if self.actor else None,
-            "occurred_at": self._normalize_datetime(self.occurred_at).isoformat(),
+            "occurred_at": normalize_event_datetime(self.occurred_at).isoformat(),
             "payload": self.payload,
             "metadata": self.metadata,
             "version": self.version,
         }
-
-    @staticmethod
-    def _normalize_datetime(value: datetime) -> datetime:
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)

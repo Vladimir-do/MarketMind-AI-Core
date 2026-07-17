@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 from app.database import ApprovalRecord, PriceHistory, Product
 from app.timeline.builder import ProductHistoryBuilder
@@ -89,7 +89,11 @@ class TimelineEngineTests(unittest.TestCase):
             approval_records=approvals,
         )
 
-        same_time = [event.event_type for event in events if event.occurred_at == timestamp]
+        same_time = [
+            event.event_type
+            for event in events
+            if event.occurred_at.astimezone(UTC).replace(tzinfo=None) == timestamp
+        ]
         self.assertLess(
             same_time.index("ai_suggestion_approved"),
             same_time.index("ai_suggestion_created"),
@@ -164,6 +168,55 @@ class TimelineEngineTests(unittest.TestCase):
         event_ids = [event.event_id for event in events]
         self.assertEqual(event_ids.count("approval:dup:created"), 1)
         self.assertTrue(warnings)
+
+    def test_timezone_sort_uses_same_instant(self):
+        utc_time = datetime(2026, 7, 17, 7, 0, tzinfo=UTC)
+        yekaterinburg_time = datetime(2026, 7, 17, 12, 0, tzinfo=timezone(timedelta(hours=5)))
+        rows = [
+            PriceHistory(
+                id=1,
+                product_id=7,
+                price=1000,
+                availability_status="in_stock",
+                recorded_at=datetime(2026, 7, 17, 6, 0, tzinfo=UTC),
+            ),
+            PriceHistory(
+                id=2,
+                product_id=7,
+                price=1100,
+                availability_status="in_stock",
+                recorded_at=yekaterinburg_time,
+            ),
+        ]
+        approvals = [
+            ApprovalRecord(
+                id=1,
+                approval_id="tz",
+                product_id="7",
+                field="name",
+                suggestion_type="rewrite",
+                before_value="A",
+                after_value="B",
+                reason="R",
+                confidence=0.9,
+                status="pending",
+                created_at=utc_time,
+            )
+        ]
+
+        events = self.builder.build(
+            product=self.product,
+            price_history=rows,
+            approval_records=approvals,
+            sort="oldest_first",
+        )
+
+        same_instant = [
+            event.event_type
+            for event in events
+            if event.occurred_at == utc_time
+        ]
+        self.assertEqual(same_instant, ["ai_suggestion_created", "price_changed"])
 
 
 if __name__ == "__main__":

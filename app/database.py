@@ -46,7 +46,10 @@ class PriceHistory(Base):
 
     product = relationship("Product", back_populates="history")
 
-    __table_args__ = (Index("ix_price_history_product_id", "product_id"),)
+    __table_args__ = (
+        Index("ix_price_history_product_id", "product_id"),
+        Index("ix_price_history_product_recorded", "product_id", "recorded_at"),
+    )
 
 
 class ScrapeAttempt(Base):
@@ -145,6 +148,7 @@ class ApprovalRecord(Base):
         Index("ix_approval_records_status", "status"),
         Index("ix_approval_records_product_id", "product_id"),
         Index("ix_approval_records_created_at", "created_at"),
+        Index("ix_approval_records_product_created", "product_id", "created_at"),
     )
 
 

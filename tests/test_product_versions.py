@@ -25,8 +25,9 @@ class ProductVersionTests(unittest.IsolatedAsyncioTestCase):
             {"name": "Версионный товар", "price": 1200, "availability": "out_of_stock"},
         )
 
-        from app.web.app import create_app
         from httpx import ASGITransport, AsyncClient
+
+        from app.web.app import create_app
 
         self.app = create_app()
         self.app.state.db = self.db
@@ -80,6 +81,12 @@ class ProductVersionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["version_number"], 2)
         self.assertIn("snapshot", data)
         self.assertIn("changes", data)
+        self.assertTrue(data["is_derived"])
+        self.assertEqual(data["snapshot_completeness"], "partial")
+        self.assertIn("known_fields", data)
+        self.assertIn("unknown_fields", data)
+        self.assertIn("source_event_ids", data)
+        self.assertFalse(data["quality_score_is_historical"])
 
     async def test_version_compare_api(self):
         product_id = await self._product_id()
@@ -99,6 +106,7 @@ class ProductVersionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Версии карточки товара", resp.text)
         self.assertIn("Сравнить", resp.text)
+        self.assertIn("Частично восстановленная версия", resp.text)
 
     async def test_compare_page(self):
         product_id = await self._product_id()

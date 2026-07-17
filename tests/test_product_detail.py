@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from tests.helpers import reload_app_modules
@@ -31,8 +31,9 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
             {"name": "Другой товар WB", "price": 2000, "availability": "in_stock"},
         )
 
+        from httpx import ASGITransport, AsyncClient
+
         from app.web.app import create_app
-        from httpx import AsyncClient, ASGITransport
 
         self.app = create_app()
         self.app.state.db = self.db
@@ -113,7 +114,7 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_product_detail_history(self):
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
-        from app.ai_recommendation.suggestions import AISuggestion, AIRecommendationResult
+        from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
 
         pid = await self._get_product_id("Ozon")
         queue = DatabaseApprovalQueue(self.db)
@@ -202,7 +203,7 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_product_detail_history_ai_approve_reject_and_rollback(self):
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
-        from app.ai_recommendation.suggestions import AISuggestion, AIRecommendationResult
+        from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
 
         pid = await self._get_product_id("Ozon")
         queue = DatabaseApprovalQueue(self.db)
@@ -257,8 +258,9 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
         await queue.reject(rejected[0].approval_id, reason="Не подходит")
         await queue.approve(rollback[0].approval_id)
 
-        from app.database import ApprovalRecord
         from sqlalchemy import select
+
+        from app.database import ApprovalRecord
 
         async with self.db.session() as s:
             record = (
@@ -270,9 +272,9 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
             ).scalar_one()
             record.snapshot_before = (
                 '{"field": "name", "value": "До отката", '
-                f'"timestamp": "{datetime.now(timezone.utc).isoformat()}"}}'
+                f'"timestamp": "{datetime.now(UTC).isoformat()}"}}'
             )
-            record.applied_at = datetime.now(timezone.utc)
+            record.applied_at = datetime.now(UTC)
             await s.commit()
         await queue.rollback(rollback[0].approval_id)
 
@@ -302,6 +304,94 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["pagination"]["offset"], 0)
         self.assertTrue(data["pagination"]["has_more"])
         self.assertEqual(data["pagination"]["next_offset"], 1)
+
+    async def test_product_detail_timeline_large_offset(self):
+        from app.database import ApprovalRecord
+
+        pid = await self._get_product_id("Ozon")
+        async with self.db.session() as s:
+            for index in range(1105):
+                s.add(
+                    ApprovalRecord(
+                        approval_id=f"bulk{index}",
+                        product_id=str(pid),
+                        field="name",
+                        suggestion_type="rewrite",
+                        before_value="A",
+                        after_value=f"B{index}",
+                        reason="bulk",
+                        confidence=0.5,
+                        status="pending",
+                        created_at=datetime(2026, 7, 17, 0, 0, tzinfo=UTC),
+                    )
+                )
+            await s.commit()
+
+        resp = await self.client.get(f"/api/products/{pid}/timeline?limit=1&offset=1000")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(len(data["items"]), 1)
+        self.assertEqual(data["pagination"]["offset"], 1000)
+        self.assertTrue(data["pagination"]["has_more"])
+
+    async def test_product_detail_timeline_filters_approval_by_lifecycle_date(self):
+        from app.database import ApprovalRecord
+
+        pid = await self._get_product_id("Ozon")
+        async with self.db.session() as s:
+            s.add(
+                ApprovalRecord(
+                    approval_id="lifecycle-date",
+                    product_id=str(pid),
+                    field="name",
+                    suggestion_type="rewrite",
+                    before_value="A",
+                    after_value="B",
+                    reason="created before range",
+                    confidence=0.8,
+                    status="approved",
+                    created_at=datetime(2026, 7, 10, 10, 0, tzinfo=UTC),
+                    reviewed_at=datetime(2026, 7, 17, 10, 0, tzinfo=UTC),
+                )
+            )
+            await s.commit()
+
+        resp = await self.client.get(
+            f"/api/products/{pid}/timeline"
+            "?date_from=2026-07-17T00:00:00+00:00"
+            "&date_to=2026-07-17T23:59:59+00:00"
+        )
+        self.assertEqual(resp.status_code, 200)
+        event_types = {item["event_type"] for item in resp.json()["items"]}
+        self.assertIn("ai_suggestion_approved", event_types)
+        self.assertNotIn("ai_suggestion_created", event_types)
+
+    async def test_product_detail_timeline_price_predecessor_for_date_from(self):
+        from sqlalchemy import select
+
+        from app.database import PriceHistory
+
+        pid = await self._get_product_id("Ozon")
+        async with self.db.session() as s:
+            rows = (
+                await s.execute(
+                    select(PriceHistory)
+                    .where(PriceHistory.product_id == pid)
+                    .order_by(PriceHistory.id)
+                )
+            ).scalars().all()
+            rows[0].recorded_at = datetime(2026, 7, 17, 10, 0, tzinfo=UTC)
+            rows[1].recorded_at = datetime(2026, 7, 17, 11, 0, tzinfo=UTC)
+            await s.commit()
+
+        resp = await self.client.get(
+            f"/api/products/{pid}/timeline?event_type=price&date_from=2026-07-17T10:30:00+00:00"
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["items"]
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["old_value"], "1500 ₽")
+        self.assertEqual(data[0]["new_value"], "1750 ₽")
 
     async def test_product_detail_history_partial(self):
         pid = await self._get_product_id("Ozon")

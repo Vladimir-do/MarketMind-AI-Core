@@ -25,6 +25,7 @@
           <th class="p-2">Дата</th>
           <th class="p-2">Источник</th>
           <th class="p-2">Тип</th>
+          <th class="p-2">Полнота</th>
           <th class="p-2">Quality Score</th>
           <th class="p-2">Изменения</th>
           <th class="p-2"></th>
@@ -37,6 +38,13 @@
           <td class="p-2 text-gray-600">{{ version.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
           <td class="p-2">{{ version.source }}</td>
           <td class="p-2">{{ version.version_type_label }}</td>
+          <td class="p-2">
+            {% if version.snapshot_completeness == 'partial' %}
+            <span class="inline-flex rounded bg-yellow-100 px-2 py-1 text-xs text-yellow-800">Частично восстановленная версия</span>
+            {% else %}
+            <span class="inline-flex rounded bg-green-100 px-2 py-1 text-xs text-green-800">Полная версия</span>
+            {% endif %}
+          </td>
           <td class="p-2">{{ version.quality_score if version.quality_score is not none else '—' }}</td>
           <td class="p-2">
             {% for change in version.changes %}

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from app.domain.events.models import DomainEvent
+if TYPE_CHECKING:
+    from app.domain.events.models import DomainEvent
 
 
 class EventBuilder(Protocol):

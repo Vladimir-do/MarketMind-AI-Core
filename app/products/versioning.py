@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from app.database import Product
-from app.timeline.schemas import ProductHistoryEvent
+from app.domain.events.time import event_sort_key, normalize_event_datetime
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from app.database import Product
+    from app.timeline.schemas import ProductHistoryEvent
 
 
 _VERSION_EVENT_TYPES = {
@@ -36,6 +40,19 @@ _VERSION_TYPE_LABELS = {
     "stock": "Остатки",
     "ai_applied": "AI применено",
     "rollback": "Откат",
+}
+
+_ALL_VERSION_FIELDS = {
+    "name",
+    "description",
+    "brand",
+    "price",
+    "availability",
+    "image_url",
+    "image_urls",
+    "attributes",
+    "ai_status",
+    "quality_score",
 }
 
 
@@ -88,13 +105,19 @@ class ProductVersion:
     quality_score: int | None
     comment: str | None
     timeline_event_ids: list[str]
+    is_derived: bool = True
+    snapshot_completeness: str = "partial"
+    known_fields: list[str] = field(default_factory=list)
+    unknown_fields: list[str] = field(default_factory=list)
+    source_event_ids: list[str] = field(default_factory=list)
+    quality_score_is_historical: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "version_id": self.version_id,
             "product_id": self.product_id,
             "version_number": self.version_number,
-            "created_at": self.created_at.isoformat(),
+            "created_at": normalize_event_datetime(self.created_at).isoformat(),
             "created_by": self.created_by,
             "source": self.source,
             "version_type": self.version_type,
@@ -105,6 +128,12 @@ class ProductVersion:
             "quality_score": self.quality_score,
             "comment": self.comment,
             "timeline_event_ids": self.timeline_event_ids,
+            "is_derived": self.is_derived,
+            "snapshot_completeness": self.snapshot_completeness,
+            "known_fields": self.known_fields,
+            "unknown_fields": self.unknown_fields,
+            "source_event_ids": self.source_event_ids,
+            "quality_score_is_historical": self.quality_score_is_historical,
         }
 
 
@@ -147,7 +176,7 @@ class ProductVersionBuilder:
             for event in timeline_events
             if event.event_type in _VERSION_EVENT_TYPES
         ]
-        version_events.sort(key=lambda event: self._comparable_datetime(event.occurred_at))
+        version_events.sort(key=lambda event: event_sort_key(event.occurred_at))
 
         versions: list[ProductVersion] = []
         snapshot_state = ProductVersionSnapshot(
@@ -159,6 +188,8 @@ class ProductVersionBuilder:
             version_type_value = self._version_type_for_event(event)
             changes = self._changes_for_event(event)
             snapshot_state = self._apply_event_to_snapshot(snapshot_state, event)
+            known_fields = self._known_fields(snapshot_state)
+            unknown_fields = sorted(_ALL_VERSION_FIELDS - set(known_fields))
             versions.append(
                 ProductVersion(
                     version_id=f"version:{product.id}:{index:04d}",
@@ -175,6 +206,9 @@ class ProductVersionBuilder:
                     quality_score=quality_score,
                     comment=event.comment or event.reason,
                     timeline_event_ids=[event.event_id],
+                    known_fields=known_fields,
+                    unknown_fields=unknown_fields,
+                    source_event_ids=[event.event_id],
                 )
             )
 
@@ -273,12 +307,6 @@ class ProductVersionBuilder:
         return event.event_group
 
     @staticmethod
-    def _comparable_datetime(value: datetime) -> datetime:
-        if value.tzinfo is None:
-            return value
-        return value.replace(tzinfo=None)
-
-    @staticmethod
     def _stringify_snapshot_value(value: Any) -> str | None:
         if value is None:
             return None
@@ -287,3 +315,15 @@ class ProductVersionBuilder:
         if isinstance(value, dict):
             return str(value) if value else None
         return str(value)
+
+    @staticmethod
+    def _known_fields(snapshot: ProductVersionSnapshot) -> list[str]:
+        data = snapshot.to_dict()
+        known = []
+        for field_name, value in data.items():
+            if value is None:
+                continue
+            if isinstance(value, (list, dict)) and not value:
+                continue
+            known.append(field_name)
+        return sorted(known)

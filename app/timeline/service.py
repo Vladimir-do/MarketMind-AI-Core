@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from typing import TYPE_CHECKING
 
-from app.database import Product
 from app.timeline.builder import ProductHistoryBuilder
-from app.timeline.repository import TimelineRepository
 from app.timeline.schemas import ProductTimeline, TimelineFilter, TimelinePageInfo, TimelinePagination
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from app.database import Product
+    from app.timeline.repository import TimelineRepository
 
 
 class TimelineService:
@@ -39,19 +43,16 @@ class TimelineService:
         safe_limit = max(1, min(limit, 200))
         safe_offset = max(offset, 0)
         safe_sort = sort if sort in {"newest_first", "oldest_first"} else "newest_first"
-        source_limit = max(200, min(safe_offset + safe_limit + 50, 1_000))
 
         price_history = await self._repository.get_price_history(
             product.id,
             date_from=date_from,
             date_to=date_to,
-            limit=source_limit,
         )
         approval_records = await self._repository.get_approval_records(
             product.id,
             date_from=date_from,
             date_to=date_to,
-            limit=source_limit,
         )
 
         filters = TimelineFilter(

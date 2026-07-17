@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
@@ -12,9 +13,11 @@ from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
 from app.products.versioning import ProductVersion, ProductVersionBuilder
 from app.timeline.repository import TimelineRepository
-from app.timeline.schemas import ProductHistoryEvent
 from app.timeline.service import TimelineService
 from app.web.app import templates
+
+if TYPE_CHECKING:
+    from app.timeline.schemas import ProductHistoryEvent
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -221,7 +224,7 @@ def _parse_history_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value)
+        return datetime.fromisoformat(value.replace(" ", "+"))
     except ValueError as exc:
         logger.info("Invalid timeline datetime filter: %s", value)
         raise HTTPException(status_code=422, detail="Некорректная дата фильтра истории") from exc

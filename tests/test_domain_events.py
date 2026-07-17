@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -16,7 +16,7 @@ from app.domain.events import (
 
 
 def _dt(hour: int) -> datetime:
-    return datetime(2026, 7, 17, hour, 0, tzinfo=timezone.utc)
+    return datetime(2026, 7, 17, hour, 0, tzinfo=UTC)
 
 
 def test_domain_event_serializes_roundtrip():
@@ -186,3 +186,44 @@ def test_read_model_event_reader_filters_sorts_and_deduplicates():
     assert [event.event_id for event in result] == ["a", "b"]
     assert reader.list_events(event_type="product.stock_changed")[0].event_id == "b"
     assert reader.list_events(limit=1, offset=1)[0].event_id == "b"
+
+
+def test_domain_event_reader_normalizes_timezone_for_sorting():
+    same_utc = datetime(2026, 7, 17, 7, 0, tzinfo=UTC)
+    same_plus_five = datetime(2026, 7, 17, 12, 0, tzinfo=timezone(timedelta(hours=5)))
+    later = datetime(2026, 7, 17, 8, 0, tzinfo=UTC)
+    reader = ReadModelEventReader(
+        [
+            DomainEvent(
+                event_id="same-b",
+                aggregate_type="product",
+                aggregate_id="1",
+                event_type="product.stock_changed",
+                source="sync",
+                occurred_at=same_plus_five,
+                payload={},
+            ),
+            DomainEvent(
+                event_id="later",
+                aggregate_type="product",
+                aggregate_id="1",
+                event_type="product.price_changed",
+                source="sync",
+                occurred_at=later,
+                payload={},
+            ),
+            DomainEvent(
+                event_id="same-a",
+                aggregate_type="product",
+                aggregate_id="1",
+                event_type="product.price_changed",
+                source="sync",
+                occurred_at=same_utc,
+                payload={},
+            ),
+        ]
+    )
+
+    result = reader.list_events(sort="oldest_first")
+
+    assert [event.event_id for event in result] == ["same-a", "same-b", "later"]

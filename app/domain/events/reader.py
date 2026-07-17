@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from typing import TYPE_CHECKING
 
-from app.domain.events.models import DomainEvent
+from app.domain.events.time import event_sort_key
+
+if TYPE_CHECKING:
+    from app.domain.events.models import DomainEvent
 
 
 class ReadModelEventReader:
@@ -41,7 +44,7 @@ class ReadModelEventReader:
 
         reverse = sort != "oldest_first"
         events.sort(key=lambda event: event.event_id)
-        events.sort(key=lambda event: self._comparable_datetime(event.occurred_at), reverse=reverse)
+        events.sort(key=lambda event: event_sort_key(event.occurred_at), reverse=reverse)
         safe_offset = max(offset, 0)
         safe_limit = max(limit, 0)
         return events[safe_offset : safe_offset + safe_limit]
@@ -56,9 +59,3 @@ class ReadModelEventReader:
             seen.add(event.event_id)
             result.append(event)
         return result
-
-    @staticmethod
-    def _comparable_datetime(value: datetime) -> datetime:
-        if value.tzinfo is None:
-            return value
-        return value.replace(tzinfo=None)

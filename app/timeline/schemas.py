@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field as dataclass_field
-from datetime import datetime
-from typing import Any
+from dataclasses import asdict, dataclass
+from dataclasses import field as dataclass_field
+from typing import TYPE_CHECKING, Any
+
+from app.domain.events.time import normalize_event_datetime
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 @dataclass(frozen=True)
@@ -38,7 +43,7 @@ class ProductHistoryEvent:
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        payload["occurred_at"] = self.occurred_at.isoformat()
+        payload["occurred_at"] = normalize_event_datetime(self.occurred_at).isoformat()
         return payload
 
 

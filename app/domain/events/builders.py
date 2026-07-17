@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from typing import TYPE_CHECKING
 
-from app.database import ApprovalRecord, PriceHistory, Product
+from app.database import Product
 from app.domain.events.models import AggregateType, DomainEvent, EventActor, EventSource
+from app.domain.events.time import event_sort_key
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from app.database import ApprovalRecord, PriceHistory
 
 
 class ProductEventBuilder:
@@ -38,7 +44,7 @@ class ProductEventBuilder:
         events: list[DomainEvent] = []
         ordered = sorted(
             [item for item in price_history if item.recorded_at is not None],
-            key=lambda item: item.recorded_at,
+            key=lambda item: event_sort_key(item.recorded_at),
         )
         previous: PriceHistory | None = None
         for item in ordered:
@@ -130,7 +136,7 @@ class ApprovalEventBuilder:
         return events
 
     def build(self, source: object) -> list[DomainEvent]:
-        if not isinstance(source, ApprovalRecord):
+        if not hasattr(source, "approval_id"):
             return []
         record = source
         events: list[DomainEvent] = []
