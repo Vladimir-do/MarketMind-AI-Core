@@ -161,4 +161,4 @@ Remote не настроен, push не выполнялся.
 - `25685aa test: cover local workflow import and rollback`
 - `60b195d feat: close local workflow UI and safety gaps`
 - `2bf3dca test: verify local workflow requirement gaps`
-- Документационный gap-audit commit создаётся после обновления отчётов.
+- `2a5f6f2 docs: add L1 traceability and UI acceptance`
