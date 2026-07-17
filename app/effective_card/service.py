@@ -113,14 +113,16 @@ class EffectiveProductCardService:
 
     @staticmethod
     def _build_card(project_product: ProjectProduct, version: ProductCardVersion | None) -> EffectiveProductCard:
-        source = json.loads(project_product.latest_source_snapshot_json or "{}")
-        applied = json.loads(version.snapshot_json) if version is not None else None
+        raw_source = json.loads(project_product.latest_source_snapshot_json or "{}")
+        source_provenance = raw_source.get("_provenance") or {}
+        source = _without_internal_fields(raw_source)
+        applied = _without_internal_fields(json.loads(version.snapshot_json)) if version is not None else None
         effective = applied or source
         overridden = sorted(
             field for field in set(source) | set(effective)
             if source.get(field) != effective.get(field)
         )
-        provenance = _build_provenance(project_product, source, effective, version)
+        provenance = _build_provenance(project_product, source, effective, version, source_provenance)
         warnings = []
         if applied and project_product.source_snapshot_hash != project_product.latest_source_snapshot_hash:
             warnings.append("Исходное значение изменилось. Ручная версия сохранена.")
@@ -179,6 +181,7 @@ def _build_provenance(
     source: dict[str, Any],
     effective: dict[str, Any],
     version: ProductCardVersion | None,
+    source_provenance: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     source_row = project_product.source_row_index
@@ -188,7 +191,7 @@ def _build_provenance(
             "source_type": "manual_version" if is_overridden else "imported_file",
             "source_file_id": project_product.source_file_id,
             "source_row": source_row,
-            "source_column": _source_column_for_field(field_name, source),
+            "source_column": _source_column_for_field(field_name, source, source_provenance),
             "original_value": source.get(field_name),
             "normalized_value": effective.get(field_name),
             "version_id": version.version_id if is_overridden and version is not None else None,
@@ -200,9 +203,16 @@ def _build_provenance(
     return result
 
 
-def _source_column_for_field(field: str, source: dict[str, Any]) -> str | None:
+def _source_column_for_field(field: str, source: dict[str, Any], source_provenance: dict[str, Any]) -> str | None:
+    field_sources = source_provenance.get("field_sources") or {}
+    if field in field_sources:
+        return str(field_sources[field])
     attributes = source.get("attributes") or {}
     marker = f"source:{field}"
     if marker in attributes:
         return field
     return field if field in source else None
+
+
+def _without_internal_fields(snapshot: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in snapshot.items() if not str(key).startswith("_")}

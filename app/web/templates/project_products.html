@@ -9,7 +9,7 @@
     <tbody>
     {% for card in products %}
       <tr class="border-t">
-        <td class="p-3">{{ card.effective_snapshot.title or "Без названия" }}</td>
+        <td class="p-3"><a class="text-blue-700 hover:underline" href="/projects/{{ project.project_id }}/products/{{ card.product_id }}">{{ card.effective_snapshot.title or "Без названия" }}</a></td>
         <td class="p-3">{{ card.effective_snapshot.price or "—" }}</td>
         <td class="p-3">{{ card.effective_snapshot.availability or "unknown" }}</td>
         <td class="p-3">{{ "Да" if card.is_manually_modified else "Нет" }}</td>

@@ -119,7 +119,10 @@ IMPORT_SCHEMA_VERSION: str = os.getenv("IMPORT_SCHEMA_VERSION", "local-import-v1
 EXPORT_SCHEMA_VERSION: str = os.getenv("EXPORT_SCHEMA_VERSION", "local-export-v1")
 IMPORT_MAX_FILE_BYTES: int = int(os.getenv("IMPORT_MAX_FILE_BYTES", str(20 * 1024 * 1024)))
 IMPORT_MAX_ROWS: int = int(os.getenv("IMPORT_MAX_ROWS", "10000"))
+IMPORT_MAX_COLUMNS: int = int(os.getenv("IMPORT_MAX_COLUMNS", "200"))
 IMPORT_MAX_CELL_CHARS: int = int(os.getenv("IMPORT_MAX_CELL_CHARS", "20000"))
+IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES: int = int(os.getenv("IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES", str(100 * 1024 * 1024)))
+IMPORT_MAX_ZIP_COMPRESSION_RATIO: int = int(os.getenv("IMPORT_MAX_ZIP_COMPRESSION_RATIO", "100"))
 IMPORT_PREVIEW_ROWS: int = int(os.getenv("IMPORT_PREVIEW_ROWS", "5"))
 
 # ── База данных ───────────────────────────────────────────────────────────────

@@ -288,6 +288,8 @@ def _normalize_status(value: Any) -> str:
 def _snapshot_from_unified(product: UnifiedProduct, product_id: int) -> dict[str, Any]:
     attributes = dict(product.attributes or {})
     for key, value in product.raw.items():
+        if key == "__field_sources":
+            continue
         attributes.setdefault(f"source:{key}", "" if value is None else str(value))
     return {
         "title": product.name or "",
@@ -299,4 +301,5 @@ def _snapshot_from_unified(product: UnifiedProduct, product_id: int) -> dict[str
         "attributes": attributes,
         "marketplace": product.marketplace or product.source_type or "unknown",
         "external_product_id": product.sku or product.source_id or str(product_id),
+        "_provenance": {"field_sources": product.raw.get("__field_sources", {})},
     }

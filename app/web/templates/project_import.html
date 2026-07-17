@@ -3,21 +3,13 @@
 {% block content %}
 <h1 class="text-2xl font-bold mb-4">Импорт товаров</h1>
 <p class="text-gray-600 mb-4">Проект: {{ project.name }}</p>
-<section class="bg-white border rounded p-5 max-w-3xl mb-4">
+<section class="bg-white border rounded p-5 max-w-5xl mb-4">
   <h2 class="font-semibold mb-2">Шаг 1. Preview файла</h2>
-  <p class="text-sm text-gray-600 mb-3">Preview ничего не записывает в товары проекта. Проверьте колонки, ошибки и предупреждения перед импортом.</p>
+  <p class="text-sm text-gray-600 mb-3">Preview ничего не записывает в товары проекта. Проверьте колонки, лист Excel, ошибки и предупреждения перед импортом.</p>
   <form hx-post="/api/projects/{{ project.project_id }}/imports/preview" hx-encoding="multipart/form-data" hx-target="#preview-result">
     <input type="file" name="file" class="block w-full border rounded p-2 mb-4" accept=".csv,.xlsx,.xlsm" required>
     <button class="bg-gray-800 text-white px-4 py-2 rounded">Показать preview</button>
   </form>
-  <pre id="preview-result" class="mt-4 bg-gray-50 border rounded p-3 text-sm whitespace-pre-wrap"></pre>
+  <div id="preview-result" class="mt-4"></div>
 </section>
-
-<form class="bg-white border rounded p-5 max-w-3xl" hx-post="/api/projects/{{ project.project_id }}/imports" hx-encoding="multipart/form-data" hx-target="#import-result">
-  <h2 class="font-semibold mb-2">Шаг 2. Импорт</h2>
-  <p class="text-sm text-gray-600 mb-3">Для простого файла можно выполнить импорт сразу. Для нестандартных колонок используйте JSON API preview/import с mapping.</p>
-  <input type="file" name="file" class="block w-full border rounded p-2 mb-4" accept=".csv,.xlsx,.xlsm" required>
-  <button class="bg-blue-600 text-white px-4 py-2 rounded">Импортировать</button>
-</form>
-<pre id="import-result" class="mt-4 bg-gray-50 border rounded p-3 text-sm whitespace-pre-wrap"></pre>
 {% endblock %}

@@ -11,7 +11,15 @@ from typing import Any
 
 import openpyxl
 
-from app.config import IMPORT_MAX_CELL_CHARS, IMPORT_MAX_FILE_BYTES, IMPORT_MAX_ROWS, IMPORT_PREVIEW_ROWS
+from app.config import (
+    IMPORT_MAX_CELL_CHARS,
+    IMPORT_MAX_COLUMNS,
+    IMPORT_MAX_FILE_BYTES,
+    IMPORT_MAX_ROWS,
+    IMPORT_MAX_ZIP_COMPRESSION_RATIO,
+    IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES,
+    IMPORT_PREVIEW_ROWS,
+)
 from app.importers.base import DEFAULT_FIELD_MAPPING
 from app.products.schema import UnifiedProduct
 
@@ -39,6 +47,13 @@ FIELD_ALIASES = {
     "название": "title",
     "наименование": "title",
     "товар": "title",
+    "name": "title",
+    "title": "title",
+    "product": "title",
+    "old_price": "old_price",
+    "discount": "attributes",
+    "image": "image_urls",
+    "images": "image_urls",
     "артикул": "sku",
     "штрихкод": "barcode",
     "баркод": "barcode",
@@ -85,6 +100,7 @@ class ImportPreview:
     warnings: list[str] = field(default_factory=list)
     errors: list[ImportCellError] = field(default_factory=list)
     duplicate: bool = False
+    requires_confirmation: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -158,7 +174,10 @@ def _analyze_csv(
     raw = path.read_bytes()
     if raw.startswith(b"PK\x03\x04"):
         raise ValueError("Файл похож на Excel/ZIP, но имеет расширение CSV")
-    text = raw.decode("utf-8-sig")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Файл должен быть в кодировке UTF-8 или UTF-8 BOM") from exc
     delimiter, delimiter_warning = _detect_delimiter(text)
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     columns = [str(column or "").strip() for column in (reader.fieldnames or [])]
@@ -184,6 +203,7 @@ def _analyze_csv(
         warnings=warnings,
         errors=errors,
         duplicate=duplicate,
+        requires_confirmation=bool(warnings),
     )
 
 
@@ -199,6 +219,7 @@ def _analyze_excel(
 ) -> ImportPreview:
     if not zipfile.is_zipfile(path):
         raise ValueError("Файл не похож на корректный XLSX/XLSM")
+    _validate_zip_safety(path)
     workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
     try:
         sheets = workbook.sheetnames
@@ -231,6 +252,7 @@ def _analyze_excel(
             warnings=warnings,
             errors=_validate_rows(rows),
             duplicate=duplicate,
+            requires_confirmation=bool(warnings),
         )
     finally:
         workbook.close()
@@ -285,6 +307,7 @@ def _row_to_product(
 ) -> tuple[UnifiedProduct | None, list[ImportCellError]]:
     fields: dict[str, Any] = {}
     attributes: dict[str, str] = {}
+    field_sources: dict[str, str] = {}
     errors: list[ImportCellError] = []
     for column, value in row.items():
         target = mapping.get(column, "attributes")
@@ -310,8 +333,10 @@ def _row_to_product(
             fields[target] = [item.strip() for item in text.split(",") if item.strip()]
         elif target == "title":
             fields["name"] = text
+            field_sources["title"] = column
         else:
             fields[target] = text
+            field_sources[target] = column
     title = str(fields.get("name") or "").strip()
     sku = str(fields.get("sku") or fields.get("vendor_code") or "").strip()
     if not title:
@@ -332,7 +357,7 @@ def _row_to_product(
         source_url=fields.get("source_url"),
         marketplace=fields.get("marketplace"),
         availability=str(fields.get("availability") or "in_stock"),
-        raw=dict(row),
+        raw={**dict(row), "__field_sources": field_sources},
     )
     return product, errors
 
@@ -360,11 +385,26 @@ def _validate_rows(rows: list[dict[str, Any]]) -> list[ImportCellError]:
     if len(rows) > IMPORT_MAX_ROWS:
         errors.append(_error(0, None, "too_many_rows", str(len(rows)), "В файле слишком много строк", "Разделите файл на несколько импортов."))
     for row_index, row in enumerate(rows[:IMPORT_MAX_ROWS], start=2):
+        if len(row) > IMPORT_MAX_COLUMNS:
+            errors.append(_error(row_index, None, "too_many_columns", str(len(row)), "В строке слишком много колонок", "Удалите лишние колонки или разделите файл."))
         for column, value in row.items():
             text = "" if value is None else str(value)
             if len(text) > IMPORT_MAX_CELL_CHARS:
                 errors.append(_error(row_index, column, "cell_too_large", text, "Слишком длинное значение", "Сократите значение в ячейке."))
     return errors
+
+
+def _validate_zip_safety(path: Path) -> None:
+    with zipfile.ZipFile(path) as archive:
+        total_compressed = 0
+        total_uncompressed = 0
+        for info in archive.infolist():
+            total_compressed += max(info.compress_size, 0)
+            total_uncompressed += max(info.file_size, 0)
+        if total_uncompressed > IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES:
+            raise ValueError("Excel-файл слишком большой после распаковки")
+        if total_compressed > 0 and total_uncompressed / total_compressed > IMPORT_MAX_ZIP_COMPRESSION_RATIO:
+            raise ValueError("Excel-файл выглядит как ZIP-bomb и отклонён")
 
 
 def _parse_int(value: str) -> int | None:

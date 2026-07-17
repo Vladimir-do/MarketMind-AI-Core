@@ -384,6 +384,7 @@ class ProductCardEditorService:
                 target.version_id,
                 version.version_id,
                 reason,
+                actual_current,
                 project_id=project_id,
                 project_product_id=project_product_id,
             )
@@ -564,10 +565,11 @@ class ProductCardEditorService:
                 "project_id": project_id,
                 "project_product_id": project_product_id,
                 "changes": [item.to_dict() for item in diff],
+                "after_version": version_id,
                 "version_id": version_id,
                 "comment": comment,
             },
-            metadata={"source_table": "domain_event_records"},
+            metadata={"source_table": "domain_event_records", "correlation_id": event_id},
         )
 
     @staticmethod
@@ -580,6 +582,7 @@ class ProductCardEditorService:
         source_version_id: str,
         version_id: str,
         reason: str | None,
+        current_version_id: str | None,
         *,
         project_id: str | None = None,
         project_product_id: str | None = None,
@@ -598,11 +601,13 @@ class ProductCardEditorService:
                 "project_id": project_id,
                 "project_product_id": project_product_id,
                 "changes": [item.to_dict() for item in diff],
+                "before_version": current_version_id,
+                "after_version": version_id,
                 "source_version_id": source_version_id,
                 "version_id": version_id,
                 "reason": reason,
             },
-            metadata={"source_table": "domain_event_records"},
+            metadata={"source_table": "domain_event_records", "correlation_id": event_id},
         )
 
     @staticmethod

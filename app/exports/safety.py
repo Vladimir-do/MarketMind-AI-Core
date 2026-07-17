@@ -15,10 +15,10 @@ def sanitize_spreadsheet_cell(value: Any) -> Any:
         return ""
     if not isinstance(value, str):
         return value
-    stripped = value.strip()
+    stripped = value.lstrip()
     if stripped.startswith("-") and _NUMERIC_RE.fullmatch(stripped):
         return value
-    if value.startswith(_FORMULA_PREFIXES):
+    if stripped.startswith(_FORMULA_PREFIXES):
         return "'" + value
     return value
 

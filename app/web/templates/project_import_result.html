@@ -1,0 +1,10 @@
+<div class="bg-gray-50 border rounded p-4 text-sm">
+  <div class="font-semibold mb-2">Результат импорта</div>
+  <p>{{ message }}</p>
+  <ul class="list-disc ml-5 mt-2">
+    <li>Статус: {{ status }}</li>
+    {% if total_products is defined %}<li>Импортировано товаров: {{ total_products }}</li>{% endif %}
+    {% if changed_products is defined %}<li>Обновлено карточек: {{ changed_products }}</li>{% endif %}
+    {% if errors is defined %}<li>Ошибок: {{ errors }}</li>{% endif %}
+  </ul>
+</div>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Версии проекта - MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Версии карточки проекта</h1>
+<p class="text-gray-600 mb-4">{{ card.effective_snapshot.title or "Без названия" }}</p>
+<div class="bg-white border rounded overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-100"><tr><th class="p-3 text-left">Номер</th><th class="p-3 text-left">Источник</th><th class="p-3 text-left">Дата</th><th class="p-3 text-left">Комментарий</th><th class="p-3 text-left">Откат</th></tr></thead>
+    <tbody>
+    {% for version in versions %}
+    <tr class="border-t">
+      <td class="p-3">{{ version.version_number }}</td>
+      <td class="p-3">{{ version.source }}</td>
+      <td class="p-3">{{ version.created_at }}</td>
+      <td class="p-3">{{ version.comment or "—" }}</td>
+      <td class="p-3">
+        <form hx-post="/api/projects/{{ project.project_id }}/products/{{ card.product_id }}/versions/{{ version.version_number }}/rollback" hx-target="#rollback-result">
+          <input type="hidden" name="current_version_id" value="{{ card.latest_version_id or '' }}">
+          <input type="text" name="reason" required placeholder="Причина отката" class="border rounded p-1 text-sm">
+          <button class="bg-red-600 text-white px-2 py-1 rounded text-sm">Откатить</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="p-4 text-gray-600">Версий пока нет.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div id="rollback-result" class="mt-4"></div>
+{% endblock %}

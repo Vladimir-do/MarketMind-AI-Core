@@ -7,9 +7,11 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from sqlalchemy import select
 
 from app.config import IMPORT_SCHEMA_VERSION
+from app.database import ProjectExport, ProjectReport
 from app.editor.service import (
     EditorConflictError,
     EditorNotFoundError,
@@ -27,11 +29,29 @@ from app.projects.service import (
 )
 from app.reports.service import ClientDeliveryReportService
 from app.web.app import templates
-from app.workspace.files import WorkspaceError, store_source_file, stored_source_file
+from app.workspace.files import WorkspaceError, project_root, store_source_file, stored_source_file
 
 router = APIRouter()
 PROJECT_UPLOAD_FILE = File(...)
 PROJECT_OPTIONAL_UPLOAD_FILE = File(None)
+FIELD_OPTIONS = [
+    ("title", "Название"),
+    ("description", "Описание"),
+    ("brand", "Бренд"),
+    ("category", "Категория"),
+    ("price", "Цена"),
+    ("old_price", "Старая цена"),
+    ("cost", "Себестоимость"),
+    ("availability", "Остаток / наличие"),
+    ("marketplace", "Маркетплейс"),
+    ("sku", "SKU"),
+    ("vendor_code", "Артикул"),
+    ("barcode", "Штрихкод"),
+    ("source_url", "URL"),
+    ("image_urls", "Изображения"),
+    ("attributes", "Дополнительная характеристика"),
+    ("skip", "Пропустить"),
+]
 
 
 def _project_service(request: Request) -> ProjectService:
@@ -96,6 +116,33 @@ def _artifact_to_dict(record) -> dict[str, Any]:
         "manifest": json.loads(getattr(record, "manifest_json", None) or "{}"),
         "status": record.status,
         "created_at": record.created_at.isoformat() if record.created_at else None,
+    }
+
+
+def _is_hx(request: Request) -> bool:
+    return request.headers.get("hx-request", "").lower() == "true"
+
+
+def _mapping_from_body(body: dict[str, Any]) -> dict[str, str]:
+    mapping = body.get("mapping")
+    if isinstance(mapping, dict):
+        return {str(key): str(value) for key, value in mapping.items()}
+    result = {}
+    for key, value in body.items():
+        if key.startswith("mapping__"):
+            result[key.removeprefix("mapping__")] = str(value)
+    return result
+
+
+def _stored_file_from_body(body: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(body.get("stored_file"), dict):
+        return body["stored_file"]
+    return {
+        "relative_path": body.get("stored_relative_path"),
+        "original_filename": body.get("stored_original_filename"),
+        "sha256": body.get("stored_sha256"),
+        "size_bytes": body.get("stored_size_bytes"),
+        "file_format": body.get("stored_file_format"),
     }
 
 
@@ -178,7 +225,7 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             stored = store_source_file(project_id, file.filename or "upload.csv", content)
         else:
             body = await _request_data(request)
-            stored_info = body.get("stored_file") or {}
+            stored_info = _stored_file_from_body(body)
             stored = stored_source_file(
                 project_id,
                 str(stored_info.get("relative_path") or ""),
@@ -189,6 +236,7 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             )
         duplicate = await _project_service(request).source_file_exists(project_id, stored.sha256)
         confirm_duplicate = bool(body.get("confirm_duplicate"))
+        confirm_warnings = bool(body.get("confirm_warnings"))
         preview = analyze_import_file(
             path=stored.absolute_path,
             original_filename=stored.original_filename,
@@ -199,13 +247,26 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             selected_sheet=body.get("selected_sheet"),
         )
         if duplicate and not confirm_duplicate:
-            return {
+            response = {
                 "status": "duplicate_file",
                 "project_id": project_id,
                 "preview": preview.to_dict(),
                 "message": "Этот файл уже импортировался. Подтвердите повторный импорт, чтобы обновить данные.",
             }
-        products, import_errors = build_products_from_preview(preview, mapping=body.get("mapping") or None)
+            if _is_hx(request):
+                return templates.TemplateResponse(request, "project_import_result.html", response)
+            return response
+        if preview.requires_confirmation and not confirm_warnings:
+            response = {
+                "status": "warning_confirmation_required",
+                "project_id": project_id,
+                "preview": preview.to_dict(),
+                "message": "В preview есть предупреждения. Подтвердите импорт после проверки.",
+            }
+            if _is_hx(request):
+                return templates.TemplateResponse(request, "project_import_result.html", response)
+            return response
+        products, import_errors = build_products_from_preview(preview, mapping=_mapping_from_body(body) or None)
         pipeline = ImportPipeline()
         result = pipeline.run_products(products)
         errors = [getattr(error, "message", str(error)) for error in result.errors]
@@ -248,7 +309,7 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             )
             saved += 1
             changed += 1 if was_changed else 0
-        return {
+        response = {
             "task_id": uuid.uuid4().hex[:12],
             "status": "completed" if created else "reimported_existing_file",
             "project_id": project_id,
@@ -258,6 +319,9 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             "errors": len(errors),
             "message": f"Импортировано {saved} товаров, ошибок: {len(errors)}",
         }
+        if _is_hx(request):
+            return templates.TemplateResponse(request, "project_import_result.html", response)
+        return response
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -277,7 +341,7 @@ async def api_preview_project_import(project_id: str, request: Request, file: Up
             file_format=stored.file_format,
             duplicate=duplicate,
         )
-        return {
+        response = {
             "project_id": project_id,
             "stored_file": {
                 "original_filename": stored.original_filename,
@@ -289,6 +353,9 @@ async def api_preview_project_import(project_id: str, request: Request, file: Up
             "preview": preview.to_dict(),
             "message": "Preview готов. Проверьте сопоставление колонок перед импортом.",
         }
+        if _is_hx(request):
+            return templates.TemplateResponse(request, "project_import_preview.html", {**response, "field_options": FIELD_OPTIONS})
+        return response
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -396,10 +463,29 @@ async def api_project_draft_quality_preview(project_id: str, product_id: int, dr
         raise _editor_error(exc) from exc
 
 
+@router.get("/api/projects/{project_id}/products/{product_id}/versions")
+async def api_project_product_versions(project_id: str, product_id: int, request: Request):
+    try:
+        project_product = await _project_service(request).get_project_product(project_id, product_id)
+        versions = await ProductCardEditorService(request.app.state.db).list_persisted_versions(
+            product_id,
+            project_id=project_id,
+            project_product_id=project_product.project_product_id,
+            limit=100,
+        )
+        from app.web.routes.editor import _version_to_dict
+
+        return {"project_id": project_id, "product_id": product_id, "items": [_version_to_dict(version) for version in versions]}
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
 @router.post("/api/projects/{project_id}/products/{product_id}/versions/{version_number}/rollback")
 async def api_project_rollback_version(project_id: str, product_id: int, version_number: int, request: Request):
     body = await _request_data(request)
     try:
+        if not str(body.get("reason") or "").strip():
+            raise ValueError("Укажите причину отката")
         project_product = await _project_service(request).get_project_product(project_id, product_id)
         result = await ProductCardEditorService(request.app.state.db).rollback_version(
             product_id,
@@ -412,11 +498,72 @@ async def api_project_rollback_version(project_id: str, product_id: int, version
         )
         from app.web.routes.editor import _version_to_dict
 
-        return {
+        response = {
             "version": _version_to_dict(result.version),
             "event": result.event.to_dict(),
             "diff": [item.to_dict() for item in result.diff],
         }
+        if _is_hx(request):
+            return templates.TemplateResponse(request, "project_action_result.html", {"result": response})
+        return response
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.post("/projects/{project_id}/products/{product_id}/manual-edit/preview", response_class=HTMLResponse)
+async def project_manual_edit_preview(project_id: str, product_id: int, request: Request):
+    body = await _request_data(request)
+    card = await _effective_service(request).get_effective_card(project_id, product_id)
+    payload = _editable_payload(body)
+    after = {**card.effective_snapshot, **payload}
+    diff = [
+        {"field": key, "before": card.effective_snapshot.get(key), "after": after.get(key)}
+        for key in sorted(set(card.effective_snapshot) | set(after))
+        if card.effective_snapshot.get(key) != after.get(key)
+    ]
+    return templates.TemplateResponse(
+        request,
+        "project_manual_edit_preview.html",
+        {
+            "project_id": project_id,
+            "product_id": product_id,
+            "payload": payload,
+            "diff": diff,
+            "current_version_id": card.latest_version_id,
+        },
+    )
+
+
+@router.post("/projects/{project_id}/products/{product_id}/manual-edit/apply", response_class=HTMLResponse)
+async def project_manual_edit_apply(project_id: str, product_id: int, request: Request):
+    body = await _request_data(request)
+    try:
+        project_product = await _project_service(request).get_project_product(project_id, product_id)
+        payload = _editable_payload(body)
+        service = ProductCardEditorService(request.app.state.db)
+        draft = await service.create_draft(
+            product_id,
+            payload=payload,
+            base_version_id=body.get("current_version_id"),
+            actor_id="operator",
+            comment=body.get("comment") or "Ручная правка через интерфейс проекта",
+            project_id=project_id,
+            project_product_id=project_product.project_product_id,
+        )
+        result = await service.apply_draft(
+            product_id,
+            draft.draft_id,
+            revision=draft.revision,
+            actor_id="operator",
+            comment=body.get("comment") or "Ручная правка через интерфейс проекта",
+            project_id=project_id,
+            project_product_id=project_product.project_product_id,
+        )
+        return templates.TemplateResponse(
+            request,
+            "project_action_result.html",
+            {"result": {"version": result.version.version_id, "diff": [item.to_dict() for item in result.diff]}},
+        )
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -476,6 +623,32 @@ async def api_list_project_reports(project_id: str, request: Request):
     return {"project_id": project_id, "items": [_artifact_to_dict(record) for record in records]}
 
 
+@router.get("/projects/{project_id}/exports/{export_id}/download")
+async def download_project_export(project_id: str, export_id: str, request: Request):
+    async with request.app.state.db.session() as session:
+        record = await session.scalar(
+            select(ProjectExport)
+            .where(ProjectExport.project_id == project_id)
+            .where(ProjectExport.export_id == export_id)
+        )
+        if record is None:
+            raise HTTPException(status_code=404, detail="Экспорт не найден")
+        return _download_project_artifact(project_id, record.relative_path)
+
+
+@router.get("/projects/{project_id}/reports/{report_id}/download")
+async def download_project_report(project_id: str, report_id: str, request: Request):
+    async with request.app.state.db.session() as session:
+        record = await session.scalar(
+            select(ProjectReport)
+            .where(ProjectReport.project_id == project_id)
+            .where(ProjectReport.report_id == report_id)
+        )
+        if record is None:
+            raise HTTPException(status_code=404, detail="Отчёт не найден")
+        return _download_project_artifact(project_id, record.relative_path)
+
+
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request):
     projects = await _project_service(request).list_projects()
@@ -515,6 +688,46 @@ async def project_products_page(project_id: str, request: Request):
     )
 
 
+@router.get("/projects/{project_id}/products/{product_id}", response_class=HTMLResponse)
+async def project_product_detail_page(project_id: str, product_id: int, request: Request):
+    project = await _project_service(request).get_project(project_id)
+    card = await _effective_service(request).get_effective_card(project_id, product_id)
+    return templates.TemplateResponse(
+        request,
+        "project_product_detail.html",
+        {"project": project, "card": card, "active": "projects"},
+    )
+
+
+@router.get("/projects/{project_id}/products/{product_id}/edit", response_class=HTMLResponse)
+async def project_product_edit_page(project_id: str, product_id: int, request: Request):
+    project = await _project_service(request).get_project(project_id)
+    card = await _effective_service(request).get_effective_card(project_id, product_id)
+    return templates.TemplateResponse(
+        request,
+        "project_product_edit.html",
+        {"project": project, "card": card, "active": "projects"},
+    )
+
+
+@router.get("/projects/{project_id}/products/{product_id}/versions", response_class=HTMLResponse)
+async def project_product_versions_page(project_id: str, product_id: int, request: Request):
+    project = await _project_service(request).get_project(project_id)
+    card = await _effective_service(request).get_effective_card(project_id, product_id)
+    project_product = await _project_service(request).get_project_product(project_id, product_id)
+    versions = await ProductCardEditorService(request.app.state.db).list_persisted_versions(
+        product_id,
+        project_id=project_id,
+        project_product_id=project_product.project_product_id,
+        limit=100,
+    )
+    return templates.TemplateResponse(
+        request,
+        "project_product_versions.html",
+        {"project": project, "card": card, "versions": versions, "active": "projects"},
+    )
+
+
 @router.get("/projects/{project_id}/reports", response_class=HTMLResponse)
 async def project_reports_page(project_id: str, request: Request):
     project = await _project_service(request).get_project(project_id)
@@ -535,3 +748,26 @@ async def project_exports_page(project_id: str, request: Request):
         "project_exports.html",
         {"project": project, "exports": exports, "active": "projects"},
     )
+
+
+def _editable_payload(body: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for field in ("title", "description", "brand", "availability"):
+        if field in body:
+            payload[field] = str(body.get(field) or "").strip()
+    if "price" in body:
+        raw_price = str(body.get("price") or "").strip()
+        payload["price"] = int(float(raw_price.replace(",", "."))) if raw_price else None
+    return payload
+
+
+def _download_project_artifact(project_id: str, relative_path: str) -> FileResponse:
+    root = project_root(project_id)
+    target = root / relative_path
+    root_resolved = root.resolve()
+    target_resolved = target.resolve()
+    if root_resolved not in target_resolved.parents:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    if not target_resolved.exists() or not target_resolved.is_file():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    return FileResponse(target_resolved, filename=target_resolved.name)

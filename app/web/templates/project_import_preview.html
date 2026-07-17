@@ -1,0 +1,89 @@
+<section class="bg-white border rounded p-5">
+  <h2 class="font-semibold mb-3">Шаг 2. Проверка и сопоставление колонок</h2>
+  <div class="grid md:grid-cols-3 gap-3 text-sm mb-4">
+    <div><span class="text-gray-500">Файл:</span> {{ preview.original_filename }}</div>
+    <div><span class="text-gray-500">Формат:</span> {{ preview.file_format }}</div>
+    <div><span class="text-gray-500">Размер:</span> {{ preview.size_bytes }} байт</div>
+    <div><span class="text-gray-500">Кодировка:</span> {{ preview.encoding or "не применимо" }}</div>
+    <div><span class="text-gray-500">Разделитель:</span> {{ preview.delimiter or "не применимо" }}</div>
+    <div><span class="text-gray-500">Строк:</span> {{ preview.row_count }}</div>
+  </div>
+  {% if preview.sheets %}
+  <div class="mb-4 text-sm">
+    <div class="font-medium">Листы Excel</div>
+    <div>{{ preview.sheets | join(", ") }}</div>
+  </div>
+  {% endif %}
+  {% if preview.warnings %}
+  <div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4 text-sm">
+    <div class="font-semibold mb-1">Предупреждения</div>
+    <ul class="list-disc ml-5">{% for warning in preview.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if preview.errors %}
+  <div class="bg-red-50 border border-red-200 rounded p-3 mb-4 text-sm">
+    <div class="font-semibold mb-1">Ошибки</div>
+    <ul class="list-disc ml-5">
+      {% for error in preview.errors[:10] %}
+      <li>Строка {{ error.row_number }}, колонка {{ error.column or "—" }}: {{ error.message }}. {{ error.recommendation }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <div class="overflow-x-auto mb-5">
+    <table class="min-w-full text-sm border">
+      <thead class="bg-gray-100">
+        <tr>{% for column in preview.columns %}<th class="p-2 border text-left">{{ column }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for row in preview.preview_rows %}
+        <tr>{% for column in preview.columns %}<td class="p-2 border">{{ row.get(column, "") }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form hx-post="/api/projects/{{ project_id }}/imports" hx-target="#import-result">
+    <input type="hidden" name="stored_relative_path" value="{{ stored_file.relative_path }}">
+    <input type="hidden" name="stored_original_filename" value="{{ stored_file.original_filename }}">
+    <input type="hidden" name="stored_sha256" value="{{ stored_file.sha256 }}">
+    <input type="hidden" name="stored_size_bytes" value="{{ stored_file.size_bytes }}">
+    <input type="hidden" name="stored_file_format" value="{{ stored_file.file_format }}">
+    {% if preview.selected_sheet %}<input type="hidden" name="selected_sheet" value="{{ preview.selected_sheet }}">{% endif %}
+    {% if preview.sheets %}
+    <label class="block text-sm mb-4">
+      <span class="text-gray-700">Выбранный лист для импорта</span>
+      <select name="selected_sheet" class="mt-1 block w-full border rounded p-2">
+        {% for sheet in preview.sheets %}
+        <option value="{{ sheet }}" {% if preview.selected_sheet == sheet %}selected{% endif %}>{{ sheet }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <div class="grid md:grid-cols-2 gap-3 mb-4">
+      {% for column in preview.columns %}
+      <label class="block text-sm">
+        <span class="text-gray-700">{{ column }}</span>
+        <select name="mapping__{{ column }}" class="mt-1 block w-full border rounded p-2">
+          {% for value, label in field_options %}
+          <option value="{{ value }}" {% if preview.suggested_mapping.get(column) == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endfor %}
+    </div>
+    {% if preview.requires_confirmation %}
+    <label class="flex items-center gap-2 text-sm mb-3">
+      <input type="checkbox" name="confirm_warnings" value="1" required>
+      <span>Я проверил предупреждения и подтверждаю импорт.</span>
+    </label>
+    {% endif %}
+    {% if preview.duplicate %}
+    <label class="flex items-center gap-2 text-sm mb-3">
+      <input type="checkbox" name="confirm_duplicate" value="1" required>
+      <span>Файл уже импортировался. Я подтверждаю повторный импорт.</span>
+    </label>
+    {% endif %}
+    <button class="bg-blue-600 text-white px-4 py-2 rounded">Импортировать выбранные данные</button>
+  </form>
+  <div id="import-result" class="mt-4"></div>
+</section>
