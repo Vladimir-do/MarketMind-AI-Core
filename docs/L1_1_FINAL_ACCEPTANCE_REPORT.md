@@ -94,6 +94,18 @@ ASGI `FileResponse` не форсируется через зависающий 
 - exports;
 - reports.
 
+## Manual Acceptance UX Fixes
+
+После ручной приёмки исправлены найденные UX-проблемы:
+
+- добавлены `start_l1_demo.sh` и `start_l1_demo.bat`;
+- legacy пункты бокового меню явно помечены как legacy;
+- rollback/manual action result больше не показывает сырой dict;
+- export/report HTMX actions возвращают русские partial-шаблоны вместо JSON;
+- список экспортов обновляется сразу после создания;
+- список отчётов проекта отображается на странице и обновляется сразу после создания;
+- у созданных export/report сразу есть ссылка скачивания.
+
 Доступно через API и используется UI:
 
 - project import preview/import;

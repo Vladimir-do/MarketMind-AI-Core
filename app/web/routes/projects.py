@@ -723,6 +723,14 @@ async def api_create_project_export(project_id: str, request: Request):
             file_format=body.get("file_format") or "csv",
             marketplace_profile=body.get("marketplace_profile") or "universal",
         )
+        if _is_hx(request):
+            project = await _project_service(request).get_project(project_id)
+            exports = await ProjectExportService(request.app.state.db).list_exports(project_id)
+            return templates.TemplateResponse(
+                request,
+                "project_exports_list.html",
+                {"project": project, "exports": exports, "created": record},
+            )
         return _artifact_to_dict(record)
     except Exception as exc:
         raise _editor_error(exc) from exc
@@ -750,6 +758,14 @@ async def api_create_project_report(project_id: str, request: Request):
             project_id,
             file_format=body.get("file_format") or "html",
         )
+        if _is_hx(request):
+            project = await _project_service(request).get_project(project_id)
+            reports = await ClientDeliveryReportService(request.app.state.db).list_reports(project_id)
+            return templates.TemplateResponse(
+                request,
+                "project_reports_list.html",
+                {"project": project, "reports": reports, "created": record},
+            )
         return _artifact_to_dict(record)
     except Exception as exc:
         raise _editor_error(exc) from exc
@@ -870,10 +886,11 @@ async def project_product_versions_page(project_id: str, product_id: int, reques
 async def project_reports_page(project_id: str, request: Request):
     project = await _project_service(request).get_project(project_id)
     report = await ClientDeliveryReportService(request.app.state.db).preview(project_id)
+    reports = await ClientDeliveryReportService(request.app.state.db).list_reports(project_id)
     return templates.TemplateResponse(
         request,
         "project_reports.html",
-        {"project": project, "report": report, "active": "projects"},
+        {"project": project, "report": report, "reports": reports, "active": "projects"},
     )
 
 

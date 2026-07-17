@@ -6,21 +6,29 @@
 
 ## 1. Подготовить demo
 
+Linux:
+
 ```bash
 cd /mnt/steam/Proekt/MarketMind-AI-Core-main
-.venv/bin/python scripts/l1_acceptance_demo.py
+./start_l1_demo.sh
 ```
 
-Скрипт создаст временную БД и покажет:
+Windows:
+
+```bat
+cd путь\к\MarketMind-AI-Core-main
+start_l1_demo.bat
+```
+
+Запускатор создаст временную БД и покажет:
 
 - идентификатор demo-проекта;
 - путь к файлу `l1_demo_products.csv`;
-- команду запуска Uvicorn;
 - адрес интерфейса.
 
-## 2. Запустить программу
+## 2. Открыть программу
 
-Скопируйте команду запуска из вывода скрипта. Адрес по умолчанию:
+Адрес по умолчанию:
 
 ```text
 http://127.0.0.1:18080/projects

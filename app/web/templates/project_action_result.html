@@ -1,4 +1,26 @@
 <div class="bg-green-50 border border-green-200 rounded p-4 text-sm">
   <div class="font-semibold">Операция выполнена</div>
-  <pre class="mt-2 whitespace-pre-wrap">{{ result }}</pre>
+  {% if result.version %}
+  <div class="mt-2">Создана версия:
+    {% if result.version.version_id %}{{ result.version.version_id }}{% else %}{{ result.version }}{% endif %}
+  </div>
+  {% endif %}
+  {% if result.diff %}
+  <div class="mt-3 font-medium">Изменения</div>
+  <ul class="list-disc ml-5 mt-1">
+    {% for item in result.diff %}
+    <li>
+      {{ item.field }}:
+      <span class="text-gray-600">{{ item.old_value or "—" }}</span>
+      →
+      <span class="font-medium">{{ item.new_value or "—" }}</span>
+    </li>
+    {% else %}
+    <li>Изменений в значениях нет.</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if result.event %}
+  <div class="mt-2 text-gray-600">Событие аудита записано.</div>
+  {% endif %}
 </div>

@@ -18,10 +18,12 @@
 <section class="bg-white border rounded p-5 mt-5">
   <h2 class="font-semibold mb-2">Сформировать файл отчёта</h2>
   <div class="flex gap-2">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"html"}' hx-target="#report-result">Создать HTML</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"json"}' hx-target="#report-result">Создать JSON</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"csv"}' hx-target="#report-result">Создать CSV</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"html"}' hx-target="#report-list">Создать HTML</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"json"}' hx-target="#report-list">Создать JSON</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"csv"}' hx-target="#report-list">Создать CSV</button>
   </div>
-  <pre id="report-result" class="mt-4 bg-gray-50 border rounded p-3 text-sm whitespace-pre-wrap"></pre>
+</section>
+<section id="report-list" class="bg-white border rounded p-5 mt-5">
+  {% include "project_reports_list.html" %}
 </section>
 {% endblock %}

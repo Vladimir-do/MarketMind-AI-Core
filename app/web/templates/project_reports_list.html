@@ -1,0 +1,15 @@
+{% if created %}
+<div class="bg-green-50 border border-green-200 rounded p-3 mb-3 text-sm">
+  Отчёт {{ created.file_format|upper }} создан.
+  <a class="text-blue-700 hover:underline" href="/projects/{{ project.project_id }}/reports/{{ created.report_id }}/download">Скачать файл</a>
+</div>
+{% endif %}
+<h2 class="font-semibold mb-3">Созданные отчёты</h2>
+{% for item in reports %}
+<div class="border-t py-2 flex justify-between gap-3">
+  <span>{{ item.file_format|upper }} — {{ item.created_at }}</span>
+  <a class="text-blue-700 hover:underline" href="/projects/{{ project.project_id }}/reports/{{ item.report_id }}/download">Скачать</a>
+</div>
+{% else %}
+<p class="text-gray-600">Отчётов пока нет.</p>
+{% endfor %}

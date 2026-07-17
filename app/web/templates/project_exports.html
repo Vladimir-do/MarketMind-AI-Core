@@ -6,21 +6,12 @@
 <div class="bg-white border rounded p-5 mb-5">
   <p class="mb-3">Экспорт использует только актуальную применённую карточку товара.</p>
   <div class="flex gap-2">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"csv","marketplace_profile":"universal"}' hx-target="#export-result">Создать CSV</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"json","marketplace_profile":"universal"}' hx-target="#export-result">Создать JSON</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"xlsx","marketplace_profile":"universal"}' hx-target="#export-result">Создать XLSX</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"csv","marketplace_profile":"universal"}' hx-target="#export-list">Создать CSV</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"json","marketplace_profile":"universal"}' hx-target="#export-list">Создать JSON</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"xlsx","marketplace_profile":"universal"}' hx-target="#export-list">Создать XLSX</button>
   </div>
-  <pre id="export-result" class="mt-4 text-sm bg-gray-50 p-3 rounded"></pre>
 </div>
-<div class="bg-white border rounded p-5">
-  <h2 class="font-semibold mb-3">Созданные экспорты</h2>
-  {% for item in exports %}
-  <div class="border-t py-2 flex justify-between gap-3">
-    <span>{{ item.file_format }} — {{ item.relative_path }}</span>
-    <a class="text-blue-700 hover:underline" href="/projects/{{ project.project_id }}/exports/{{ item.export_id }}/download">Скачать</a>
-  </div>
-  {% else %}
-  <p class="text-gray-600">Экспортов пока нет.</p>
-  {% endfor %}
+<div id="export-list" class="bg-white border rounded p-5">
+  {% include "project_exports_list.html" %}
 </div>
 {% endblock %}

@@ -204,6 +204,34 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             _download_project_artifact(project_a, "../secret.csv")
         self.assertEqual(traversal.exception.status_code, 404)
 
+    async def test_project_export_and_report_htmx_return_russian_partials(self):
+        project_id = await self._create_project("HTMX")
+        await self._import_basic_csv(project_id)
+
+        export = await self.client.post(
+            f"/api/projects/{project_id}/exports",
+            json={"file_format": "csv"},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(export.status_code, 200)
+        self.assertIn("Экспорт CSV создан", export.text)
+        self.assertIn("/download", export.text)
+        self.assertNotIn('"relative_path"', export.text)
+
+        report_page = await self.client.get(f"/projects/{project_id}/reports")
+        self.assertEqual(report_page.status_code, 200)
+        self.assertIn("Созданные отчёты", report_page.text)
+
+        report = await self.client.post(
+            f"/api/projects/{project_id}/reports",
+            json={"file_format": "html"},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(report.status_code, 200)
+        self.assertIn("Отчёт HTML создан", report.text)
+        self.assertIn("/download", report.text)
+        self.assertNotIn('"relative_path"', report.text)
+
     async def test_demo_fixture_full_local_workflow(self):
         project_id = await self._create_project("Demo fixture")
         fixture = Path(__file__).resolve().parent / "fixtures" / "l1_demo_products.csv"
