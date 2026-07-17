@@ -240,6 +240,11 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exports_page.status_code, 200)
         self.assertIn('/static/vendor/htmx.min.js', exports_page.text)
         self.assertNotIn('https://unpkg.com/htmx.org@1.9.12', exports_page.text)
+        self.assertIn(f'action="/projects/{project_id}/exports"', exports_page.text)
+        self.assertIn('method="post"', exports_page.text)
+        self.assertNotIn('hx-post=', exports_page.text)
+        self.assertNotIn('hx-target=', exports_page.text)
+        self.assertIn('type="submit"', exports_page.text)
 
         htmx_asset = await self.client.get("/static/vendor/htmx.min.js")
         self.assertEqual(htmx_asset.status_code, 200)
@@ -252,10 +257,11 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             follow_redirects=False,
         )
         self.assertEqual(export_redirect.status_code, 303)
-        self.assertIn(f"/projects/{project_id}/exports", export_redirect.headers["location"])
+        self.assertIn(f"/projects/{project_id}/exports?created=", export_redirect.headers["location"])
 
         exports_page_after = await self.client.get(export_redirect.headers["location"])
         self.assertEqual(exports_page_after.status_code, 200)
+        self.assertIn("Экспорт CSV создан", exports_page_after.text)
         self.assertIn("Созданные экспорты", exports_page_after.text)
         self.assertIn("/download", exports_page_after.text)
         self.assertNotIn("Экспортов пока нет", exports_page_after.text)
@@ -273,6 +279,11 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         report_page = await self.client.get(f"/projects/{project_id}/reports")
         self.assertEqual(report_page.status_code, 200)
         self.assertIn('/static/vendor/htmx.min.js', report_page.text)
+        self.assertIn(f'action="/projects/{project_id}/reports"', report_page.text)
+        self.assertIn('method="post"', report_page.text)
+        self.assertNotIn('hx-post=', report_page.text)
+        self.assertNotIn('hx-target=', report_page.text)
+        self.assertIn('type="submit"', report_page.text)
 
         report_redirect = await self.client.post(
             f"/projects/{project_id}/reports",
@@ -280,10 +291,11 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             follow_redirects=False,
         )
         self.assertEqual(report_redirect.status_code, 303)
-        self.assertIn(f"/projects/{project_id}/reports", report_redirect.headers["location"])
+        self.assertIn(f"/projects/{project_id}/reports?created=", report_redirect.headers["location"])
 
         report_page_after = await self.client.get(report_redirect.headers["location"])
         self.assertEqual(report_page_after.status_code, 200)
+        self.assertIn("Отчёт HTML создан", report_page_after.text)
         self.assertIn("Созданные отчёты", report_page_after.text)
         self.assertIn("/download", report_page_after.text)
         self.assertNotIn("Отчётов пока нет", report_page_after.text)

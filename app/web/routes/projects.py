@@ -908,25 +908,38 @@ async def project_product_versions_page(project_id: str, product_id: int, reques
 
 
 @router.get("/projects/{project_id}/reports", response_class=HTMLResponse)
-async def project_reports_page(project_id: str, request: Request):
+async def project_reports_page(project_id: str, request: Request, created: str | None = Query(None)):
     project = await _project_service(request).get_project(project_id)
     report = await ClientDeliveryReportService(request.app.state.db).preview(project_id)
     reports = await ClientDeliveryReportService(request.app.state.db).list_reports(project_id)
+    created_report = await _project_report_by_id(request, project_id, created) if created else None
     return templates.TemplateResponse(
         request,
         "project_reports.html",
-        {"project": project, "report": report, "reports": reports, "active": "projects"},
+        {
+            "project": project,
+            "report": report,
+            "reports": reports,
+            "created": created_report,
+            "active": "projects",
+        },
     )
 
 
 @router.get("/projects/{project_id}/exports", response_class=HTMLResponse)
-async def project_exports_page(project_id: str, request: Request):
+async def project_exports_page(project_id: str, request: Request, created: str | None = Query(None)):
     project = await _project_service(request).get_project(project_id)
     exports = await ProjectExportService(request.app.state.db).list_exports(project_id)
+    created_export = await _project_export_by_id(request, project_id, created) if created else None
     return templates.TemplateResponse(
         request,
         "project_exports.html",
-        {"project": project, "exports": exports, "active": "projects"},
+        {
+            "project": project,
+            "exports": exports,
+            "created": created_export,
+            "active": "projects",
+        },
     )
 
 
@@ -962,7 +975,10 @@ async def _project_export_created_response(request: Request, project_id: str, re
             "project_exports_list.html",
             {"project": project, "exports": exports, "created": record},
         )
-    return RedirectResponse(url=f"/projects/{project_id}/exports", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(
+        url=f"/projects/{project_id}/exports?created={record.export_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 async def _project_report_created_response(request: Request, project_id: str, record: ProjectReport):
@@ -974,4 +990,25 @@ async def _project_report_created_response(request: Request, project_id: str, re
             "project_reports_list.html",
             {"project": project, "reports": reports, "created": record},
         )
-    return RedirectResponse(url=f"/projects/{project_id}/reports", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(
+        url=f"/projects/{project_id}/reports?created={record.report_id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+async def _project_export_by_id(request: Request, project_id: str, export_id: str):
+    async with request.app.state.db.session() as session:
+        return await session.scalar(
+            select(ProjectExport)
+            .where(ProjectExport.project_id == project_id)
+            .where(ProjectExport.export_id == export_id)
+        )
+
+
+async def _project_report_by_id(request: Request, project_id: str, report_id: str):
+    async with request.app.state.db.session() as session:
+        return await session.scalar(
+            select(ProjectReport)
+            .where(ProjectReport.project_id == project_id)
+            .where(ProjectReport.report_id == report_id)
+        )

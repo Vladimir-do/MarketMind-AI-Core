@@ -6,17 +6,17 @@
 <div class="bg-white border rounded p-5 mb-5">
   <p class="mb-3">Экспорт использует только актуальную применённую карточку товара.</p>
   <div class="flex gap-2">
-    <form method="post" action="/projects/{{ project.project_id }}/exports" hx-post="/projects/{{ project.project_id }}/exports" hx-target="#export-list" hx-disabled-elt="button">
+    <form method="post" action="/projects/{{ project.project_id }}/exports">
       <input type="hidden" name="file_format" value="csv">
       <input type="hidden" name="marketplace_profile" value="universal">
       <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать CSV</button>
     </form>
-    <form method="post" action="/projects/{{ project.project_id }}/exports" hx-post="/projects/{{ project.project_id }}/exports" hx-target="#export-list" hx-disabled-elt="button">
+    <form method="post" action="/projects/{{ project.project_id }}/exports">
       <input type="hidden" name="file_format" value="json">
       <input type="hidden" name="marketplace_profile" value="universal">
       <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать JSON</button>
     </form>
-    <form method="post" action="/projects/{{ project.project_id }}/exports" hx-post="/projects/{{ project.project_id }}/exports" hx-target="#export-list" hx-disabled-elt="button">
+    <form method="post" action="/projects/{{ project.project_id }}/exports">
       <input type="hidden" name="file_format" value="xlsx">
       <input type="hidden" name="marketplace_profile" value="universal">
       <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать XLSX</button>
