@@ -1,18 +1,18 @@
 import hashlib
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
 
-from app.config import BLOCK_PATTERNS_JSONL, DATABASE_URL, SCRAPE_ATTEMPTS_JSONL, logger
 from app.compat.aiosqlite_patch import apply_aiosqlite_future_poll_patch
+from app.config import BLOCK_PATTERNS_JSONL, DATABASE_URL, SCRAPE_ATTEMPTS_JSONL, logger
+from app.utils.proxy import mask_proxy_url
 
 apply_aiosqlite_future_poll_patch()
-from app.utils.proxy import mask_proxy_url
 
 Base = declarative_base()
 
@@ -27,8 +27,8 @@ class Product(Base):
     url        = Column(Text, nullable=False)
     name       = Column(Text)
     image_url  = Column(Text)
-    first_seen = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    last_check = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    first_seen = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_check = Column(DateTime, default=lambda: datetime.now(UTC))
 
     history = relationship("PriceHistory", back_populates="product", cascade="all, delete-orphan")
 
@@ -42,7 +42,7 @@ class PriceHistory(Base):
     product_id          = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     price               = Column(Integer)           # рубли, целое; None = недоступен
     availability_status = Column(String(20), nullable=False)  # in_stock / out_of_stock / deleted / blocked
-    recorded_at         = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    recorded_at         = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
 
     product = relationship("Product", back_populates="history")
 
@@ -78,8 +78,8 @@ class ScrapeAttempt(Base):
     error_class = Column(String(120))
     error_text  = Column(Text)
     errors      = Column(Text)
-    created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at  = Column(DateTime, default=lambda: datetime.now(UTC))
+    recorded_at = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
 
     __table_args__ = (
         Index("ix_scrape_attempts_marketplace_recorded", "marketplace", "recorded_at"),
@@ -105,7 +105,7 @@ class BlockedPattern(Base):
     latency_ms      = Column(Integer, default=0)
     error_class     = Column(String(120))
     error_text      = Column(Text)
-    recorded_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    recorded_at     = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
 
     __table_args__ = (
         Index("ix_blocked_patterns_marketplace_recorded", "marketplace", "recorded_at"),
@@ -118,7 +118,7 @@ class Subscriber(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class ApprovalRecord(Base):
@@ -139,7 +139,7 @@ class ApprovalRecord(Base):
     reject_reason   = Column(Text)
     snapshot_before = Column(Text)  # JSON: value before apply
     snapshot_after  = Column(Text)  # JSON: value after apply
-    created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at      = Column(DateTime, default=lambda: datetime.now(UTC))
     reviewed_at     = Column(DateTime)
     applied_at      = Column(DateTime)
     rolled_back_at  = Column(DateTime)
@@ -149,6 +149,80 @@ class ApprovalRecord(Base):
         Index("ix_approval_records_product_id", "product_id"),
         Index("ix_approval_records_created_at", "created_at"),
         Index("ix_approval_records_product_created", "product_id", "created_at"),
+    )
+
+
+class ProductCardDraft(Base):
+    __tablename__ = "product_card_drafts"
+
+    draft_id        = Column(String(64), primary_key=True)
+    product_id      = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    base_version_id = Column(String(128))
+    status          = Column(String(32), nullable=False, default="draft")
+    payload_json    = Column(Text, nullable=False)
+    validation_json = Column(Text)
+    created_by      = Column(String(128))
+    created_at      = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    updated_at      = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    revision        = Column(Integer, nullable=False, default=1)
+    comment         = Column(Text)
+
+    product = relationship("Product")
+
+    __table_args__ = (
+        Index("ix_product_card_drafts_product_status_updated", "product_id", "status", "updated_at"),
+        Index("ix_product_card_drafts_product_id", "product_id"),
+    )
+
+
+class ProductCardVersion(Base):
+    __tablename__ = "product_card_versions"
+
+    version_id              = Column(String(128), primary_key=True)
+    product_id              = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    version_number          = Column(Integer, nullable=False)
+    snapshot_json           = Column(Text, nullable=False)
+    snapshot_schema_version = Column(Integer, nullable=False, default=1)
+    source                  = Column(String(32), nullable=False)
+    actor_type              = Column(String(32), nullable=False)
+    actor_id                = Column(String(128))
+    comment                 = Column(Text)
+    created_at              = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    base_version_id         = Column(String(128))
+    trigger_event_id        = Column(String(128))
+    checksum                = Column(String(64), nullable=False)
+
+    product = relationship("Product")
+
+    __table_args__ = (
+        Index("ix_product_card_versions_product_number", "product_id", "version_number", unique=True),
+        Index("ix_product_card_versions_product_created", "product_id", "created_at"),
+        Index("ix_product_card_versions_trigger_event_id", "trigger_event_id"),
+    )
+
+
+class DomainEventRecord(Base):
+    __tablename__ = "domain_event_records"
+
+    event_id       = Column(String(128), primary_key=True)
+    aggregate_type = Column(String(64), nullable=False)
+    aggregate_id   = Column(Text, nullable=False)
+    event_type     = Column(String(128), nullable=False)
+    source         = Column(String(32), nullable=False)
+    actor_type     = Column(String(32), nullable=False)
+    actor_id       = Column(String(128))
+    occurred_at    = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    payload_json   = Column(Text, nullable=False)
+    metadata_json  = Column(Text, nullable=False)
+    schema_version = Column(Integer, nullable=False, default=1)
+    correlation_id = Column(String(128))
+    causation_id   = Column(String(128))
+    created_at     = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        Index("ix_domain_event_records_aggregate_time", "aggregate_type", "aggregate_id", "occurred_at"),
+        Index("ix_domain_event_records_event_type_time", "event_type", "occurred_at"),
+        Index("ix_domain_event_records_correlation_id", "correlation_id"),
     )
 
 
@@ -396,7 +470,7 @@ class Database:
             return result.scalar_one_or_none()
 
     async def get_last_price(self, product_id: int) -> PriceHistory | None:
-        from sqlalchemy import select, desc
+        from sqlalchemy import desc, select
         async with self.session() as s:
             result = await s.execute(
                 select(PriceHistory)
@@ -432,7 +506,7 @@ class Database:
         strategy: str | None = None,
         cooldown_sec: int = 0,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         latency_ms = max(0, int(latency_ms))
         proxy = mask_proxy_url(proxy) if proxy else None
         error_text = error_text[:1000] if error_text else None
@@ -442,10 +516,7 @@ class Database:
         task_type = task_type or "marketplace_product"
         parser_used = parser_used or marketplace
         success = (status == "ok") if success is None else bool(success)
-        if confidence is None:
-            confidence = 0.9 if success else 0.0
-        else:
-            confidence = max(0.0, min(1.0, float(confidence)))
+        confidence = (0.9 if success else 0.0) if confidence is None else max(0.0, min(1.0, float(confidence)))
         next_best_strategy = next_best_strategy or _next_best_strategy_for(source, status)
         trigger = trigger or _classify_failure_trigger(
             status=status,
@@ -562,7 +633,7 @@ class Database:
         error_class: str | None = None,
         error_text: str | None = None,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         proxy = mask_proxy_url(proxy) if proxy else None
         payload = {
             "recorded_at": now,
@@ -626,7 +697,7 @@ class Database:
         if marketplace:
             stmt = stmt.where(ScrapeAttempt.marketplace == marketplace)
         if minutes:
-            since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+            since = datetime.now(UTC) - timedelta(minutes=minutes)
             stmt = stmt.where(ScrapeAttempt.recorded_at >= since)
         async with self.session() as s:
             result = await s.execute(stmt)
@@ -645,7 +716,7 @@ class Database:
         if marketplace:
             stmt = stmt.where(BlockedPattern.marketplace == marketplace)
         if minutes:
-            since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+            since = datetime.now(UTC) - timedelta(minutes=minutes)
             stmt = stmt.where(BlockedPattern.recorded_at >= since)
         async with self.session() as s:
             result = await s.execute(stmt)
@@ -970,10 +1041,10 @@ class Database:
         Сохраняет товар и добавляет запись в историю если цена/наличие изменились.
         Возвращает (product, price_changed).
         """
-        from sqlalchemy import select, desc
+        from sqlalchemy import desc, select
 
         url_hash = url_to_hash(url)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async with self.session() as s:
             result = await s.execute(select(Product).where(Product.url_hash == url_hash))
