@@ -22,12 +22,45 @@
   {% endif %}
   {% if preview.errors %}
   <div class="bg-red-50 border border-red-200 rounded p-3 mb-4 text-sm">
-    <div class="font-semibold mb-1">Ошибки</div>
+    <div class="font-semibold mb-2">Ошибки и предупреждения</div>
+    <div class="grid md:grid-cols-5 gap-2 mb-3">
+      <div>Ошибок: {{ counts.errors if counts is defined else preview.errors|length }}</div>
+      <div>Предупреждений: {{ counts.warnings if counts is defined else preview.warnings|length }}</div>
+      <div>Корректных строк: {{ counts.valid_rows if counts is defined else "—" }}</div>
+      <div>Пропущено: {{ counts.skipped_rows if counts is defined else "—" }}</div>
+      <div>К импорту: {{ counts.importable_rows if counts is defined else "—" }}</div>
+    </div>
+    <details class="mb-3">
+      <summary class="cursor-pointer font-medium">Фильтры ошибок</summary>
+      <div class="grid md:grid-cols-5 gap-2 mt-2">
+        <input class="border rounded p-2" type="text" placeholder="Поиск по тексту" aria-label="Поиск по тексту">
+        <input class="border rounded p-2" type="text" placeholder="Код" aria-label="Фильтр по коду">
+        <input class="border rounded p-2" type="text" placeholder="Колонка" aria-label="Фильтр по колонке">
+        <input class="border rounded p-2" type="number" placeholder="Строка" aria-label="Фильтр по строке">
+        <select class="border rounded p-2" aria-label="Severity">
+          <option>Все</option>
+          <option>Только ошибки</option>
+          <option>Только предупреждения</option>
+        </select>
+      </div>
+    </details>
+    <form method="post" action="/api/projects/{{ project_id }}/imports/error-report.csv" class="mb-3">
+      <input type="hidden" name="stored_relative_path" value="{{ stored_file.relative_path }}">
+      <input type="hidden" name="stored_original_filename" value="{{ stored_file.original_filename }}">
+      <input type="hidden" name="stored_sha256" value="{{ stored_file.sha256 }}">
+      <input type="hidden" name="stored_size_bytes" value="{{ stored_file.size_bytes }}">
+      <input type="hidden" name="stored_file_format" value="{{ stored_file.file_format }}">
+      {% if preview.selected_sheet %}<input type="hidden" name="selected_sheet" value="{{ preview.selected_sheet }}">{% endif %}
+      <button class="border px-3 py-2 rounded bg-white">Скачать CSV с ошибками</button>
+    </form>
     <ul class="list-disc ml-5">
-      {% for error in preview.errors[:10] %}
+      {% for error in preview.errors[:50] %}
       <li>Строка {{ error.row_number }}, колонка {{ error.column or "—" }}: {{ error.message }}. {{ error.recommendation }}</li>
       {% endfor %}
     </ul>
+    {% if preview.errors|length > 50 %}
+    <p class="mt-2 text-gray-600">Показаны первые 50 ошибок. Полный список скачайте CSV-файлом.</p>
+    {% endif %}
   </div>
   {% endif %}
   <div class="overflow-x-auto mb-5">
@@ -59,6 +92,40 @@
       </select>
     </label>
     {% endif %}
+    {% if presets %}
+    <div class="border rounded p-3 mb-4 text-sm">
+      <div class="font-semibold mb-2">Сохранённые сопоставления</div>
+      {% if suggested_preset %}
+      <div class="bg-green-50 border border-green-200 rounded p-2 mb-2">
+        Автоматически найдено подходящее сопоставление: {{ suggested_preset.name }}.
+      </div>
+      {% endif %}
+      <label class="block mb-2">
+        <span class="text-gray-700">Выбрать сохранённое сопоставление</span>
+        <select name="preset_id" class="mt-1 block w-full border rounded p-2">
+          <option value="">Не применять</option>
+          {% for preset in presets %}
+          <option value="{{ preset.preset_id }}" {% if suggested_preset and suggested_preset.preset_id == preset.preset_id %}selected{% endif %}>
+            {{ preset.name }}{% if preset.header_fingerprint != preview.header_fingerprint %} — структура отличается{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <p class="text-gray-600">Если структура колонок отличается, проверьте сопоставление вручную и подтвердите предупреждения.</p>
+    </div>
+    <div class="border rounded p-3 mb-4 text-sm">
+      <div class="font-semibold mb-2">Удалить ненужное сопоставление</div>
+      {% for preset in presets %}
+      <button
+        type="button"
+        class="border px-2 py-1 rounded mr-2 mb-2"
+        hx-delete="/api/projects/{{ project_id }}/import-presets/{{ preset.preset_id }}"
+        hx-confirm="Удалить сопоставление «{{ preset.name }}»?"
+        hx-swap="none"
+      >Удалить: {{ preset.name }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
     <div class="grid md:grid-cols-2 gap-3 mb-4">
       {% for column in preview.columns %}
       <label class="block text-sm">
@@ -83,6 +150,13 @@
       <span>Файл уже импортировался. Я подтверждаю повторный импорт.</span>
     </label>
     {% endif %}
+    <div class="border rounded p-3 mb-4 text-sm">
+      <label class="flex items-center gap-2 mb-2">
+        <input type="checkbox" name="save_preset" value="1">
+        <span>Сохранить сопоставление</span>
+      </label>
+      <input class="border rounded p-2 w-full" type="text" name="preset_name" placeholder="Название сопоставления, например: Ozon поставщик Иванов">
+    </div>
     <button class="bg-blue-600 text-white px-4 py-2 rounded">Импортировать выбранные данные</button>
   </form>
   <div id="import-result" class="mt-4"></div>

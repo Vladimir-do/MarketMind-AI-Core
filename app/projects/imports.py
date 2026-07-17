@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
+import json
 import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -76,6 +78,7 @@ class ImportCellError:
     value_preview: str
     message: str
     recommendation: str
+    severity: str = "error"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -93,6 +96,7 @@ class ImportPreview:
     sheets: list[str] = field(default_factory=list)
     hidden_sheets: list[str] = field(default_factory=list)
     selected_sheet: str | None = None
+    header_fingerprint: str | None = None
     row_count: int = 0
     columns: list[str] = field(default_factory=list)
     preview_rows: list[dict[str, Any]] = field(default_factory=list)
@@ -157,7 +161,8 @@ def build_products_from_preview(
 def _read_rows_for_preview(preview: ImportPreview) -> list[dict[str, Any]]:
     path = Path(preview.source_path)
     if preview.file_format == "csv":
-        text = path.read_text(encoding=preview.encoding or "utf-8-sig")
+        encoding = "cp1251" if preview.encoding == "windows-1251" else preview.encoding or "utf-8-sig"
+        text = path.read_text(encoding=encoding)
         reader = csv.DictReader(io.StringIO(text), delimiter=preview.delimiter or ",")
         return [dict(row) for row in reader]
     return _excel_rows(path, preview.selected_sheet)
@@ -174,16 +179,19 @@ def _analyze_csv(
     raw = path.read_bytes()
     if raw.startswith(b"PK\x03\x04"):
         raise ValueError("Файл похож на Excel/ZIP, но имеет расширение CSV")
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError as exc:
-        raise ValueError("Файл должен быть в кодировке UTF-8 или UTF-8 BOM") from exc
+    text, encoding, encoding_warning = _decode_csv_bytes(raw)
     delimiter, delimiter_warning = _detect_delimiter(text)
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     columns = [str(column or "").strip() for column in (reader.fieldnames or [])]
     rows = [dict(row) for row in reader]
+    if not columns or (not rows and "\n" not in text):
+        raise ValueError("CSV не содержит строк товаров для импорта")
+    suggested_mapping = guess_mapping(columns)
     errors = _validate_rows(rows)
+    errors.extend(_preview_product_errors(rows, suggested_mapping))
     warnings = []
+    if encoding_warning:
+        warnings.append(encoding_warning)
     if delimiter_warning:
         warnings.append(delimiter_warning)
     if duplicate:
@@ -194,12 +202,13 @@ def _analyze_csv(
         file_format="csv",
         size_bytes=size_bytes,
         sha256=sha256,
-        encoding="utf-8-sig" if raw.startswith(b"\xef\xbb\xbf") else "utf-8",
+        encoding=encoding,
         delimiter=delimiter,
+        header_fingerprint=header_fingerprint(columns),
         row_count=len(rows),
         columns=columns,
         preview_rows=rows[:IMPORT_PREVIEW_ROWS],
-        suggested_mapping=guess_mapping(columns),
+        suggested_mapping=suggested_mapping,
         warnings=warnings,
         errors=errors,
         duplicate=duplicate,
@@ -229,6 +238,7 @@ def _analyze_excel(
             raise ValueError("Выбранный лист не найден в книге")
         rows = _excel_rows(path, sheet_name)
         columns = list(rows[0].keys()) if rows else []
+        suggested_mapping = guess_mapping(columns)
         warnings = []
         if hidden_sheets:
             warnings.append("В книге есть скрытые листы: " + ", ".join(hidden_sheets))
@@ -245,12 +255,13 @@ def _analyze_excel(
             sheets=sheets,
             hidden_sheets=hidden_sheets,
             selected_sheet=sheet_name,
+            header_fingerprint=header_fingerprint(columns),
             row_count=len(rows),
             columns=columns,
             preview_rows=rows[:IMPORT_PREVIEW_ROWS],
-            suggested_mapping=guess_mapping(columns),
+            suggested_mapping=suggested_mapping,
             warnings=warnings,
-            errors=_validate_rows(rows),
+            errors=[*_validate_rows(rows), *_preview_product_errors(rows, suggested_mapping)],
             duplicate=duplicate,
             requires_confirmation=bool(warnings),
         )
@@ -289,6 +300,12 @@ def guess_mapping(columns: list[str]) -> dict[str, str]:
     return result
 
 
+def header_fingerprint(columns: list[str]) -> str:
+    normalized = [_normalize_header(column) for column in columns]
+    payload = json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _normalize_mapping(mapping: dict[str, str], columns: list[str]) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for column in columns:
@@ -309,6 +326,7 @@ def _row_to_product(
     attributes: dict[str, str] = {}
     field_sources: dict[str, str] = {}
     errors: list[ImportCellError] = []
+    fatal_error = False
     for column, value in row.items():
         target = mapping.get(column, "attributes")
         if target == "skip":
@@ -327,10 +345,15 @@ def _row_to_product(
             parsed = _parse_int(text)
             if parsed is None:
                 errors.append(_error(row_number, column, "invalid_number", text, "Ожидалось числовое значение", "Исправьте число или сопоставьте колонку как характеристику."))
+                fatal_error = True
             else:
                 fields[target] = parsed
         elif target == "image_urls":
             fields[target] = [item.strip() for item in text.split(",") if item.strip()]
+        elif target == "availability":
+            parsed_stock = _parse_int(text)
+            fields[target] = "in_stock" if parsed_stock is None or parsed_stock > 0 else "out_of_stock"
+            attributes[column] = text
         elif target == "title":
             fields["name"] = text
             field_sources["title"] = column
@@ -341,6 +364,8 @@ def _row_to_product(
     sku = str(fields.get("sku") or fields.get("vendor_code") or "").strip()
     if not title:
         errors.append(_error(row_number, "title", "missing_title", "", "Не найдено название товара", "Сопоставьте колонку с названием или заполните значение."))
+        return None, errors
+    if fatal_error:
         return None, errors
     product = UnifiedProduct(
         name=title,
@@ -375,6 +400,26 @@ def _detect_delimiter(text: str) -> tuple[str, str | None]:
     return delimiter, None
 
 
+def _decode_csv_bytes(raw: bytes) -> tuple[str, str, str | None]:
+    try:
+        text = raw.decode("utf-8-sig")
+        encoding = "utf-8-sig" if raw.startswith(b"\xef\xbb\xbf") else "utf-8"
+        return text, encoding, None
+    except UnicodeDecodeError:
+        pass
+    try:
+        text = raw.decode("cp1251")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            "Не удалось определить кодировку CSV. Сохраните файл как UTF-8, UTF-8 BOM или Windows-1251 и загрузите снова."
+        ) from exc
+    return (
+        text,
+        "windows-1251",
+        "Файл похож на Windows-1251. Проверьте preview и явно подтвердите импорт перед сохранением.",
+    )
+
+
 def _validate_size(size_bytes: int) -> None:
     if size_bytes > IMPORT_MAX_FILE_BYTES:
         raise ValueError("Файл слишком большой для безопасного импорта")
@@ -391,6 +436,14 @@ def _validate_rows(rows: list[dict[str, Any]]) -> list[ImportCellError]:
             text = "" if value is None else str(value)
             if len(text) > IMPORT_MAX_CELL_CHARS:
                 errors.append(_error(row_index, column, "cell_too_large", text, "Слишком длинное значение", "Сократите значение в ячейке."))
+    return errors
+
+
+def _preview_product_errors(rows: list[dict[str, Any]], mapping: dict[str, str]) -> list[ImportCellError]:
+    errors: list[ImportCellError] = []
+    for index, row in enumerate(rows[:IMPORT_MAX_ROWS], start=2):
+        _product, row_errors = _row_to_product(row, mapping, index)
+        errors.extend(row_errors)
     return errors
 
 

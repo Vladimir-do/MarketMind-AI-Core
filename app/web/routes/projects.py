@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from sqlalchemy import select
 
 from app.config import IMPORT_SCHEMA_VERSION
@@ -19,6 +21,7 @@ from app.editor.service import (
     ProductCardEditorService,
 )
 from app.effective_card.service import EffectiveProductCardService
+from app.exports.safety import sanitize_spreadsheet_cell
 from app.exports.service import ProjectExportService
 from app.pipeline import ImportPipeline
 from app.projects.imports import analyze_import_file, build_products_from_preview
@@ -106,6 +109,22 @@ def _file_to_dict(record) -> dict[str, Any]:
     }
 
 
+def _preset_to_dict(record) -> dict[str, Any]:
+    return {
+        "preset_id": record.preset_id,
+        "project_id": record.project_id,
+        "name": record.name,
+        "marketplace": record.marketplace,
+        "schema_version": record.schema_version,
+        "source_columns": json.loads(record.source_columns_json or "[]"),
+        "mapping": json.loads(record.mapping_json or "{}"),
+        "header_fingerprint": record.header_fingerprint,
+        "active": record.active,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "last_used_at": record.last_used_at.isoformat() if record.last_used_at else None,
+    }
+
+
 def _artifact_to_dict(record) -> dict[str, Any]:
     return {
         "id": getattr(record, "export_id", None) or getattr(record, "report_id", None),
@@ -144,6 +163,48 @@ def _stored_file_from_body(body: dict[str, Any]) -> dict[str, Any]:
         "size_bytes": body.get("stored_size_bytes"),
         "file_format": body.get("stored_file_format"),
     }
+
+
+def _preview_error_counts(preview) -> dict[str, int]:
+    warning_count = len(preview.warnings)
+    error_count = len(preview.errors)
+    return {
+        "errors": error_count,
+        "warnings": warning_count,
+        "valid_rows": max(preview.row_count - error_count, 0),
+        "skipped_rows": error_count,
+        "importable_rows": max(preview.row_count - error_count, 0),
+    }
+
+
+def _error_csv_response(project_id: str, preview) -> Response:
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=["row_number", "column", "code", "value_preview", "message", "recommendation", "severity"],
+    )
+    writer.writeheader()
+    for warning in preview.warnings:
+        writer.writerow(
+            {
+                "row_number": 0,
+                "column": "",
+                "code": "warning",
+                "value_preview": "",
+                "message": sanitize_spreadsheet_cell(warning),
+                "recommendation": "Проверьте preview и подтвердите импорт только если данные распознаны правильно.",
+                "severity": "warning",
+            }
+        )
+    for error in preview.errors:
+        data = error.to_dict()
+        writer.writerow({key: sanitize_spreadsheet_cell(str(data.get(key) or "")) for key in writer.fieldnames})
+    filename = f"errors_{project_id}_{uuid.uuid4().hex[:8]}.csv"
+    return Response(
+        "\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def _editor_error(exc: Exception) -> HTTPException:
@@ -266,7 +327,24 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             if _is_hx(request):
                 return templates.TemplateResponse(request, "project_import_result.html", response)
             return response
-        products, import_errors = build_products_from_preview(preview, mapping=_mapping_from_body(body) or None)
+        mapping = _mapping_from_body(body)
+        preset_id = str(body.get("preset_id") or "").strip()
+        if preset_id:
+            preset = await _project_service(request).get_mapping_preset(project_id, preset_id)
+            preset_mapping = json.loads(preset.mapping_json or "{}")
+            if preset.header_fingerprint != preview.header_fingerprint and not confirm_warnings:
+                response = {
+                    "status": "preset_mismatch",
+                    "project_id": project_id,
+                    "preview": preview.to_dict(),
+                    "message": "Структура файла отличается от сохранённого сопоставления. Проверьте колонки и подтвердите импорт.",
+                }
+                if _is_hx(request):
+                    return templates.TemplateResponse(request, "project_import_result.html", response)
+                return response
+            mapping = mapping or preset_mapping
+            await _project_service(request).touch_mapping_preset(project_id, preset_id)
+        products, import_errors = build_products_from_preview(preview, mapping=mapping or None)
         pipeline = ImportPipeline()
         result = pipeline.run_products(products)
         errors = [getattr(error, "message", str(error)) for error in result.errors]
@@ -309,6 +387,16 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             )
             saved += 1
             changed += 1 if was_changed else 0
+        if body.get("save_preset") and mapping:
+            await _project_service(request).save_mapping_preset(
+                project_id,
+                name=str(body.get("preset_name") or f"Сопоставление {stored.original_filename}"),
+                marketplace=str(body.get("marketplace") or "unknown"),
+                schema_version=IMPORT_SCHEMA_VERSION,
+                source_columns=preview.columns,
+                mapping=mapping,
+                header_fingerprint=preview.header_fingerprint or "",
+            )
         response = {
             "task_id": uuid.uuid4().hex[:12],
             "status": "completed" if created else "reimported_existing_file",
@@ -341,6 +429,12 @@ async def api_preview_project_import(project_id: str, request: Request, file: Up
             file_format=stored.file_format,
             duplicate=duplicate,
         )
+        presets = await _project_service(request).list_mapping_presets(project_id)
+        preset_items = [_preset_to_dict(preset) for preset in presets]
+        suggested_preset = next(
+            (preset for preset in preset_items if preset["header_fingerprint"] == preview.header_fingerprint),
+            None,
+        )
         response = {
             "project_id": project_id,
             "stored_file": {
@@ -351,11 +445,55 @@ async def api_preview_project_import(project_id: str, request: Request, file: Up
                 "file_format": stored.file_format,
             },
             "preview": preview.to_dict(),
+            "counts": _preview_error_counts(preview),
+            "presets": preset_items,
+            "suggested_preset": suggested_preset,
             "message": "Preview готов. Проверьте сопоставление колонок перед импортом.",
         }
         if _is_hx(request):
-            return templates.TemplateResponse(request, "project_import_preview.html", {**response, "field_options": FIELD_OPTIONS})
+            return templates.TemplateResponse(
+                request,
+                "project_import_preview.html",
+                {**response, "field_options": FIELD_OPTIONS},
+            )
         return response
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/imports/error-report.csv")
+async def api_project_import_error_report(project_id: str, request: Request):
+    try:
+        await _project_service(request).get_project(project_id)
+        body = await _request_data(request)
+        stored_info = _stored_file_from_body(body)
+        stored = stored_source_file(
+            project_id,
+            str(stored_info.get("relative_path") or ""),
+            original_filename=str(stored_info.get("original_filename") or "upload.csv"),
+            sha256=str(stored_info.get("sha256") or ""),
+            size_bytes=int(stored_info.get("size_bytes") or 0),
+            file_format=str(stored_info.get("file_format") or "csv"),
+        )
+        preview = analyze_import_file(
+            path=stored.absolute_path,
+            original_filename=stored.original_filename,
+            sha256=stored.sha256,
+            size_bytes=stored.size_bytes,
+            file_format=stored.file_format,
+            duplicate=await _project_service(request).source_file_exists(project_id, stored.sha256),
+            selected_sheet=body.get("selected_sheet"),
+        )
+        return _error_csv_response(project_id, preview)
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.delete("/api/projects/{project_id}/import-presets/{preset_id}")
+async def api_delete_import_preset(project_id: str, preset_id: str, request: Request):
+    try:
+        await _project_service(request).delete_mapping_preset(project_id, preset_id)
+        return {"status": "deleted", "preset_id": preset_id}
     except Exception as exc:
         raise _editor_error(exc) from exc
 

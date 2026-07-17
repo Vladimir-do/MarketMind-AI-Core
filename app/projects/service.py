@@ -13,6 +13,7 @@ from app.database import (
     ClientProject,
     ClientProjectFile,
     Database,
+    ImportMappingPreset,
     ProjectProduct,
 )
 from app.editor.service import ProductCardEditorService
@@ -174,6 +175,85 @@ class ProjectService:
             )
             return existing is not None
 
+    async def list_mapping_presets(self, project_id: str) -> list[ImportMappingPreset]:
+        async with self._db.session() as session:
+            await self._require_project(session, project_id)
+            result = await session.execute(
+                select(ImportMappingPreset)
+                .where(ImportMappingPreset.project_id == project_id)
+                .where(ImportMappingPreset.active.is_(True))
+                .order_by(desc(ImportMappingPreset.last_used_at), desc(ImportMappingPreset.created_at))
+            )
+            return list(result.scalars().all())
+
+    async def get_mapping_preset(self, project_id: str, preset_id: str) -> ImportMappingPreset:
+        async with self._db.session() as session:
+            record = await session.scalar(
+                select(ImportMappingPreset)
+                .where(ImportMappingPreset.project_id == project_id)
+                .where(ImportMappingPreset.preset_id == preset_id)
+                .where(ImportMappingPreset.active.is_(True))
+            )
+            if record is None:
+                raise ProjectNotFoundError("Сохранённое сопоставление не найдено")
+            return record
+
+    async def save_mapping_preset(
+        self,
+        project_id: str,
+        *,
+        name: str,
+        marketplace: str,
+        schema_version: str,
+        source_columns: list[str],
+        mapping: dict[str, str],
+        header_fingerprint: str,
+    ) -> ImportMappingPreset:
+        now = datetime.now(UTC)
+        async with self._db.session() as session:
+            await self._require_project(session, project_id)
+            record = ImportMappingPreset(
+                preset_id=f"preset_{uuid.uuid4().hex[:12]}",
+                project_id=project_id,
+                name=_required_text(name, "Название сопоставления обязательно"),
+                marketplace=_optional_text(marketplace) or "unknown",
+                schema_version=schema_version,
+                source_columns_json=json.dumps(list(source_columns), ensure_ascii=False),
+                mapping_json=json.dumps(dict(mapping), ensure_ascii=False, sort_keys=True),
+                header_fingerprint=header_fingerprint,
+                active=True,
+                created_at=now,
+                last_used_at=now,
+            )
+            session.add(record)
+            await session.commit()
+            return record
+
+    async def touch_mapping_preset(self, project_id: str, preset_id: str) -> None:
+        async with self._db.session() as session:
+            record = await session.scalar(
+                select(ImportMappingPreset)
+                .where(ImportMappingPreset.project_id == project_id)
+                .where(ImportMappingPreset.preset_id == preset_id)
+                .where(ImportMappingPreset.active.is_(True))
+            )
+            if record is None:
+                raise ProjectNotFoundError("Сохранённое сопоставление не найдено")
+            record.last_used_at = datetime.now(UTC)
+            await session.commit()
+
+    async def delete_mapping_preset(self, project_id: str, preset_id: str) -> None:
+        async with self._db.session() as session:
+            record = await session.scalar(
+                select(ImportMappingPreset)
+                .where(ImportMappingPreset.project_id == project_id)
+                .where(ImportMappingPreset.preset_id == preset_id)
+            )
+            if record is None:
+                raise ProjectNotFoundError("Сохранённое сопоставление не найдено")
+            record.active = False
+            await session.commit()
+
     async def list_files(self, project_id: str) -> list[ClientProjectFile]:
         async with self._db.session() as session:
             await self._require_project(session, project_id)
@@ -299,7 +379,7 @@ def _snapshot_from_unified(product: UnifiedProduct, product_id: int) -> dict[str
         "availability": product.availability or "unknown",
         "image_urls": list(product.image_urls or []),
         "attributes": attributes,
-        "marketplace": product.marketplace or product.source_type or "unknown",
+        "marketplace": product.marketplace or "unknown",
         "external_product_id": product.sku or product.source_id or str(product_id),
         "_provenance": {"field_sources": product.raw.get("__field_sources", {})},
     }

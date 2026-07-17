@@ -187,6 +187,27 @@ class ClientProjectFile(Base):
     )
 
 
+class ImportMappingPreset(Base):
+    __tablename__ = "import_mapping_presets"
+
+    preset_id           = Column(String(64), primary_key=True)
+    project_id          = Column(String(64), ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False)
+    name                = Column(Text, nullable=False)
+    marketplace         = Column(String(32), nullable=False, default="unknown")
+    schema_version      = Column(String(32), nullable=False, default="local-import-v1")
+    source_columns_json = Column(Text, nullable=False)
+    mapping_json        = Column(Text, nullable=False)
+    header_fingerprint  = Column(String(64), nullable=False)
+    active              = Column(Boolean, nullable=False, default=True)
+    created_at          = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    last_used_at        = Column(DateTime)
+
+    __table_args__ = (
+        Index("ix_import_mapping_presets_project_active", "project_id", "active"),
+        Index("ix_import_mapping_presets_project_fingerprint", "project_id", "header_fingerprint"),
+    )
+
+
 class ProjectProduct(Base):
     __tablename__ = "project_products"
 
