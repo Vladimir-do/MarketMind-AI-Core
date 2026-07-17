@@ -3,6 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import openpyxl
+
+from app.exports.safety import sanitize_spreadsheet_cell
 from tests.helpers import reload_app_modules
 
 
@@ -97,6 +100,83 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(products.status_code, 200)
         self.assertEqual(products.json()["items"][0]["effective_snapshot"]["title"], "Проектный товар")
 
+    async def test_import_preview_supports_bom_semicolon_multiline_and_mapping(self):
+        project_id = await self._create_project("Preview")
+        csv_text = (
+            "\ufeffНазвание;Цена;Комментарий клиента\n"
+            '"Товар с\nпереносом";123;"оставить как атрибут"\n'
+        )
+        preview = await self.client.post(
+            f"/api/projects/{project_id}/imports/preview",
+            files={"file": ("source.csv", csv_text.encode("utf-8"), "text/csv")},
+        )
+        self.assertEqual(preview.status_code, 200)
+        data = preview.json()
+        self.assertEqual(data["preview"]["delimiter"], ";")
+        self.assertEqual(data["preview"]["encoding"], "utf-8-sig")
+        self.assertEqual(data["preview"]["row_count"], 1)
+        self.assertEqual(data["preview"]["suggested_mapping"]["Комментарий клиента"], "attributes")
+
+        imported = await self.client.post(
+            f"/api/projects/{project_id}/imports",
+            json={
+                "stored_file": data["stored_file"],
+                "mapping": data["preview"]["suggested_mapping"],
+            },
+        )
+        self.assertEqual(imported.status_code, 200)
+        self.assertEqual(imported.json()["total_products"], 1)
+
+        product_id = await self._product_id(project_id)
+        card = (await self.client.get(f"/api/projects/{project_id}/products/{product_id}/effective-card")).json()
+        self.assertEqual(card["effective_snapshot"]["title"], "Товар с переносом")
+        self.assertEqual(card["effective_snapshot"]["attributes"]["Комментарий клиента"], "оставить как атрибут")
+        self.assertIn("provenance", card)
+        self.assertEqual(card["provenance"]["title"]["source_type"], "imported_file")
+
+    async def test_xlsx_preview_lists_sheets_and_hidden_sheet_warning(self):
+        project_id = await self._create_project("Excel")
+        workbook_path = Path(self.tmp.name) / "multi.xlsx"
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = "Основной"
+        sheet.append(["Название", "Цена"])
+        sheet.append(["Excel товар", 500])
+        hidden = workbook.create_sheet("Скрытый")
+        hidden.sheet_state = "hidden"
+        hidden.append(["Название", "Цена"])
+        hidden.append(["Не импортировать", 999])
+        workbook.save(workbook_path)
+
+        preview = await self.client.post(
+            f"/api/projects/{project_id}/imports/preview",
+            files={"file": ("multi.xlsx", workbook_path.read_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+
+        self.assertEqual(preview.status_code, 200)
+        data = preview.json()["preview"]
+        self.assertEqual(data["selected_sheet"], "Основной")
+        self.assertIn("Скрытый", data["hidden_sheets"])
+        self.assertTrue(any("скрытые листы" in item.lower() for item in data["warnings"]))
+
+    async def test_duplicate_import_requires_explicit_confirmation(self):
+        project_id = await self._create_project("Duplicate")
+        await self._import_csv(project_id, "Первый")
+        csv_text = "название,цена,ссылка,маркетплейс\nПервый,1000,https://example.test/shared-product,ozon\n"
+        preview = await self.client.post(
+            f"/api/projects/{project_id}/imports/preview",
+            files={"file": ("same.csv", csv_text.encode("utf-8"), "text/csv")},
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertTrue(preview.json()["preview"]["duplicate"])
+
+        blocked = await self.client.post(
+            f"/api/projects/{project_id}/imports",
+            json={"stored_file": preview.json()["stored_file"]},
+        )
+        self.assertEqual(blocked.status_code, 200)
+        self.assertEqual(blocked.json()["status"], "duplicate_file")
+
     async def test_products_from_different_projects_do_not_mix(self):
         project_a = await self._create_project("A")
         project_b = await self._create_project("B")
@@ -153,6 +233,53 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(export.status_code, 200)
         self.assertIn("exports/", export.json()["relative_path"])
+        self.assertEqual(export.json()["manifest"]["checksum"], export.json()["checksum"])
+        self.assertEqual(sanitize_spreadsheet_cell("-10"), "-10")
+        self.assertEqual(sanitize_spreadsheet_cell("=SUM(A1:A2)"), "'=SUM(A1:A2)")
+
+    async def test_project_rollback_is_project_scoped(self):
+        project_a = await self._create_project("Rollback A")
+        project_b = await self._create_project("Rollback B")
+        await self._import_csv(project_a, "Исходное A")
+        await self._import_csv(project_b, "Исходное B")
+        product_id = await self._product_id(project_a)
+
+        first_draft = await self.client.post(
+            f"/api/projects/{project_a}/products/{product_id}/drafts",
+            json={"payload": {"title": "Версия A1"}},
+        )
+        first = await self.client.post(
+            f"/api/projects/{project_a}/products/{product_id}/drafts/{first_draft.json()['draft_id']}/apply",
+            json={"revision": first_draft.json()["revision"], "comment": "Первая версия"},
+        )
+        self.assertEqual(first.status_code, 200)
+
+        second_draft = await self.client.post(
+            f"/api/projects/{project_a}/products/{product_id}/drafts",
+            json={"payload": {"title": "Версия A2"}},
+        )
+        second = await self.client.post(
+            f"/api/projects/{project_a}/products/{product_id}/drafts/{second_draft.json()['draft_id']}/apply",
+            json={"revision": second_draft.json()["revision"], "comment": "Вторая версия"},
+        )
+        self.assertEqual(second.status_code, 200)
+
+        rollback = await self.client.post(
+            f"/api/projects/{project_a}/products/{product_id}/versions/{first.json()['version']['version_number']}/rollback",
+            json={
+                "current_version_id": second.json()["version"]["version_id"],
+                "reason": "Вернуть согласованное название",
+            },
+        )
+        self.assertEqual(rollback.status_code, 200)
+
+        card_a = (await self.client.get(f"/api/projects/{project_a}/products/{product_id}/effective-card")).json()
+        card_b = (await self.client.get(f"/api/projects/{project_b}/products/{product_id}/effective-card")).json()
+        legacy = (await self.client.get(f"/api/products/{product_id}")).json()
+
+        self.assertEqual(card_a["effective_snapshot"]["title"], "Версия A1")
+        self.assertEqual(card_b["effective_snapshot"]["title"], "Исходное B")
+        self.assertNotEqual(legacy["name"], "Версия A1")
 
     async def test_project_report_contains_only_project_data(self):
         project_a = await self._create_project("Report A")
