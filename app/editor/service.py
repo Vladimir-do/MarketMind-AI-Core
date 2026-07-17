@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy import desc, select
 
-from app.database import Database, PriceHistory, Product, ProductCardDraft, ProductCardVersion
+from app.database import Database, PriceHistory, Product, ProductCardDraft, ProductCardVersion, ProjectProduct
 from app.domain.events.models import AggregateType, DomainEvent, EventActor, EventSource
 from app.domain.events.repository import DomainEventRepository
 from app.editor.repository import ProductEditorRepository
@@ -64,19 +64,35 @@ class ProductCardEditorService:
         base_version_id: str | None = None,
         actor_id: str | None = "local_user",
         comment: str | None = None,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
     ) -> ProductCardDraft:
         now = datetime.now(UTC)
         async with self._db.session() as session:
             product = await session.get(Product, product_id)
             if product is None:
                 raise EditorNotFoundError("Товар не найден")
+            if project_id or project_product_id:
+                await self._require_project_product(session, product_id, project_id, project_product_id)
             repo = ProductEditorRepository(session)
-            base_version_id = base_version_id or await self._current_version_id(repo, product)
-            current = await self._effective_snapshot(session, product)
+            base_version_id = base_version_id or await self._current_version_id(
+                repo,
+                product,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
+            current = await self._effective_snapshot(
+                session,
+                product,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             draft_payload = normalize_card_payload({**current, **(payload or {})})
             draft = ProductCardDraft(
                 draft_id=f"draft_{uuid.uuid4().hex}",
                 product_id=product_id,
+                project_id=project_id,
+                project_product_id=project_product_id,
                 base_version_id=base_version_id,
                 status="draft",
                 payload_json=self._json(draft_payload),
@@ -91,11 +107,23 @@ class ProductCardEditorService:
             await session.commit()
             return draft
 
-    async def list_drafts(self, product_id: int, *, status: str | None = None) -> list[ProductCardDraft]:
+    async def list_drafts(
+        self,
+        product_id: int,
+        *,
+        status: str | None = None,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
+    ) -> list[ProductCardDraft]:
         async with self._db.session() as session:
             if await session.get(Product, product_id) is None:
                 raise EditorNotFoundError("Товар не найден")
-            return await ProductEditorRepository(session).list_drafts(product_id, status=status)
+            return await ProductEditorRepository(session).list_drafts(
+                product_id,
+                status=status,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
 
     async def update_draft(
         self,
@@ -105,10 +133,12 @@ class ProductCardEditorService:
         payload: dict[str, Any],
         revision: int,
         comment: str | None = None,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
     ) -> ProductCardDraft:
         now = datetime.now(UTC)
         async with self._db.session() as session:
-            draft = await self._get_owned_draft(session, product_id, draft_id)
+            draft = await self._get_owned_draft(session, product_id, draft_id, project_id, project_product_id)
             if draft.revision != revision:
                 raise EditorConflictError(
                     "Черновик был изменён после открытия",
@@ -125,16 +155,23 @@ class ProductCardEditorService:
 
     async def discard_draft(self, product_id: int, draft_id: str) -> ProductCardDraft:
         async with self._db.session() as session:
-            draft = await self._get_owned_draft(session, product_id, draft_id)
+            draft = await self._get_owned_draft(session, product_id, draft_id, None, None)
             draft.status = "discarded"
             draft.updated_at = datetime.now(UTC)
             draft.revision += 1
             await session.commit()
             return draft
 
-    async def validate_draft(self, product_id: int, draft_id: str) -> ValidationResult:
+    async def validate_draft(
+        self,
+        product_id: int,
+        draft_id: str,
+        *,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
+    ) -> ValidationResult:
         async with self._db.session() as session:
-            draft = await self._get_owned_draft(session, product_id, draft_id)
+            draft = await self._get_owned_draft(session, product_id, draft_id, project_id, project_product_id)
             validation = validate_card_payload(self._load_json(draft.payload_json))
             draft.validation_json = self._json(validation.to_dict())
             draft.status = "ready_for_review" if validation.is_valid else "draft"
@@ -150,22 +187,37 @@ class ProductCardEditorService:
         revision: int,
         actor_id: str | None = "local_user",
         comment: str | None = None,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
     ) -> ApplyResult:
         now = datetime.now(UTC)
         async with self._db.session() as session:
             product = await session.get(Product, product_id)
             if product is None:
                 raise EditorNotFoundError("Товар не найден")
-            draft = await self._get_owned_draft(session, product_id, draft_id)
+            project_product = None
+            if project_id or project_product_id:
+                project_product = await self._require_project_product(session, product_id, project_id, project_product_id)
+            draft = await self._get_owned_draft(session, product_id, draft_id, project_id, project_product_id)
             if draft.revision != revision:
                 raise EditorConflictError(
                     "Черновик был изменён после открытия",
                     conflict={"current_revision": draft.revision, "requested_revision": revision},
                 )
             repo = ProductEditorRepository(session)
-            current_version_id = await self._current_version_id(repo, product)
+            current_version_id = await self._current_version_id(
+                repo,
+                product,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             if draft.base_version_id != current_version_id:
-                current_snapshot = await self._effective_snapshot(session, product)
+                current_snapshot = await self._effective_snapshot(
+                    session,
+                    product,
+                    project_id=project_id,
+                    project_product_id=project_product_id,
+                )
                 draft_snapshot = self._load_json(draft.payload_json)
                 draft.status = "conflicted"
                 draft.updated_at = now
@@ -186,7 +238,12 @@ class ProductCardEditorService:
                 await session.commit()
                 raise EditorValidationError(validation)
 
-            before = await self._effective_snapshot(session, product)
+            before = await self._effective_snapshot(
+                session,
+                product,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             snapshot = normalize_card_payload({**before, **draft_payload})
             diff = self._diff(before, snapshot)
             if not diff:
@@ -195,7 +252,13 @@ class ProductCardEditorService:
                 )
 
             checksum = self.checksum(snapshot)
-            duplicate = await self._latest_same_checksum(repo, product_id, checksum)
+            duplicate = await self._latest_same_checksum(
+                repo,
+                product_id,
+                checksum,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             if duplicate is not None:
                 draft.status = "applied"
                 draft.updated_at = now
@@ -207,6 +270,8 @@ class ProductCardEditorService:
             version = ProductCardVersion(
                 version_id=f"version:{product_id}:{version_number:04d}",
                 product_id=product_id,
+                project_id=project_id,
+                project_product_id=project_product_id,
                 version_number=version_number,
                 snapshot_json=self._json(snapshot),
                 snapshot_schema_version=1,
@@ -220,9 +285,23 @@ class ProductCardEditorService:
                 checksum=checksum,
             )
             session.add(version)
-            event = self._manual_event(product_id, event_id, actor_id, now, diff, version.version_id, comment)
+            event = self._manual_event(
+                product_id,
+                event_id,
+                actor_id,
+                now,
+                diff,
+                version.version_id,
+                comment,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             await DomainEventRepository(session).append(event, correlation_id=draft.draft_id, causation_id=draft.draft_id)
-            self._apply_snapshot_to_product(session, product, snapshot, before, now)
+            if project_product is None:
+                self._apply_snapshot_to_product(session, product, snapshot, before, now)
+            else:
+                project_product.effective_updated_at = now
+                project_product.updated_at = now
             draft.status = "applied"
             draft.updated_at = now
             draft.revision += 1
@@ -237,23 +316,43 @@ class ProductCardEditorService:
         current_version_id: str | None = None,
         actor_id: str | None = "local_user",
         reason: str | None = None,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
     ) -> ApplyResult:
         now = datetime.now(UTC)
         async with self._db.session() as session:
             product = await session.get(Product, product_id)
             if product is None:
                 raise EditorNotFoundError("Товар не найден")
+            project_product = None
+            if project_id or project_product_id:
+                project_product = await self._require_project_product(session, product_id, project_id, project_product_id)
             repo = ProductEditorRepository(session)
-            target = await repo.get_version(product_id, version_number)
+            target = await repo.get_version(
+                product_id,
+                version_number,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             if target is None:
                 raise EditorNotFoundError("Версия не найдена")
-            actual_current = await self._current_version_id(repo, product)
+            actual_current = await self._current_version_id(
+                repo,
+                product,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             if current_version_id and current_version_id != actual_current:
                 raise EditorConflictError(
                     "Карточка была изменена после открытия версии",
                     conflict={"current_version_id": actual_current, "requested_version_id": current_version_id},
                 )
-            before = await self._effective_snapshot(session, product)
+            before = await self._effective_snapshot(
+                session,
+                product,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             snapshot = self._load_json(target.snapshot_json)
             diff = self._diff(before, snapshot)
             event_id = f"product:{product_id}:rollback:{uuid.uuid4().hex}"
@@ -261,6 +360,8 @@ class ProductCardEditorService:
             version = ProductCardVersion(
                 version_id=f"version:{product_id}:{next_number:04d}",
                 product_id=product_id,
+                project_id=project_id,
+                project_product_id=project_product_id,
                 version_number=next_number,
                 snapshot_json=self._json(snapshot),
                 snapshot_schema_version=1,
@@ -274,15 +375,44 @@ class ProductCardEditorService:
                 checksum=self.checksum(snapshot),
             )
             session.add(version)
-            event = self._rollback_event(product_id, event_id, actor_id, now, diff, target.version_id, version.version_id, reason)
+            event = self._rollback_event(
+                product_id,
+                event_id,
+                actor_id,
+                now,
+                diff,
+                target.version_id,
+                version.version_id,
+                reason,
+                project_id=project_id,
+                project_product_id=project_product_id,
+            )
             await DomainEventRepository(session).append(event, correlation_id=event_id, causation_id=target.trigger_event_id)
-            self._apply_snapshot_to_product(session, product, snapshot, before, now)
+            if project_product is None:
+                self._apply_snapshot_to_product(session, product, snapshot, before, now)
+            else:
+                project_product.effective_updated_at = now
+                project_product.updated_at = now
             await session.commit()
             return ApplyResult(version=version, event=event, diff=diff)
 
-    async def list_persisted_versions(self, product_id: int, *, limit: int = 50, offset: int = 0) -> list[ProductCardVersion]:
+    async def list_persisted_versions(
+        self,
+        product_id: int,
+        *,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[ProductCardVersion]:
         async with self._db.session() as session:
-            return await ProductEditorRepository(session).list_versions(product_id, limit=limit, offset=offset)
+            return await ProductEditorRepository(session).list_versions(
+                product_id,
+                project_id=project_id,
+                project_product_id=project_product_id,
+                limit=limit,
+                offset=offset,
+            )
 
     async def list_audit_events(self, product_id: int, *, limit: int = 50, offset: int = 0) -> list[DomainEvent]:
         async with self._db.session() as session:
@@ -293,20 +423,55 @@ class ProductCardEditorService:
                 offset=offset,
             )
 
-    async def _get_owned_draft(self, session, product_id: int, draft_id: str) -> ProductCardDraft:
+    async def _get_owned_draft(
+        self,
+        session,
+        product_id: int,
+        draft_id: str,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
+    ) -> ProductCardDraft:
         draft = await session.get(ProductCardDraft, draft_id)
         if draft is None or draft.product_id != product_id:
             raise EditorNotFoundError("Черновик не найден")
+        if project_id is not None and draft.project_id != project_id:
+            raise EditorNotFoundError("Черновик не найден")
+        if project_product_id is not None and draft.project_product_id != project_product_id:
+            raise EditorNotFoundError("Черновик не найден")
         return draft
 
-    async def _current_version_id(self, repo: ProductEditorRepository, product: Product) -> str:
-        latest = await repo.latest_version(product.id)
+    async def _current_version_id(
+        self,
+        repo: ProductEditorRepository,
+        product: Product,
+        *,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
+    ) -> str:
+        latest = await repo.latest_version(product.id, project_id=project_id, project_product_id=project_product_id)
         if latest is not None:
             return latest.version_id
         marker = product.last_check.isoformat() if product.last_check else "unknown"
         return f"source:{product.id}:{marker}"
 
-    async def _effective_snapshot(self, session, product: Product) -> dict[str, Any]:
+    async def _effective_snapshot(
+        self,
+        session,
+        product: Product,
+        *,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
+    ) -> dict[str, Any]:
+        if project_id or project_product_id:
+            project_product = await self._require_project_product(session, product.id, project_id, project_product_id)
+            latest = await ProductEditorRepository(session).latest_version(
+                product.id,
+                project_id=project_product.project_id,
+                project_product_id=project_product.project_product_id,
+            )
+            if latest is not None:
+                return normalize_card_payload(self._load_json(latest.snapshot_json))
+            return normalize_card_payload(self._load_json(project_product.latest_source_snapshot_json))
         latest_price = await session.scalar(
             select(PriceHistory)
             .where(PriceHistory.product_id == product.id)
@@ -355,8 +520,11 @@ class ProductCardEditorService:
         repo: ProductEditorRepository,
         product_id: int,
         checksum: str,
+        *,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
     ) -> ProductCardVersion | None:
-        latest = await repo.latest_version(product_id)
+        latest = await repo.latest_version(product_id, project_id=project_id, project_product_id=project_product_id)
         if latest is not None and latest.checksum == checksum:
             return latest
         return None
@@ -378,17 +546,23 @@ class ProductCardEditorService:
         diff: list[CardDiffItem],
         version_id: str,
         comment: str | None,
+        *,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
     ) -> DomainEvent:
+        aggregate_id = project_product_id or str(product_id)
         return DomainEvent(
             event_id=event_id,
             aggregate_type=AggregateType.PRODUCT.value,
-            aggregate_id=str(product_id),
+            aggregate_id=aggregate_id,
             event_type="product.manual_change_applied",
             source=EventSource.USER.value,
-            actor=EventActor("user", actor_id=actor_id, display_name="Пользователь"),
+            actor=EventActor("local_user" if project_id else "user", actor_id=actor_id, display_name="Пользователь"),
             occurred_at=occurred_at,
             payload={
                 "product_id": product_id,
+                "project_id": project_id,
+                "project_product_id": project_product_id,
                 "changes": [item.to_dict() for item in diff],
                 "version_id": version_id,
                 "comment": comment,
@@ -406,17 +580,23 @@ class ProductCardEditorService:
         source_version_id: str,
         version_id: str,
         reason: str | None,
+        *,
+        project_id: str | None = None,
+        project_product_id: str | None = None,
     ) -> DomainEvent:
+        aggregate_id = project_product_id or str(product_id)
         return DomainEvent(
             event_id=event_id,
             aggregate_type=AggregateType.PRODUCT.value,
-            aggregate_id=str(product_id),
+            aggregate_id=aggregate_id,
             event_type="product.version_rolled_back",
             source=EventSource.USER.value,
-            actor=EventActor("user", actor_id=actor_id, display_name="Пользователь"),
+            actor=EventActor("local_user" if project_id else "user", actor_id=actor_id, display_name="Пользователь"),
             occurred_at=occurred_at,
             payload={
                 "product_id": product_id,
+                "project_id": project_id,
+                "project_product_id": project_product_id,
                 "changes": [item.to_dict() for item in diff],
                 "source_version_id": source_version_id,
                 "version_id": version_id,
@@ -436,6 +616,23 @@ class ProductCardEditorService:
             occurred_at=occurred_at,
             payload={"product_id": product_id},
         )
+
+    @staticmethod
+    async def _require_project_product(
+        session,
+        product_id: int,
+        project_id: str | None,
+        project_product_id: str | None,
+    ) -> ProjectProduct:
+        stmt = select(ProjectProduct).where(ProjectProduct.product_id == product_id)
+        if project_id is not None:
+            stmt = stmt.where(ProjectProduct.project_id == project_id)
+        if project_product_id is not None:
+            stmt = stmt.where(ProjectProduct.project_product_id == project_product_id)
+        record = await session.scalar(stmt)
+        if record is None:
+            raise EditorNotFoundError("Товар не найден в проекте")
+        return record
 
     @staticmethod
     def checksum(snapshot: dict[str, Any]) -> str:

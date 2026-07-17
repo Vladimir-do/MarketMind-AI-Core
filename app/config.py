@@ -110,6 +110,7 @@ RUNTIME_DATA_DIR: Path = _runtime_data_dir()
 REPORTS_DIR: Path = _path_from_env("REPORTS_DIR", RUNTIME_DATA_DIR / "reports")
 PARSER_DEBUG_DIR: Path = _path_from_env("PARSER_DEBUG_DIR", RUNTIME_DATA_DIR / "debug")
 OZON_PROFILE_DIR: Path = _path_from_env("OZON_PROFILE_DIR", RUNTIME_DATA_DIR / "ozon_profile")
+MARKETMIND_WORKSPACE_DIR: Path = _path_from_env("MARKETMIND_WORKSPACE_DIR", RUNTIME_DATA_DIR / "workspace")
 SCRAPE_ATTEMPTS_JSONL: Path = _path_from_env("SCRAPE_ATTEMPTS_JSONL", RUNTIME_DATA_DIR / "scrape_attempts.jsonl")
 BLOCK_PATTERNS_JSONL: Path = _path_from_env("BLOCK_PATTERNS_JSONL", RUNTIME_DATA_DIR / "blocked_patterns.jsonl")
 

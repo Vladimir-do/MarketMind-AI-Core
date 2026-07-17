@@ -4,7 +4,19 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -121,6 +133,115 @@ class Subscriber(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
+class ClientProject(Base):
+    __tablename__ = "client_projects"
+
+    project_id         = Column(String(64), primary_key=True)
+    name               = Column(Text, nullable=False)
+    client_name        = Column(Text)
+    marketplace        = Column(String(32), nullable=False, default="unknown")
+    status             = Column(String(32), nullable=False, default="new")
+    description        = Column(Text)
+    source_filename    = Column(Text)
+    source_file_hash   = Column(String(64))
+    source_imported_at = Column(DateTime)
+    created_at         = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    updated_at         = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    completed_at       = Column(DateTime)
+    notes              = Column(Text)
+    export_directory   = Column(Text)
+
+    __table_args__ = (
+        Index("ix_client_projects_status_updated", "status", "updated_at"),
+    )
+
+
+class ClientProjectFile(Base):
+    __tablename__ = "client_project_files"
+
+    file_id           = Column(String(64), primary_key=True)
+    project_id        = Column(String(64), ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False)
+    original_filename = Column(Text, nullable=False)
+    stored_filename   = Column(Text, nullable=False)
+    relative_path     = Column(Text, nullable=False)
+    sha256            = Column(String(64), nullable=False)
+    size_bytes        = Column(Integer, nullable=False)
+    file_format       = Column(String(16), nullable=False)
+    row_count         = Column(Integer)
+    import_status     = Column(String(32), nullable=False, default="pending")
+    import_errors_json = Column(Text)
+    imported_at       = Column(DateTime)
+    created_at        = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "sha256", name="uq_client_project_files_project_sha256"),
+        Index("ix_client_project_files_project_created", "project_id", "created_at"),
+    )
+
+
+class ProjectProduct(Base):
+    __tablename__ = "project_products"
+
+    project_product_id          = Column(String(64), primary_key=True)
+    project_id                  = Column(String(64), ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False)
+    product_id                  = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    source_file_id              = Column(String(64), ForeignKey("client_project_files.file_id", ondelete="SET NULL"))
+    source_row_index            = Column(Integer)
+    source_snapshot_json        = Column(Text, nullable=False)
+    source_snapshot_hash        = Column(String(64), nullable=False)
+    latest_source_snapshot_json = Column(Text, nullable=False)
+    latest_source_snapshot_hash = Column(String(64), nullable=False)
+    status                      = Column(String(32), nullable=False, default="active")
+    created_at                  = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    updated_at                  = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    source_updated_at           = Column(DateTime)
+    effective_updated_at        = Column(DateTime)
+
+    product = relationship("Product")
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "product_id", name="uq_project_products_project_product"),
+        Index("ix_project_products_project_updated", "project_id", "updated_at"),
+        Index("ix_project_products_product_id", "product_id"),
+    )
+
+
+class ProjectExport(Base):
+    __tablename__ = "project_exports"
+
+    export_id           = Column(String(64), primary_key=True)
+    project_id          = Column(String(64), ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False)
+    export_type         = Column(String(32), nullable=False)
+    marketplace_profile = Column(String(32), nullable=False)
+    file_format         = Column(String(16), nullable=False)
+    relative_path       = Column(Text, nullable=False)
+    product_count       = Column(Integer, nullable=False, default=0)
+    status              = Column(String(32), nullable=False, default="created")
+    warnings_json       = Column(Text)
+    created_at          = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        Index("ix_project_exports_project_created", "project_id", "created_at"),
+    )
+
+
+class ProjectReport(Base):
+    __tablename__ = "project_reports"
+
+    report_id     = Column(String(64), primary_key=True)
+    project_id    = Column(String(64), ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False)
+    report_type   = Column(String(32), nullable=False)
+    file_format   = Column(String(16), nullable=False)
+    relative_path = Column(Text, nullable=False)
+    summary_json  = Column(Text, nullable=False)
+    status        = Column(String(32), nullable=False, default="created")
+    created_at    = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        Index("ix_project_reports_project_created", "project_id", "created_at"),
+    )
+
+
 class ApprovalRecord(Base):
     __tablename__ = "approval_records"
 
@@ -157,6 +278,8 @@ class ProductCardDraft(Base):
 
     draft_id        = Column(String(64), primary_key=True)
     product_id      = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    project_id      = Column(String(64), ForeignKey("client_projects.project_id", ondelete="SET NULL"))
+    project_product_id = Column(String(64), ForeignKey("project_products.project_product_id", ondelete="SET NULL"))
     base_version_id = Column(String(128))
     status          = Column(String(32), nullable=False, default="draft")
     payload_json    = Column(Text, nullable=False)
@@ -172,6 +295,7 @@ class ProductCardDraft(Base):
     __table_args__ = (
         Index("ix_product_card_drafts_product_status_updated", "product_id", "status", "updated_at"),
         Index("ix_product_card_drafts_product_id", "product_id"),
+        Index("ix_product_card_drafts_project_product_status", "project_id", "project_product_id", "status"),
     )
 
 
@@ -180,6 +304,8 @@ class ProductCardVersion(Base):
 
     version_id              = Column(String(128), primary_key=True)
     product_id              = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    project_id              = Column(String(64), ForeignKey("client_projects.project_id", ondelete="SET NULL"))
+    project_product_id      = Column(String(64), ForeignKey("project_products.project_product_id", ondelete="SET NULL"))
     version_number          = Column(Integer, nullable=False)
     snapshot_json           = Column(Text, nullable=False)
     snapshot_schema_version = Column(Integer, nullable=False, default=1)
@@ -198,6 +324,7 @@ class ProductCardVersion(Base):
         Index("ix_product_card_versions_product_number", "product_id", "version_number", unique=True),
         Index("ix_product_card_versions_product_created", "product_id", "created_at"),
         Index("ix_product_card_versions_trigger_event_id", "trigger_event_id"),
+        Index("ix_product_card_versions_project_product_number", "project_id", "project_product_id", "version_number"),
     )
 
 
