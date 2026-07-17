@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import HTMLResponse
 
+from app.config import IMPORT_SCHEMA_VERSION
 from app.editor.service import (
     EditorConflictError,
     EditorNotFoundError,
@@ -18,6 +19,7 @@ from app.editor.service import (
 from app.effective_card.service import EffectiveProductCardService
 from app.exports.service import ProjectExportService
 from app.pipeline import ImportPipeline
+from app.projects.imports import analyze_import_file, build_products_from_preview
 from app.projects.service import (
     ProjectError,
     ProjectNotFoundError,
@@ -25,10 +27,11 @@ from app.projects.service import (
 )
 from app.reports.service import ClientDeliveryReportService
 from app.web.app import templates
-from app.workspace.files import WorkspaceError, store_source_file
+from app.workspace.files import WorkspaceError, store_source_file, stored_source_file
 
 router = APIRouter()
 PROJECT_UPLOAD_FILE = File(...)
+PROJECT_OPTIONAL_UPLOAD_FILE = File(None)
 
 
 def _project_service(request: Request) -> ProjectService:
@@ -68,9 +71,17 @@ def _file_to_dict(record) -> dict[str, Any]:
         "sha256": record.sha256,
         "size_bytes": record.size_bytes,
         "file_format": record.file_format,
+        "schema_version": record.schema_version,
+        "encoding": record.encoding,
+        "delimiter": record.delimiter,
+        "selected_sheet": record.selected_sheet,
         "row_count": record.row_count,
+        "successful_rows": record.successful_rows,
+        "warning_count": record.warning_count,
+        "error_count": record.error_count,
         "import_status": record.import_status,
         "import_errors": json.loads(record.import_errors_json or "[]"),
+        "import_summary": json.loads(record.import_summary_json or "{}"),
         "imported_at": record.imported_at.isoformat() if record.imported_at else None,
     }
 
@@ -81,6 +92,8 @@ def _artifact_to_dict(record) -> dict[str, Any]:
         "project_id": record.project_id,
         "file_format": record.file_format,
         "relative_path": record.relative_path,
+        "checksum": getattr(record, "checksum", None),
+        "manifest": json.loads(getattr(record, "manifest_json", None) or "{}"),
         "status": record.status,
         "created_at": record.created_at.isoformat() if record.created_at else None,
     }
@@ -156,19 +169,60 @@ async def api_archive_project(project_id: str, request: Request):
 
 
 @router.post("/api/projects/{project_id}/imports")
-async def api_import_project_file(project_id: str, request: Request, file: UploadFile = PROJECT_UPLOAD_FILE):
+async def api_import_project_file(project_id: str, request: Request, file: UploadFile | None = PROJECT_OPTIONAL_UPLOAD_FILE):
     try:
         await _project_service(request).get_project(project_id)
-        content = await file.read()
-        stored = store_source_file(project_id, file.filename or "upload.csv", content)
+        body: dict[str, Any] = {}
+        if file is not None:
+            content = await file.read()
+            stored = store_source_file(project_id, file.filename or "upload.csv", content)
+        else:
+            body = await _request_data(request)
+            stored_info = body.get("stored_file") or {}
+            stored = stored_source_file(
+                project_id,
+                str(stored_info.get("relative_path") or ""),
+                original_filename=str(stored_info.get("original_filename") or "upload.csv"),
+                sha256=str(stored_info.get("sha256") or ""),
+                size_bytes=int(stored_info.get("size_bytes") or 0),
+                file_format=str(stored_info.get("file_format") or "csv"),
+            )
+        duplicate = await _project_service(request).source_file_exists(project_id, stored.sha256)
+        confirm_duplicate = bool(body.get("confirm_duplicate"))
+        preview = analyze_import_file(
+            path=stored.absolute_path,
+            original_filename=stored.original_filename,
+            sha256=stored.sha256,
+            size_bytes=stored.size_bytes,
+            file_format=stored.file_format,
+            duplicate=duplicate,
+            selected_sheet=body.get("selected_sheet"),
+        )
+        if duplicate and not confirm_duplicate:
+            return {
+                "status": "duplicate_file",
+                "project_id": project_id,
+                "preview": preview.to_dict(),
+                "message": "Этот файл уже импортировался. Подтвердите повторный импорт, чтобы обновить данные.",
+            }
+        products, import_errors = build_products_from_preview(preview, mapping=body.get("mapping") or None)
         pipeline = ImportPipeline()
-        result = pipeline.run_file(stored.absolute_path)
+        result = pipeline.run_products(products)
         errors = [getattr(error, "message", str(error)) for error in result.errors]
+        errors.extend(error.message for error in import_errors)
         file_record, created = await _project_service(request).record_source_file(
             project_id,
             stored,
-            row_count=result.import_metadata.get("rows_extracted"),
+            row_count=preview.row_count,
+            successful_rows=len(result.enriched),
+            warning_count=len(preview.warnings),
+            error_count=len(errors),
             errors=errors,
+            schema_version=IMPORT_SCHEMA_VERSION,
+            encoding=preview.encoding,
+            delimiter=preview.delimiter,
+            selected_sheet=preview.selected_sheet,
+            summary=preview.to_dict(),
         )
         saved = 0
         changed = 0
@@ -196,13 +250,44 @@ async def api_import_project_file(project_id: str, request: Request, file: Uploa
             changed += 1 if was_changed else 0
         return {
             "task_id": uuid.uuid4().hex[:12],
-            "status": "completed" if created else "duplicate_file",
+            "status": "completed" if created else "reimported_existing_file",
             "project_id": project_id,
             "file": _file_to_dict(file_record),
             "total_products": saved,
             "changed_products": changed,
             "errors": len(errors),
             "message": f"Импортировано {saved} товаров, ошибок: {len(errors)}",
+        }
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/imports/preview")
+async def api_preview_project_import(project_id: str, request: Request, file: UploadFile = PROJECT_UPLOAD_FILE):
+    try:
+        await _project_service(request).get_project(project_id)
+        content = await file.read()
+        stored = store_source_file(project_id, file.filename or "upload.csv", content)
+        duplicate = await _project_service(request).source_file_exists(project_id, stored.sha256)
+        preview = analyze_import_file(
+            path=stored.absolute_path,
+            original_filename=stored.original_filename,
+            sha256=stored.sha256,
+            size_bytes=stored.size_bytes,
+            file_format=stored.file_format,
+            duplicate=duplicate,
+        )
+        return {
+            "project_id": project_id,
+            "stored_file": {
+                "original_filename": stored.original_filename,
+                "relative_path": stored.relative_path,
+                "sha256": stored.sha256,
+                "size_bytes": stored.size_bytes,
+                "file_format": stored.file_format,
+            },
+            "preview": preview.to_dict(),
+            "message": "Preview готов. Проверьте сопоставление колонок перед импортом.",
         }
     except Exception as exc:
         raise _editor_error(exc) from exc
@@ -307,6 +392,31 @@ async def api_project_draft_quality_preview(project_id: str, product_id: int, dr
     body = await _request_data(request)
     try:
         return await _effective_service(request).draft_quality_preview(project_id, product_id, body.get("payload") or {})
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/products/{product_id}/versions/{version_number}/rollback")
+async def api_project_rollback_version(project_id: str, product_id: int, version_number: int, request: Request):
+    body = await _request_data(request)
+    try:
+        project_product = await _project_service(request).get_project_product(project_id, product_id)
+        result = await ProductCardEditorService(request.app.state.db).rollback_version(
+            product_id,
+            version_number,
+            current_version_id=body.get("current_version_id"),
+            actor_id="operator",
+            reason=body.get("reason"),
+            project_id=project_id,
+            project_product_id=project_product.project_product_id,
+        )
+        from app.web.routes.editor import _version_to_dict
+
+        return {
+            "version": _version_to_dict(result.version),
+            "event": result.event.to_dict(),
+            "diff": [item.to_dict() for item in result.diff],
+        }
     except Exception as exc:
         raise _editor_error(exc) from exc
 

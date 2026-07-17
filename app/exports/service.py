@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import uuid
@@ -12,7 +13,8 @@ from typing import Any
 import openpyxl
 from sqlalchemy import select
 
-from app.database import ClientProject, Database, ProjectExport
+from app.config import EXPORT_SCHEMA_VERSION
+from app.database import ClientProject, ClientProjectFile, Database, ProjectExport
 from app.effective_card.service import EffectiveProductCard, EffectiveProductCardService
 from app.exports.safety import sanitize_export_row, sanitize_spreadsheet_cell
 from app.workspace.files import project_artifact_path
@@ -74,18 +76,44 @@ class ProjectExportService:
             target.write_bytes(_xlsx_bytes(rows))
         else:
             raise ValueError("Формат экспорта не поддерживается")
+        checksum = hashlib.sha256(target.read_bytes()).hexdigest()
         async with self._db.session() as session:
             project = await session.get(ClientProject, project_id)
             if project is None:
                 raise ValueError("Проект не найден")
+            source_file_result = await session.execute(
+                select(ClientProjectFile)
+                .where(ClientProjectFile.project_id == project_id)
+                .order_by(ClientProjectFile.created_at)
+            )
+            manifest = {
+                "project_id": project_id,
+                "export_id": export_id,
+                "format": safe_format,
+                "schema_version": EXPORT_SCHEMA_VERSION,
+                "generated_at": now.isoformat(),
+                "source_file_hashes": [record.sha256 for record in source_file_result.scalars().all()],
+                "product_count": len(rows),
+                "warning_count": 0,
+                "error_count": 0,
+                "effective_versions": [
+                    row.get("latest_version_id")
+                    for row in rows
+                    if row.get("latest_version_id")
+                ],
+                "checksum": checksum,
+            }
             record = ProjectExport(
                 export_id=export_id,
                 project_id=project_id,
                 export_type="product_cards",
                 marketplace_profile=marketplace_profile,
                 file_format=safe_format,
+                schema_version=EXPORT_SCHEMA_VERSION,
                 relative_path=relative_path,
                 product_count=len(rows),
+                checksum=checksum,
+                manifest_json=json.dumps(manifest, ensure_ascii=False, sort_keys=True),
                 status="created",
                 warnings_json="[]",
                 created_at=now,

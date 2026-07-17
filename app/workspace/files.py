@@ -8,7 +8,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.config import MARKETMIND_WORKSPACE_DIR
+from app.config import IMPORT_MAX_FILE_BYTES, MARKETMIND_WORKSPACE_DIR
 
 _SAFE_NAME_RE = re.compile(r"[^a-zA-Z0-9а-яА-ЯёЁ._-]+")
 _SUPPORTED_IMPORT_SUFFIXES = {".csv", ".xlsx", ".xlsm"}
@@ -48,6 +48,8 @@ def store_source_file(project_id: str, filename: str, content: bytes) -> StoredP
         raise WorkspaceError("Формат файла не поддерживается")
     if not content:
         raise WorkspaceError("Файл пустой")
+    if len(content) > IMPORT_MAX_FILE_BYTES:
+        raise WorkspaceError("Файл слишком большой для безопасного импорта")
     digest = hashlib.sha256(content).hexdigest()
     safe_stem = _safe_filename(Path(original).stem)[:80] or "source"
     stored_name = f"{safe_stem}_{digest[:12]}{suffix}"
@@ -65,6 +67,23 @@ def store_source_file(project_id: str, filename: str, content: bytes) -> StoredP
         sha256=digest,
         size_bytes=len(content),
         file_format=suffix.removeprefix("."),
+    )
+
+
+def stored_source_file(project_id: str, relative_path: str, *, original_filename: str, sha256: str, size_bytes: int, file_format: str) -> StoredProjectFile:
+    root = project_root(project_id)
+    target = root / relative_path
+    _ensure_inside(root, target)
+    if not target.exists() or not target.is_file():
+        raise WorkspaceError("Сохранённый файл импорта не найден")
+    return StoredProjectFile(
+        original_filename=Path(original_filename).name,
+        stored_filename=target.name,
+        relative_path=target.relative_to(root).as_posix(),
+        absolute_path=target,
+        sha256=sha256,
+        size_bytes=size_bytes,
+        file_format=file_format,
     )
 
 

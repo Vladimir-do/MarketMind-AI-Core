@@ -30,6 +30,7 @@ class EffectiveProductCard:
     source_updated_at: str | None = None
     effective_updated_at: str | None = None
     warnings: list[str] = field(default_factory=list)
+    provenance: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -119,6 +120,7 @@ class EffectiveProductCardService:
             field for field in set(source) | set(effective)
             if source.get(field) != effective.get(field)
         )
+        provenance = _build_provenance(project_product, source, effective, version)
         warnings = []
         if applied and project_product.source_snapshot_hash != project_product.latest_source_snapshot_hash:
             warnings.append("Исходное значение изменилось. Ручная версия сохранена.")
@@ -136,6 +138,7 @@ class EffectiveProductCardService:
             source_updated_at=project_product.source_updated_at.isoformat() if project_product.source_updated_at else None,
             effective_updated_at=project_product.effective_updated_at.isoformat() if project_product.effective_updated_at else None,
             warnings=warnings,
+            provenance=provenance,
         )
 
 
@@ -169,3 +172,37 @@ def _analysis_to_dict(analysis) -> dict[str, Any]:
             for item in analysis.findings
         ],
     }
+
+
+def _build_provenance(
+    project_product: ProjectProduct,
+    source: dict[str, Any],
+    effective: dict[str, Any],
+    version: ProductCardVersion | None,
+) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    source_row = project_product.source_row_index
+    for field_name in sorted(set(source) | set(effective)):
+        is_overridden = version is not None and source.get(field_name) != effective.get(field_name)
+        result[field_name] = {
+            "source_type": "manual_version" if is_overridden else "imported_file",
+            "source_file_id": project_product.source_file_id,
+            "source_row": source_row,
+            "source_column": _source_column_for_field(field_name, source),
+            "original_value": source.get(field_name),
+            "normalized_value": effective.get(field_name),
+            "version_id": version.version_id if is_overridden and version is not None else None,
+            "draft_id": None,
+            "changed_at": version.created_at.isoformat() if is_overridden and version is not None else None,
+            "reason": version.comment if is_overridden and version is not None else "Импортировано из файла заказчика",
+            "actor": version.actor_id if is_overridden and version is not None else "operator",
+        }
+    return result
+
+
+def _source_column_for_field(field: str, source: dict[str, Any]) -> str | None:
+    attributes = source.get("attributes") or {}
+    marker = f"source:{field}"
+    if marker in attributes:
+        return field
+    return field if field in source else None

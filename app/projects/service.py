@@ -110,7 +110,15 @@ class ProjectService:
         stored: StoredProjectFile,
         *,
         row_count: int | None = None,
+        successful_rows: int = 0,
+        warning_count: int = 0,
+        error_count: int = 0,
         errors: list[str] | None = None,
+        schema_version: str = "local-import-v1",
+        encoding: str | None = None,
+        delimiter: str | None = None,
+        selected_sheet: str | None = None,
+        summary: dict[str, Any] | None = None,
     ) -> tuple[ClientProjectFile, bool]:
         now = datetime.now(UTC)
         async with self._db.session() as session:
@@ -133,9 +141,17 @@ class ProjectService:
                 sha256=stored.sha256,
                 size_bytes=stored.size_bytes,
                 file_format=stored.file_format,
+                schema_version=schema_version,
+                encoding=encoding,
+                delimiter=delimiter,
+                selected_sheet=selected_sheet,
                 row_count=row_count,
+                successful_rows=successful_rows,
+                warning_count=warning_count,
+                error_count=error_count,
                 import_status="completed" if not errors else "completed_with_errors",
                 import_errors_json=json.dumps(errors or [], ensure_ascii=False),
+                import_summary_json=json.dumps(summary or {}, ensure_ascii=False, sort_keys=True),
                 imported_at=now,
                 created_at=now,
             )
@@ -147,6 +163,16 @@ class ProjectService:
             project.updated_at = now
             await session.commit()
             return record, True
+
+    async def source_file_exists(self, project_id: str, sha256: str) -> bool:
+        async with self._db.session() as session:
+            await self._require_project(session, project_id)
+            existing = await session.scalar(
+                select(ClientProjectFile)
+                .where(ClientProjectFile.project_id == project_id)
+                .where(ClientProjectFile.sha256 == sha256)
+            )
+            return existing is not None
 
     async def list_files(self, project_id: str) -> list[ClientProjectFile]:
         async with self._db.session() as session:
@@ -260,6 +286,9 @@ def _normalize_status(value: Any) -> str:
 
 
 def _snapshot_from_unified(product: UnifiedProduct, product_id: int) -> dict[str, Any]:
+    attributes = dict(product.attributes or {})
+    for key, value in product.raw.items():
+        attributes.setdefault(f"source:{key}", "" if value is None else str(value))
     return {
         "title": product.name or "",
         "description": product.description,
@@ -267,7 +296,7 @@ def _snapshot_from_unified(product: UnifiedProduct, product_id: int) -> dict[str
         "price": product.price,
         "availability": product.availability or "unknown",
         "image_urls": list(product.image_urls or []),
-        "attributes": dict(product.attributes or {}),
+        "attributes": attributes,
         "marketplace": product.marketplace or product.source_type or "unknown",
         "external_product_id": product.sku or product.source_id or str(product_id),
     }
