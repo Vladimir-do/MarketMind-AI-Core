@@ -114,6 +114,14 @@ MARKETMIND_WORKSPACE_DIR: Path = _path_from_env("MARKETMIND_WORKSPACE_DIR", RUNT
 SCRAPE_ATTEMPTS_JSONL: Path = _path_from_env("SCRAPE_ATTEMPTS_JSONL", RUNTIME_DATA_DIR / "scrape_attempts.jsonl")
 BLOCK_PATTERNS_JSONL: Path = _path_from_env("BLOCK_PATTERNS_JSONL", RUNTIME_DATA_DIR / "blocked_patterns.jsonl")
 
+# ── Local client workflow limits ─────────────────────────────────────────────
+IMPORT_SCHEMA_VERSION: str = os.getenv("IMPORT_SCHEMA_VERSION", "local-import-v1")
+EXPORT_SCHEMA_VERSION: str = os.getenv("EXPORT_SCHEMA_VERSION", "local-export-v1")
+IMPORT_MAX_FILE_BYTES: int = int(os.getenv("IMPORT_MAX_FILE_BYTES", str(20 * 1024 * 1024)))
+IMPORT_MAX_ROWS: int = int(os.getenv("IMPORT_MAX_ROWS", "10000"))
+IMPORT_MAX_CELL_CHARS: int = int(os.getenv("IMPORT_MAX_CELL_CHARS", "20000"))
+IMPORT_PREVIEW_ROWS: int = int(os.getenv("IMPORT_PREVIEW_ROWS", "5"))
+
 # ── База данных ───────────────────────────────────────────────────────────────
 DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{(RUNTIME_DATA_DIR / 'parser.db').as_posix()}")
 if DATABASE_URL.startswith("sqlite+aiosqlite:///"):
