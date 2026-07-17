@@ -17,8 +17,9 @@ class ReportsUITests(unittest.IsolatedAsyncioTestCase):
         self.db = database.Database()
         await self.db.init()
 
-        from app.web.app import create_app
         from httpx import ASGITransport, AsyncClient
+
+        from app.web.app import create_app
 
         self.app = create_app()
         self.app.state.db = self.db
@@ -80,7 +81,7 @@ class ReportsUITests(unittest.IsolatedAsyncioTestCase):
         resp = await self.client.get("/")
         self.assertEqual(resp.status_code, 200)
         self.assertIn('href="/reports"', resp.text)
-        self.assertIn("Отчёты", resp.text)
+        self.assertIn("Legacy отчёты", resp.text)
 
 
 if __name__ == "__main__":

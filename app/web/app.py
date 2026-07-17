@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -33,6 +34,25 @@ def create_app() -> FastAPI:
         await db._engine.dispose()
 
     app = FastAPI(title="MarketMind AI", version="0.1.0", lifespan=lifespan)
+
+    vendor_dir = STATIC_DIR / "vendor"
+    vendor_files = {
+        "htmx.min.js": (vendor_dir / "htmx.min.js", "application/javascript; charset=utf-8"),
+        "htmx.LICENSE.txt": (vendor_dir / "htmx.LICENSE.txt", "text/plain; charset=utf-8"),
+        "htmx.meta.json": (vendor_dir / "htmx.meta.json", "application/json; charset=utf-8"),
+    }
+
+    @app.get("/static/vendor/{filename}")
+    async def vendor_static(filename: str) -> Response:
+        file_info = vendor_files.get(filename)
+        if file_info is None:
+            raise HTTPException(status_code=404, detail="Файл не найден")
+        file_path, media_type = file_info
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="Файл не найден")
+        if file_path.suffix == ".js":
+            return Response(file_path.read_text(encoding="utf-8"), media_type=media_type)
+        return Response(file_path.read_bytes(), media_type=media_type)
 
     app.add_middleware(
         CORSMiddleware,

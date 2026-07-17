@@ -6,9 +6,21 @@
 <div class="bg-white border rounded p-5 mb-5">
   <p class="mb-3">Экспорт использует только актуальную применённую карточку товара.</p>
   <div class="flex gap-2">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"csv","marketplace_profile":"universal"}' hx-target="#export-list">Создать CSV</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"json","marketplace_profile":"universal"}' hx-target="#export-list">Создать JSON</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"xlsx","marketplace_profile":"universal"}' hx-target="#export-list">Создать XLSX</button>
+    <form method="post" action="/projects/{{ project.project_id }}/exports" hx-post="/projects/{{ project.project_id }}/exports" hx-target="#export-list" hx-disabled-elt="button">
+      <input type="hidden" name="file_format" value="csv">
+      <input type="hidden" name="marketplace_profile" value="universal">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать CSV</button>
+    </form>
+    <form method="post" action="/projects/{{ project.project_id }}/exports" hx-post="/projects/{{ project.project_id }}/exports" hx-target="#export-list" hx-disabled-elt="button">
+      <input type="hidden" name="file_format" value="json">
+      <input type="hidden" name="marketplace_profile" value="universal">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать JSON</button>
+    </form>
+    <form method="post" action="/projects/{{ project.project_id }}/exports" hx-post="/projects/{{ project.project_id }}/exports" hx-target="#export-list" hx-disabled-elt="button">
+      <input type="hidden" name="file_format" value="xlsx">
+      <input type="hidden" name="marketplace_profile" value="universal">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать XLSX</button>
+    </form>
   </div>
 </div>
 <div id="export-list" class="bg-white border rounded p-5">

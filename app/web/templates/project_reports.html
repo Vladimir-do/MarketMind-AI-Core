@@ -18,9 +18,18 @@
 <section class="bg-white border rounded p-5 mt-5">
   <h2 class="font-semibold mb-2">Сформировать файл отчёта</h2>
   <div class="flex gap-2">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"html"}' hx-target="#report-list">Создать HTML</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"json"}' hx-target="#report-list">Создать JSON</button>
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/reports" hx-vals='{"file_format":"csv"}' hx-target="#report-list">Создать CSV</button>
+    <form method="post" action="/projects/{{ project.project_id }}/reports" hx-post="/projects/{{ project.project_id }}/reports" hx-target="#report-list" hx-disabled-elt="button">
+      <input type="hidden" name="file_format" value="html">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать HTML</button>
+    </form>
+    <form method="post" action="/projects/{{ project.project_id }}/reports" hx-post="/projects/{{ project.project_id }}/reports" hx-target="#report-list" hx-disabled-elt="button">
+      <input type="hidden" name="file_format" value="json">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать JSON</button>
+    </form>
+    <form method="post" action="/projects/{{ project.project_id }}/reports" hx-post="/projects/{{ project.project_id }}/reports" hx-target="#report-list" hx-disabled-elt="button">
+      <input type="hidden" name="file_format" value="csv">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать CSV</button>
+    </form>
   </div>
 </section>
 <section id="report-list" class="bg-white border rounded p-5 mt-5">

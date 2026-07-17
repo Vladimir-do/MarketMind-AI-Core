@@ -1,0 +1,8 @@
+{
+  "name": "htmx",
+  "version": "1.9.12",
+  "source": "https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js",
+  "license": "BSD-2-Clause",
+  "license_file": "htmx.LICENSE.txt",
+  "checksum_sha256": "449317ade7881e949510db614991e195c3a099c4c791c24dacec55f9f4a2a452"
+}

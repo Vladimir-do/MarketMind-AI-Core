@@ -232,6 +232,73 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/download", report.text)
         self.assertNotIn('"relative_path"', report.text)
 
+    async def test_project_exports_and_reports_use_local_htmx_and_web_fallback(self):
+        project_id = await self._create_project("Browser fallback")
+        await self._import_basic_csv(project_id)
+
+        exports_page = await self.client.get(f"/projects/{project_id}/exports")
+        self.assertEqual(exports_page.status_code, 200)
+        self.assertIn('/static/vendor/htmx.min.js', exports_page.text)
+        self.assertNotIn('https://unpkg.com/htmx.org@1.9.12', exports_page.text)
+
+        htmx_asset = await self.client.get("/static/vendor/htmx.min.js")
+        self.assertEqual(htmx_asset.status_code, 200)
+        self.assertIn("javascript", htmx_asset.headers["content-type"].lower())
+        self.assertTrue(htmx_asset.text.strip())
+
+        export_redirect = await self.client.post(
+            f"/projects/{project_id}/exports",
+            data={"file_format": "csv", "marketplace_profile": "universal"},
+            follow_redirects=False,
+        )
+        self.assertEqual(export_redirect.status_code, 303)
+        self.assertIn(f"/projects/{project_id}/exports", export_redirect.headers["location"])
+
+        exports_page_after = await self.client.get(export_redirect.headers["location"])
+        self.assertEqual(exports_page_after.status_code, 200)
+        self.assertIn("Созданные экспорты", exports_page_after.text)
+        self.assertIn("/download", exports_page_after.text)
+        self.assertNotIn("Экспортов пока нет", exports_page_after.text)
+
+        export_hx = await self.client.post(
+            f"/projects/{project_id}/exports",
+            data={"file_format": "xlsx", "marketplace_profile": "universal"},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(export_hx.status_code, 200)
+        self.assertIn("Экспорт XLSX создан", export_hx.text)
+        self.assertIn("/download", export_hx.text)
+        self.assertNotIn('"relative_path"', export_hx.text)
+
+        report_page = await self.client.get(f"/projects/{project_id}/reports")
+        self.assertEqual(report_page.status_code, 200)
+        self.assertIn('/static/vendor/htmx.min.js', report_page.text)
+
+        report_redirect = await self.client.post(
+            f"/projects/{project_id}/reports",
+            data={"file_format": "html"},
+            follow_redirects=False,
+        )
+        self.assertEqual(report_redirect.status_code, 303)
+        self.assertIn(f"/projects/{project_id}/reports", report_redirect.headers["location"])
+
+        report_page_after = await self.client.get(report_redirect.headers["location"])
+        self.assertEqual(report_page_after.status_code, 200)
+        self.assertIn("Созданные отчёты", report_page_after.text)
+        self.assertIn("/download", report_page_after.text)
+        self.assertNotIn("Отчётов пока нет", report_page_after.text)
+        self.assertNotIn('"relative_path"', report_page_after.text)
+
+        report_hx = await self.client.post(
+            f"/projects/{project_id}/reports",
+            data={"file_format": "json"},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(report_hx.status_code, 200)
+        self.assertIn("Отчёт JSON создан", report_hx.text)
+        self.assertIn("/download", report_hx.text)
+        self.assertNotIn('"relative_path"', report_hx.text)
+
     async def test_demo_fixture_full_local_workflow(self):
         project_id = await self._create_project("Demo fixture")
         fixture = Path(__file__).resolve().parent / "fixtures" / "l1_demo_products.csv"
