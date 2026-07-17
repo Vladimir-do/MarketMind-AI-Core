@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Импорт проекта - MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Импорт товаров</h1>
+<p class="text-gray-600 mb-4">Проект: {{ project.name }}</p>
+<form class="bg-white border rounded p-5 max-w-xl" hx-post="/api/projects/{{ project.project_id }}/imports" hx-encoding="multipart/form-data" hx-target="#import-result">
+  <input type="file" name="file" class="block w-full border rounded p-2 mb-4" accept=".csv,.xlsx,.xlsm" required>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded">Импортировать</button>
+</form>
+<pre id="import-result" class="mt-4 bg-gray-50 border rounded p-3 text-sm"></pre>
+{% endblock %}

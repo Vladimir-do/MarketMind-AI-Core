@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Товары проекта - MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Товары проекта</h1>
+<p class="text-gray-600 mb-4">{{ project.name }}</p>
+<div class="bg-white border rounded overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-100"><tr><th class="text-left p-3">Товар</th><th class="text-left p-3">Цена</th><th class="text-left p-3">Статус</th><th class="text-left p-3">Изменён вручную</th></tr></thead>
+    <tbody>
+    {% for card in products %}
+      <tr class="border-t">
+        <td class="p-3">{{ card.effective_snapshot.title or "Без названия" }}</td>
+        <td class="p-3">{{ card.effective_snapshot.price or "—" }}</td>
+        <td class="p-3">{{ card.effective_snapshot.availability or "unknown" }}</td>
+        <td class="p-3">{{ "Да" if card.is_manually_modified else "Нет" }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="p-4 text-gray-600">Товаров пока нет.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

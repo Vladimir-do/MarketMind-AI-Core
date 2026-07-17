@@ -50,12 +50,14 @@ def create_app() -> FastAPI:
     from app.web.routes.import_ import router as import_router
     from app.web.routes.product_detail import router as product_detail_router
     from app.web.routes.products import router as products_router
+    from app.web.routes.projects import router as projects_router
     from app.web.routes.reports import router as reports_router
     from app.web.routes.suggestions import router as suggestions_router
 
     app.include_router(dashboard_router)
     app.include_router(products_router)
     app.include_router(import_router)
+    app.include_router(projects_router)
     app.include_router(suggestions_router)
     app.include_router(product_detail_router)
     app.include_router(editor_router)

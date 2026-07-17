@@ -28,6 +28,8 @@ def _draft_to_dict(draft) -> dict[str, Any]:
     return {
         "draft_id": draft.draft_id,
         "product_id": draft.product_id,
+        "project_id": draft.project_id,
+        "project_product_id": draft.project_product_id,
         "base_version_id": draft.base_version_id,
         "status": draft.status,
         "payload": json.loads(draft.payload_json or "{}"),
@@ -46,6 +48,8 @@ def _version_to_dict(version) -> dict[str, Any]:
     return {
         "version_id": version.version_id,
         "product_id": version.product_id,
+        "project_id": version.project_id,
+        "project_product_id": version.project_product_id,
         "version_number": version.version_number,
         "snapshot": json.loads(version.snapshot_json),
         "snapshot_schema_version": version.snapshot_schema_version,

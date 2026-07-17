@@ -1,0 +1,155 @@
+"""Project-scoped export generation."""
+
+from __future__ import annotations
+
+import csv
+import io
+import json
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
+import openpyxl
+from sqlalchemy import select
+
+from app.database import ClientProject, Database, ProjectExport
+from app.effective_card.service import EffectiveProductCard, EffectiveProductCardService
+from app.exports.safety import sanitize_export_row, sanitize_spreadsheet_cell
+from app.workspace.files import project_artifact_path
+
+_EXPORT_HEADERS = [
+    "project_id",
+    "product_id",
+    "marketplace",
+    "external_product_id",
+    "title",
+    "description",
+    "brand",
+    "price",
+    "availability",
+    "image_urls",
+    "attributes",
+    "source_quality_score",
+    "effective_quality_score",
+    "latest_version_id",
+    "warnings",
+]
+
+
+class ProjectExportService:
+    """Creates local export files from EffectiveProductCard only."""
+
+    def __init__(self, db: Database) -> None:
+        self._db = db
+        self._effective = EffectiveProductCardService(db)
+
+    async def preview(self, project_id: str, *, marketplace_profile: str = "universal") -> dict[str, Any]:
+        rows = await self._rows(project_id, marketplace_profile=marketplace_profile)
+        return {
+            "project_id": project_id,
+            "marketplace_profile": marketplace_profile,
+            "total_products": len(rows),
+            "items": rows[:20],
+            "warnings": [],
+        }
+
+    async def create_export(
+        self,
+        project_id: str,
+        *,
+        file_format: str = "csv",
+        marketplace_profile: str = "universal",
+    ) -> ProjectExport:
+        rows = await self._rows(project_id, marketplace_profile=marketplace_profile)
+        safe_format = file_format.lower()
+        now = datetime.now(UTC)
+        export_id = f"export_{uuid.uuid4().hex[:12]}"
+        filename = f"project_{project_id}_{marketplace_profile}_{now.strftime('%Y%m%d_%H%M%S')}_{export_id[-6:]}.{safe_format}"
+        target, relative_path = project_artifact_path(project_id, "exports", filename)
+        if safe_format == "csv":
+            target.write_bytes(_csv_bytes(rows))
+        elif safe_format == "json":
+            target.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        elif safe_format == "xlsx":
+            target.write_bytes(_xlsx_bytes(rows))
+        else:
+            raise ValueError("Формат экспорта не поддерживается")
+        async with self._db.session() as session:
+            project = await session.get(ClientProject, project_id)
+            if project is None:
+                raise ValueError("Проект не найден")
+            record = ProjectExport(
+                export_id=export_id,
+                project_id=project_id,
+                export_type="product_cards",
+                marketplace_profile=marketplace_profile,
+                file_format=safe_format,
+                relative_path=relative_path,
+                product_count=len(rows),
+                status="created",
+                warnings_json="[]",
+                created_at=now,
+            )
+            session.add(record)
+            await session.commit()
+            return record
+
+    async def list_exports(self, project_id: str) -> list[ProjectExport]:
+        async with self._db.session() as session:
+            result = await session.execute(
+                select(ProjectExport)
+                .where(ProjectExport.project_id == project_id)
+                .order_by(ProjectExport.created_at.desc())
+            )
+            return list(result.scalars().all())
+
+    async def _rows(self, project_id: str, *, marketplace_profile: str) -> list[dict[str, Any]]:
+        cards = await self._effective.list_effective_cards(project_id, limit=500)
+        result = []
+        for card in cards:
+            quality = await self._effective.quality(project_id, card.product_id)
+            result.append(_export_row(card, quality, marketplace_profile))
+        return result
+
+
+def _export_row(card: EffectiveProductCard, quality: dict[str, Any], marketplace_profile: str) -> dict[str, Any]:
+    snapshot = card.effective_snapshot
+    row = {
+        "project_id": card.project_id,
+        "product_id": card.product_id,
+        "marketplace": marketplace_profile if marketplace_profile != "universal" else snapshot.get("marketplace"),
+        "external_product_id": snapshot.get("external_product_id"),
+        "title": snapshot.get("title"),
+        "description": snapshot.get("description"),
+        "brand": snapshot.get("brand"),
+        "price": snapshot.get("price"),
+        "availability": snapshot.get("availability"),
+        "image_urls": ", ".join(snapshot.get("image_urls") or []),
+        "attributes": json.dumps(snapshot.get("attributes") or {}, ensure_ascii=False, sort_keys=True),
+        "source_quality_score": quality["source"]["score"],
+        "effective_quality_score": quality["effective"]["score"],
+        "latest_version_id": card.latest_version_id,
+        "warnings": "; ".join(card.warnings),
+    }
+    return sanitize_export_row(row)
+
+
+def _csv_bytes(rows: list[dict[str, Any]]) -> bytes:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=_EXPORT_HEADERS)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({header: row.get(header, "") for header in _EXPORT_HEADERS})
+    return buffer.getvalue().encode("utf-8-sig")
+
+
+def _xlsx_bytes(rows: list[dict[str, Any]]) -> bytes:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Карточки"
+    sheet.append(_EXPORT_HEADERS)
+    for row in rows:
+        sheet.append([sanitize_spreadsheet_cell(row.get(header, "")) for header in _EXPORT_HEADERS])
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()

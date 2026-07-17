@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Экспорт проекта - MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Экспорт результата</h1>
+<p class="text-gray-600 mb-4">{{ project.name }}</p>
+<div class="bg-white border rounded p-5 mb-5">
+  <p class="mb-3">Экспорт использует только актуальную применённую карточку товара.</p>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded" hx-post="/api/projects/{{ project.project_id }}/exports" hx-vals='{"file_format":"csv","marketplace_profile":"universal"}' hx-target="#export-result">Создать CSV</button>
+  <pre id="export-result" class="mt-4 text-sm bg-gray-50 p-3 rounded"></pre>
+</div>
+<div class="bg-white border rounded p-5">
+  <h2 class="font-semibold mb-3">Созданные экспорты</h2>
+  {% for item in exports %}
+  <div class="border-t py-2">{{ item.file_format }} — {{ item.relative_path }}</div>
+  {% else %}
+  <p class="text-gray-600">Экспортов пока нет.</p>
+  {% endfor %}
+</div>
+{% endblock %}

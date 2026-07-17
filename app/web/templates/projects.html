@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Проекты - MarketMind AI{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">Проекты заказчиков</h1>
+    <p class="text-gray-600">Отдельные рабочие пространства для заказов.</p>
+  </div>
+  <a href="/projects/new" class="bg-blue-600 text-white px-4 py-2 rounded">Новый проект</a>
+</div>
+{% if projects %}
+<div class="grid gap-3">
+  {% for project in projects %}
+  <a href="/projects/{{ project.project_id }}" class="block bg-white border rounded p-4 hover:border-blue-400">
+    <div class="flex justify-between">
+      <div>
+        <div class="font-semibold">{{ project.name }}</div>
+        <div class="text-sm text-gray-600">Заказчик: {{ project.client_name or "не указан" }}</div>
+      </div>
+      <span class="text-sm bg-gray-100 px-2 py-1 rounded">{{ project.status }}</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white border rounded p-6 text-gray-600">Проектов пока нет.</div>
+{% endif %}
+{% endblock %}
