@@ -3,11 +3,48 @@ import io
 import os
 import tempfile
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 
 import openpyxl
 
 from tests.helpers import reload_app_modules
+
+
+class FormSnapshotParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.forms = []
+        self._current_form = None
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "form":
+            self._current_form = {"attrs": attributes, "buttons": []}
+            self.forms.append(self._current_form)
+        elif tag == "button" and self._current_form is not None:
+            self._current_form["buttons"].append(attributes)
+
+    def handle_endtag(self, tag):
+        if tag == "form":
+            self._current_form = None
+
+
+def creation_forms(html: str, action: str):
+    parser = FormSnapshotParser()
+    parser.feed(html)
+    return [form for form in parser.forms if form["attrs"].get("action") == action]
+
+
+def assert_plain_creation_forms(testcase, html: str, action: str, expected_count: int):
+    forms = creation_forms(html, action)
+    testcase.assertEqual(len(forms), expected_count)
+    for form in forms:
+        attrs = form["attrs"]
+        testcase.assertEqual(attrs.get("action"), action)
+        testcase.assertEqual(attrs.get("method"), "post")
+        testcase.assertFalse([name for name in attrs if name.startswith("hx-")])
+        testcase.assertTrue(any(button.get("type") == "submit" for button in form["buttons"]))
 
 
 class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
@@ -204,7 +241,7 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             _download_project_artifact(project_a, "../secret.csv")
         self.assertEqual(traversal.exception.status_code, 404)
 
-    async def test_project_export_and_report_htmx_return_russian_partials(self):
+    async def test_project_export_and_report_api_return_json_even_with_hx_header(self):
         project_id = await self._create_project("HTMX")
         await self._import_basic_csv(project_id)
 
@@ -214,9 +251,9 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             headers={"HX-Request": "true"},
         )
         self.assertEqual(export.status_code, 200)
-        self.assertIn("Экспорт CSV создан", export.text)
-        self.assertIn("/download", export.text)
-        self.assertNotIn('"relative_path"', export.text)
+        self.assertEqual(export.headers["content-type"].split(";")[0], "application/json")
+        self.assertEqual(export.json()["file_format"], "csv")
+        self.assertIn("exports/", export.json()["relative_path"])
 
         report_page = await self.client.get(f"/projects/{project_id}/reports")
         self.assertEqual(report_page.status_code, 200)
@@ -228,9 +265,9 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             headers={"HX-Request": "true"},
         )
         self.assertEqual(report.status_code, 200)
-        self.assertIn("Отчёт HTML создан", report.text)
-        self.assertIn("/download", report.text)
-        self.assertNotIn('"relative_path"', report.text)
+        self.assertEqual(report.headers["content-type"].split(";")[0], "application/json")
+        self.assertEqual(report.json()["file_format"], "html")
+        self.assertIn("reports/", report.json()["relative_path"])
 
     async def test_project_exports_and_reports_use_local_htmx_and_web_fallback(self):
         project_id = await self._create_project("Browser fallback")
@@ -240,11 +277,9 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exports_page.status_code, 200)
         self.assertIn('/static/vendor/htmx.min.js', exports_page.text)
         self.assertNotIn('https://unpkg.com/htmx.org@1.9.12', exports_page.text)
-        self.assertIn(f'action="/projects/{project_id}/exports"', exports_page.text)
-        self.assertIn('method="post"', exports_page.text)
-        self.assertNotIn('hx-post=', exports_page.text)
-        self.assertNotIn('hx-target=', exports_page.text)
-        self.assertIn('type="submit"', exports_page.text)
+        assert_plain_creation_forms(self, exports_page.text, f"/projects/{project_id}/exports", 3)
+        for hx_attr in ("hx-post", "hx-target", "hx-swap", "hx-trigger"):
+            self.assertNotIn(f"{hx_attr}=", exports_page.text)
 
         htmx_asset = await self.client.get("/static/vendor/htmx.min.js")
         self.assertEqual(htmx_asset.status_code, 200)
@@ -254,10 +289,14 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         export_redirect = await self.client.post(
             f"/projects/{project_id}/exports",
             data={"file_format": "csv", "marketplace_profile": "universal"},
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
             follow_redirects=False,
         )
         self.assertEqual(export_redirect.status_code, 303)
-        self.assertIn(f"/projects/{project_id}/exports?created=", export_redirect.headers["location"])
+        self.assertRegex(
+            export_redirect.headers["location"],
+            rf"^/projects/{project_id}/exports\?created=export_[0-9a-f]+$",
+        )
 
         exports_page_after = await self.client.get(export_redirect.headers["location"])
         self.assertEqual(exports_page_after.status_code, 200)
@@ -270,28 +309,32 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             f"/projects/{project_id}/exports",
             data={"file_format": "xlsx", "marketplace_profile": "universal"},
             headers={"HX-Request": "true"},
+            follow_redirects=False,
         )
-        self.assertEqual(export_hx.status_code, 200)
-        self.assertIn("Экспорт XLSX создан", export_hx.text)
-        self.assertIn("/download", export_hx.text)
-        self.assertNotIn('"relative_path"', export_hx.text)
+        self.assertEqual(export_hx.status_code, 303)
+        self.assertRegex(
+            export_hx.headers["location"],
+            rf"^/projects/{project_id}/exports\?created=export_[0-9a-f]+$",
+        )
 
         report_page = await self.client.get(f"/projects/{project_id}/reports")
         self.assertEqual(report_page.status_code, 200)
         self.assertIn('/static/vendor/htmx.min.js', report_page.text)
-        self.assertIn(f'action="/projects/{project_id}/reports"', report_page.text)
-        self.assertIn('method="post"', report_page.text)
-        self.assertNotIn('hx-post=', report_page.text)
-        self.assertNotIn('hx-target=', report_page.text)
-        self.assertIn('type="submit"', report_page.text)
+        assert_plain_creation_forms(self, report_page.text, f"/projects/{project_id}/reports", 3)
+        for hx_attr in ("hx-post", "hx-target", "hx-swap", "hx-trigger"):
+            self.assertNotIn(f"{hx_attr}=", report_page.text)
 
         report_redirect = await self.client.post(
             f"/projects/{project_id}/reports",
             data={"file_format": "html"},
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
             follow_redirects=False,
         )
         self.assertEqual(report_redirect.status_code, 303)
-        self.assertIn(f"/projects/{project_id}/reports?created=", report_redirect.headers["location"])
+        self.assertRegex(
+            report_redirect.headers["location"],
+            rf"^/projects/{project_id}/reports\?created=report_[0-9a-f]+$",
+        )
 
         report_page_after = await self.client.get(report_redirect.headers["location"])
         self.assertEqual(report_page_after.status_code, 200)
@@ -305,11 +348,13 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             f"/projects/{project_id}/reports",
             data={"file_format": "json"},
             headers={"HX-Request": "true"},
+            follow_redirects=False,
         )
-        self.assertEqual(report_hx.status_code, 200)
-        self.assertIn("Отчёт JSON создан", report_hx.text)
-        self.assertIn("/download", report_hx.text)
-        self.assertNotIn('"relative_path"', report_hx.text)
+        self.assertEqual(report_hx.status_code, 303)
+        self.assertRegex(
+            report_hx.headers["location"],
+            rf"^/projects/{project_id}/reports\?created=report_[0-9a-f]+$",
+        )
 
     async def test_demo_fixture_full_local_workflow(self):
         project_id = await self._create_project("Demo fixture")

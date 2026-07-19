@@ -730,8 +730,6 @@ async def api_create_project_export(project_id: str, request: Request):
             file_format=body.get("file_format") or "csv",
             marketplace_profile=body.get("marketplace_profile") or "universal",
         )
-        if _is_hx(request):
-            return await _project_export_created_response(request, project_id, record)
         return _artifact_to_dict(record)
     except Exception as exc:
         raise _editor_error(exc) from exc
@@ -753,7 +751,7 @@ async def project_create_export(project_id: str, request: Request):
             file_format=body.get("file_format") or "csv",
             marketplace_profile=body.get("marketplace_profile") or "universal",
         )
-        return await _project_export_created_response(request, project_id, record)
+        return _project_export_created_response(project_id, record)
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -775,8 +773,6 @@ async def api_create_project_report(project_id: str, request: Request):
             project_id,
             file_format=body.get("file_format") or "html",
         )
-        if _is_hx(request):
-            return await _project_report_created_response(request, project_id, record)
         return _artifact_to_dict(record)
     except Exception as exc:
         raise _editor_error(exc) from exc
@@ -797,7 +793,7 @@ async def project_create_report(project_id: str, request: Request):
             project_id,
             file_format=body.get("file_format") or "html",
         )
-        return await _project_report_created_response(request, project_id, record)
+        return _project_report_created_response(project_id, record)
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -966,30 +962,14 @@ def _download_project_artifact(project_id: str, relative_path: str) -> FileRespo
     return FileResponse(target_resolved, filename=target_resolved.name)
 
 
-async def _project_export_created_response(request: Request, project_id: str, record: ProjectExport):
-    if _is_hx(request):
-        project = await _project_service(request).get_project(project_id)
-        exports = await ProjectExportService(request.app.state.db).list_exports(project_id)
-        return templates.TemplateResponse(
-            request,
-            "project_exports_list.html",
-            {"project": project, "exports": exports, "created": record},
-        )
+def _project_export_created_response(project_id: str, record: ProjectExport):
     return RedirectResponse(
         url=f"/projects/{project_id}/exports?created={record.export_id}",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
-async def _project_report_created_response(request: Request, project_id: str, record: ProjectReport):
-    if _is_hx(request):
-        project = await _project_service(request).get_project(project_id)
-        reports = await ClientDeliveryReportService(request.app.state.db).list_reports(project_id)
-        return templates.TemplateResponse(
-            request,
-            "project_reports_list.html",
-            {"project": project, "reports": reports, "created": record},
-        )
+def _project_report_created_response(project_id: str, record: ProjectReport):
     return RedirectResponse(
         url=f"/projects/{project_id}/reports?created={record.report_id}",
         status_code=status.HTTP_303_SEE_OTHER,
