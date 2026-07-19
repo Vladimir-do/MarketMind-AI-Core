@@ -4,7 +4,7 @@
 
 ## Status
 
-Статус: `IMPLEMENTED_PENDING_FINAL_VERIFICATION`
+Статус: `PASSED`
 
 L2 добавляет локальный постоянный рабочий режим для первых реальных заказов без SaaS-функций.
 
@@ -79,13 +79,32 @@ Work UI shows:
 
 ## Verification
 
-Initial focused result:
+Final results:
 
 ```text
 tests/test_l2_production_mode.py: 6 passed
+tests/test_client_projects.py tests/test_l1_1_final_acceptance.py: 32 passed
+full pytest: 545 passed, 24 warnings, 14 subtests passed
+Ruff changed files: All checks passed
+git diff --check: passed
+Alembic upgrade -> downgrade -1 -> upgrade head: passed on temporary SQLite
+Secret scan changed files: no matches
 ```
 
-Final verification commands and manual persistence check must be recorded before marking L2 as fully passed.
+## Manual Persistence Check
+
+Проверено 2026-07-19:
+
+1. Запущено `./start_marketmind.sh`.
+2. UI показал `РАБОЧИЙ РЕЖИМ. ДАННЫЕ СОХРАНЯЮТСЯ`.
+3. Через API создан проект `project_216924a7caa8` с названием `L2 persistence check`.
+4. Сервер остановлен через Ctrl+C.
+5. `./start_marketmind.sh` запущен повторно.
+6. При повторном запуске автоматически создан backup:
+   `runtime/backups/marketmind_20260719_191424_startup.db`.
+7. Страница `/projects/project_216924a7caa8` открылась и показала сохранённый проект.
+
+Результат: `PASSED`.
 
 ## Current Operator Command
 
