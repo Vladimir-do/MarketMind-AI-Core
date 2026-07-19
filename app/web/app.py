@@ -21,6 +21,10 @@ if TYPE_CHECKING:
 
 
 def create_app() -> FastAPI:
+    from app.runtime_paths import runtime_banner
+
+    templates.env.globals["runtime_banner"] = runtime_banner()
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
@@ -72,6 +76,7 @@ def create_app() -> FastAPI:
     from app.web.routes.products import router as products_router
     from app.web.routes.projects import router as projects_router
     from app.web.routes.reports import router as reports_router
+    from app.web.routes.system import router as system_router
     from app.web.routes.suggestions import router as suggestions_router
 
     app.include_router(dashboard_router)
@@ -83,5 +88,6 @@ def create_app() -> FastAPI:
     app.include_router(editor_router)
     app.include_router(analytics_router)
     app.include_router(reports_router)
+    app.include_router(system_router)
 
     return app

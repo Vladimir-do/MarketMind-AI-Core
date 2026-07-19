@@ -48,6 +48,7 @@ app/data/
 app/data/debug/
 app/data/reports/
 app/data/ozon_profile/
+runtime/
 debug_*.html
 debug_*.png
 

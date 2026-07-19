@@ -40,6 +40,7 @@ async def _ensure_demo_project(database_url: str, data_dir: Path, workspace_dir:
     os.environ["MARKETMIND_WORKSPACE_DIR"] = workspace_dir.as_posix()
     os.environ["SCRAPE_ATTEMPTS_JSONL"] = (data_dir / "scrape_attempts.jsonl").as_posix()
     os.environ["BLOCK_PATTERNS_JSONL"] = (data_dir / "block_patterns.jsonl").as_posix()
+    os.environ["MARKETMIND_MODE"] = "demo"
 
     from app.database import Database
     from app.projects.service import ProjectService
@@ -70,6 +71,7 @@ def main() -> None:
 
     data_dir, workspace_dir, demo_csv, db_path = _prepare_paths(root)
     database_url = f"sqlite+aiosqlite:///{db_path.as_posix()}"
+    os.environ["MARKETMIND_MODE"] = "demo"
     project_id = asyncio.run(_ensure_demo_project(database_url, data_dir, workspace_dir))
     url = f"http://{HOST}:{PORT}/projects"
 

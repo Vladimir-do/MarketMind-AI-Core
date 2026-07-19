@@ -12,6 +12,14 @@
   <a href="/projects/{{ project.project_id }}/reports" class="bg-white border rounded p-4 hover:border-blue-400">Отчёты</a>
   <a href="/projects/{{ project.project_id }}/exports" class="bg-white border rounded p-4 hover:border-blue-400">Экспорт</a>
 </div>
+<div class="bg-white border rounded p-5 mb-6 flex flex-wrap gap-3">
+  <form method="post" action="/projects/{{ project.project_id }}/full-archive">
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Скачать полный архив проекта</button>
+  </form>
+  <form method="post" action="/projects/{{ project.project_id }}/archive">
+    <button class="bg-gray-700 text-white px-4 py-2 rounded" type="submit">Архивировать проект</button>
+  </form>
+</div>
 <section class="bg-white border rounded p-5">
   <h2 class="font-semibold mb-3">Последние товары</h2>
   {% if products %}

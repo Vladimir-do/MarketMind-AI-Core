@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
@@ -26,6 +27,7 @@ from app.exports.safety import sanitize_spreadsheet_cell
 from app.exports.service import ProjectExportService
 from app.pipeline import ImportPipeline
 from app.projects.imports import analyze_import_file, build_products_from_preview
+from app.projects.archive import ProjectArchiveService
 from app.projects.service import (
     ProjectError,
     ProjectNotFoundError,
@@ -798,6 +800,27 @@ async def project_create_report(project_id: str, request: Request):
         raise _editor_error(exc) from exc
 
 
+@router.post("/projects/{project_id}/archive")
+async def project_archive(project_id: str, request: Request):
+    try:
+        await _project_service(request).archive_project(project_id)
+        return RedirectResponse(f"/projects/{project_id}", status_code=status.HTTP_303_SEE_OTHER)
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.post("/projects/{project_id}/full-archive")
+async def project_create_full_archive(project_id: str, request: Request):
+    try:
+        result = await ProjectArchiveService(request.app.state.db).create_project_archive(project_id)
+        return RedirectResponse(
+            f"/projects/{project_id}/archives/{Path(result['relative_path']).name}/download",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
 @router.get("/projects/{project_id}/exports/{export_id}/download")
 async def download_project_export(project_id: str, export_id: str, request: Request):
     async with request.app.state.db.session() as session:
@@ -822,6 +845,11 @@ async def download_project_report(project_id: str, report_id: str, request: Requ
         if record is None:
             raise HTTPException(status_code=404, detail="Отчёт не найден")
         return _download_project_artifact(project_id, record.relative_path)
+
+
+@router.get("/projects/{project_id}/archives/{filename}/download")
+async def download_project_archive(project_id: str, filename: str):
+    return _download_project_artifact(project_id, f"archives/{Path(filename).name}")
 
 
 @router.get("/projects", response_class=HTMLResponse)

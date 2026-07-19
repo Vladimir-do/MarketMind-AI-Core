@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Состояние системы - MarketMind AI{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Состояние системы</h1>
+  <p class="text-gray-600">Локальный рабочий режим и резервные копии.</p>
+</div>
+
+{% if status.warnings %}
+<div class="mb-5 grid gap-2">
+  {% for warning in status.warnings %}
+  <div class="border border-yellow-300 bg-yellow-50 text-yellow-900 rounded p-3">{{ warning }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">Пути и ресурсы</h2>
+  <dl class="grid gap-2 text-sm">
+    <div><dt class="font-medium">Рабочая БД</dt><dd class="text-gray-700 break-all">{{ status.database_path }}</dd></div>
+    <div><dt class="font-medium">Workspace</dt><dd class="text-gray-700 break-all">{{ status.workspace_path }}</dd></div>
+    <div><dt class="font-medium">Runtime home</dt><dd class="text-gray-700 break-all">{{ status.runtime_home }}</dd></div>
+    <div><dt class="font-medium">Свободное место</dt><dd class="text-gray-700">{{ status.free_space_human }}</dd></div>
+    <div><dt class="font-medium">Версия схемы</dt><dd class="text-gray-700">{{ status.schema_version }}</dd></div>
+    <div><dt class="font-medium">Проектов</dt><dd class="text-gray-700">{{ status.project_count }}</dd></div>
+    <div><dt class="font-medium">Активных проектов</dt><dd class="text-gray-700">{{ status.active_project_count }}</dd></div>
+    <div><dt class="font-medium">Последняя резервная копия</dt><dd class="text-gray-700">{{ status.last_backup.name if status.last_backup else "нет" }}</dd></div>
+  </dl>
+</section>
+
+<section class="bg-white border rounded p-5 mb-5">
+  <div class="flex items-center justify-between gap-3 mb-3">
+    <h2 class="font-semibold">Резервные копии</h2>
+    <form method="post" action="/system/backups">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать резервную копию</button>
+    </form>
+  </div>
+  {% if backups %}
+  <div class="divide-y">
+    {% for backup in backups %}
+    <div class="py-3 grid md:grid-cols-[1fr_auto] gap-3">
+      <div class="text-sm">
+        <div class="font-medium">{{ backup.name }}</div>
+        <div class="text-gray-600">Дата: {{ backup.created_at }}</div>
+        <div class="text-gray-600">Размер: {{ backup.size_bytes }} bytes</div>
+        <div class="text-gray-600 break-all">Checksum: {{ backup.checksum }}</div>
+      </div>
+      <form method="post" action="/system/backups/{{ backup.name }}/restore" class="flex items-center gap-2">
+        <input class="border rounded px-2 py-1" name="confirmation" placeholder="ВОССТАНОВИТЬ">
+        <button class="bg-red-600 text-white px-3 py-2 rounded" type="submit">Восстановить</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-gray-600">Резервных копий пока нет.</p>
+  {% endif %}
+</section>
+
+<section class="bg-white border rounded p-5">
+  <h2 class="font-semibold mb-2">Безопасная остановка</h2>
+  <p class="text-gray-700">Для завершения рабочего сеанса нажмите Ctrl+C в терминале, где запущен `start_marketmind.sh` или `start_marketmind.bat`.</p>
+</section>
+{% endblock %}
