@@ -94,7 +94,7 @@
 | L1-RUFF-01 | New files Ruff clean | Да | targeted Ruff | Final check | All checks passed | VERIFIED | Нет |
 | L1-RUFF-02 | Full legacy Ruff | Частично | 268 legacy diagnostics | Diagnostic check | Not fixed by scope | PARTIAL | Separate cleanup plan |
 | L1-DOC-01 | Docs updated | Да | L1 audit/plan/report/traceability/UI report | File existence | Docs in repo | VERIFIED | Нет |
-| L1-DOC-02 | Инструкция ручной приёмки владельцем | Да | `docs/L1_MANUAL_ACCEPTANCE.md`, `scripts/l1_acceptance_demo.py` | `test_demo_fixture_full_local_workflow` | AWAITING_OWNER_ACCEPTANCE | VERIFIED | Ожидается фактический проход владельцем |
+| L1-DOC-02 | Инструкция ручной приёмки владельцем | Да | `docs/L1_MANUAL_ACCEPTANCE.md`, `scripts/l1_acceptance_demo.py` | `test_demo_fixture_full_local_workflow` + owner browser smoke 2026-07-19 | PASSED | VERIFIED | Финальный export/report PRG smoke пройден владельцем |
 
 ## Remaining partials
 

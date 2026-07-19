@@ -1,14 +1,14 @@
 # L1.1 Final Acceptance Report
 
-Дата: 2026-07-17
+Дата: 2026-07-19
 
 ## Verdict
 
-Технический статус: `READY_FOR_OWNER_ACCEPTANCE`.
+Технический статус: `PASSED`.
 
-Пользовательская приёмка: `AWAITING_OWNER_ACCEPTANCE`.
+Пользовательская приёмка: `PASSED`.
 
-L1.1 закрывает обязательные операторские пробелы: presets mapping, фильтрацию и CSV-экспорт ошибок, Windows-1251 с подтверждением, download route tests и demo happy path. Полная ручная приёмка не объявляется завершённой до фактического прохода владельцем по `docs/L1_MANUAL_ACCEPTANCE.md`.
+L1.1 закрывает обязательные операторские пробелы: presets mapping, фильтрацию и CSV-экспорт ошибок, Windows-1251 с подтверждением, download route tests и demo happy path. Владелец выполнил финальную браузерную проверку project export/report после PRG-фикса.
 
 ## Partial Requirements
 
@@ -51,6 +51,7 @@ Fixture: `tests/fixtures/l1_demo_products.csv`.
 | `tests/test_client_projects.py` | 23 passed |
 | Focused P4/P5/P6/L1/L1.1 | 81 passed |
 | Full pytest | 537 passed, 24 warnings, 14 subtests passed |
+| Full pytest after PRG fix | 539 passed, 24 warnings, 14 subtests passed |
 | Ruff new/changed files | All checks passed |
 | Full Ruff diagnostic | 267 legacy errors |
 | Alembic upgrade -> downgrade -> upgrade | passed on temporary SQLite |
@@ -101,10 +102,26 @@ ASGI `FileResponse` не форсируется через зависающий 
 - добавлены `start_l1_demo.sh` и `start_l1_demo.bat`;
 - legacy пункты бокового меню явно помечены как legacy;
 - rollback/manual action result больше не показывает сырой dict;
-- export/report HTMX actions возвращают русские partial-шаблоны вместо JSON;
-- список экспортов обновляется сразу после создания;
-- список отчётов проекта отображается на странице и обновляется сразу после создания;
+- project export/report формы создания файлов используют обычный Post/Redirect/Get без HTMX-атрибутов;
+- web POST export/report возвращает `303 See Other` на страницу с `?created=...`;
+- список экспортов отображает созданный файл после redirect;
+- список отчётов проекта отображает созданный файл после redirect;
 - у созданных export/report сразу есть ссылка скачивания.
+
+## Final Owner Browser Check
+
+Дата: 2026-07-19.
+
+Demo-сервер был перезапущен из commit `95f6245` через `./start_l1_demo.sh` на `http://127.0.0.1:18080`.
+
+Проверено владельцем:
+
+- создать CSV export;
+- скачать CSV export;
+- создать HTML-отчёт;
+- скачать HTML-отчёт.
+
+Результат: `PASSED`.
 
 Доступно через API и используется UI:
 
@@ -118,7 +135,7 @@ ASGI `FileResponse` не форсируется через зависающий 
 - `ClientProjectFile` DB unique constraint остаётся `project_id + sha256`; `schema_version` хранится в metadata и workflow, но не в unique key.
 - Full Ruff backlog остаётся legacy-долгом.
 - Межпроектный перенос presets не реализован намеренно: preset другого проекта не применяется автоматически.
-- Браузерная приёмка владельцем ещё не выполнена.
+- Браузерная приёмка владельцем выполнена для финального export/report PRG smoke.
 
 ## Push
 
@@ -126,5 +143,5 @@ Push не выполнялся.
 
 ## Current Acceptance State
 
-- Technical L1.1: ready after local commits.
-- Owner browser acceptance: `AWAITING_OWNER_ACCEPTANCE`.
+- Technical L1.1: `PASSED`.
+- Owner browser acceptance: `PASSED`.

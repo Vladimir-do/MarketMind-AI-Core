@@ -1,6 +1,6 @@
 # L1 UI Acceptance Report
 
-Дата: 2026-07-17
+Дата: 2026-07-19
 
 ## Scope
 
@@ -70,6 +70,19 @@
   - project rollback tests;
   - export/report tests.
 
+## Final browser PRG check
+
+После исправления project export/report forms demo-сервер был перезапущен из commit `95f6245` через `./start_l1_demo.sh` на `http://127.0.0.1:18080`.
+
+Владелец подтвердил в реальном браузере:
+
+- CSV export создаётся;
+- CSV export скачивается;
+- HTML-отчёт создаётся;
+- HTML-отчёт скачивается.
+
+Результат: `PASSED`.
+
 ## L1.1 update
 
 - Добавлено сохранение, выбор и удаление presets сопоставления колонок.
@@ -81,5 +94,5 @@
 
 ## Remaining UI limitations
 
-- Полная пользовательская приёмка через реальный браузер ожидает владельца: `AWAITING_OWNER_ACCEPTANCE`.
-- Download route проверен route-level и artifact-level; полноценное открытие браузера из Codex окружения не выполнялось.
+- Полная пользовательская проверка финального export/report PRG smoke выполнена владельцем: `PASSED`.
+- Download route проверен route-level, artifact-level и финальным браузерным smoke для CSV export и HTML report.
