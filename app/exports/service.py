@@ -15,11 +15,12 @@ from sqlalchemy import select
 
 from app.config import EXPORT_SCHEMA_VERSION
 from app.database import ClientProject, ClientProjectFile, Database, ProjectExport
-from app.effective_card.service import EffectiveProductCard, EffectiveProductCardService
+from app.effective_card.service import EffectiveProductCard, EffectiveProductCardService, _unified_from_snapshot
 from app.exports.safety import sanitize_export_row, sanitize_spreadsheet_cell
+from app.seo_intelligence import audit_unified_product_seo
 from app.workspace.files import project_artifact_path
 
-_EXPORT_HEADERS = [
+_BASE_HEADERS = [
     "project_id",
     "product_id",
     "marketplace",
@@ -36,6 +37,29 @@ _EXPORT_HEADERS = [
     "latest_version_id",
     "warnings",
 ]
+
+_EXPORT_HEADERS = _BASE_HEADERS + [
+    "seo_score",
+    "seo_level",
+    "seo_ready",
+    "seo_recommendations",
+    "seo_critical_issues",
+    "seo_warning_issues",
+]
+
+_CSV_SEO_HEADERS = [
+    "seo_score",
+    "seo_tier",
+    "seo_ready",
+    "seo_recommendations",
+]
+
+_TIER_LABELS: dict[str, str] = {
+    "strong": "Сильная",
+    "usable": "ОК",
+    "needs_work": "Доработка",
+    "weak": "Слабая",
+}
 
 
 class ProjectExportService:
@@ -136,12 +160,16 @@ class ProjectExportService:
         result = []
         for card in cards:
             quality = await self._effective.quality(project_id, card.product_id)
-            result.append(_export_row(card, quality, marketplace_profile))
+            seo = audit_unified_product_seo(_unified_from_snapshot(card.effective_snapshot, card.product_id))
+            result.append(_export_row(card, quality, marketplace_profile, seo))
         return result
 
 
-def _export_row(card: EffectiveProductCard, quality: dict[str, Any], marketplace_profile: str) -> dict[str, Any]:
+def _export_row(card: EffectiveProductCard, quality: dict[str, Any], marketplace_profile: str, seo: Any) -> dict[str, Any]:
     snapshot = card.effective_snapshot
+    critical = sum(1 for f in seo.findings if f.severity == "critical")
+    warning = sum(1 for f in seo.findings if f.severity == "warning")
+    rec_text = "\n".join(r.action for r in seo.recommendations[:5])
     row = {
         "project_id": card.project_id,
         "product_id": card.product_id,
@@ -158,16 +186,28 @@ def _export_row(card: EffectiveProductCard, quality: dict[str, Any], marketplace
         "effective_quality_score": quality["effective"]["score"],
         "latest_version_id": card.latest_version_id,
         "warnings": "; ".join(card.warnings),
+        # SEO-колонки для XLSX (человекочитаемые)
+        "seo_score": seo.score,
+        "seo_level": _TIER_LABELS.get(seo.tier, seo.tier),
+        "seo_ready": "да" if seo.ready else "нет",
+        "seo_recommendations": rec_text,
+        "seo_critical_issues": critical,
+        "seo_warning_issues": warning,
+        # SEO-колонки для CSV (snake_case)
+        "seo_tier": seo.tier,
     }
     return sanitize_export_row(row)
 
 
+_CSV_HEADERS = _BASE_HEADERS + _CSV_SEO_HEADERS
+
+
 def _csv_bytes(rows: list[dict[str, Any]]) -> bytes:
     buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=_EXPORT_HEADERS)
+    writer = csv.DictWriter(buffer, fieldnames=_CSV_HEADERS)
     writer.writeheader()
     for row in rows:
-        writer.writerow({header: row.get(header, "") for header in _EXPORT_HEADERS})
+        writer.writerow({header: row.get(header, "") for header in _CSV_HEADERS})
     return buffer.getvalue().encode("utf-8-sig")
 
 

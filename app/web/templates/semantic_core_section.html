@@ -1,0 +1,71 @@
+{# ── Семантическое ядро (HTMX partial) ──────────────────────────────── #}
+<div class="space-y-3">
+  {# Coverage score #}
+  <div>
+    <div class="flex items-center justify-between text-sm mb-1">
+      <span class="text-gray-600">Покрытие ключевых слов</span>
+      <span class="font-semibold
+        {% if coverage_score >= 0.7 %}text-green-600
+        {% elif coverage_score >= 0.4 %}text-yellow-600
+        {% else %}text-red-600{% endif %}">{{ (coverage_score * 100)|round(0)|int }}%</span>
+    </div>
+    <div class="w-full h-2 rounded-full bg-gray-200">
+      <div class="h-2 rounded-full transition-all
+        {% if coverage_score >= 0.7 %}bg-green-500
+        {% elif coverage_score >= 0.4 %}bg-yellow-500
+        {% else %}bg-red-500{% endif %}"
+        style="width: {{ (coverage_score * 100)|round(0)|int }}%"></div>
+    </div>
+  </div>
+
+  {# Primary terms #}
+  {% if primary_terms %}
+  <div>
+    <div class="text-xs text-gray-500 mb-1">Основные ключевые слова</div>
+    <div class="flex flex-wrap gap-1.5">
+      {% for term in primary_terms[:3] %}
+      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">{{ term }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Secondary terms #}
+  {% if secondary_terms %}
+  <div>
+    <div class="text-xs text-gray-500 mb-1">Дополнительные ключевые слова</div>
+    <div class="flex flex-wrap gap-1.5">
+      {% for term in secondary_terms[:6] %}
+      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">{{ term }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Long tail terms #}
+  {% if long_tail_terms %}
+  <div>
+    <div class="text-xs text-gray-500 mb-1">Длинные ключевые фразы</div>
+    <div class="flex flex-wrap gap-1.5">
+      {% for term in long_tail_terms[:6] %}
+      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">{{ term }}</span>
+      {% endfor %}
+      {% if long_tail_terms|length > 6 %}
+      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-400">+{{ long_tail_terms|length - 6 }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# Junk ratio warning #}
+  {% if junk_ratio > 0.3 %}
+  <div class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+    Высокая доля мусорных слов: {{ (junk_ratio * 100)|round(0)|int }}%. Удалите запрещённые и шумовые токены.
+  </div>
+  {% endif %}
+
+  {# Total terms summary #}
+  <div class="text-xs text-gray-400">
+    Всего токенов: {{ total_terms }}
+  </div>
+</div>

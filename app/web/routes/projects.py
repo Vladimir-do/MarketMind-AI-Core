@@ -14,6 +14,8 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, 
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy import select
 
+from app.ai_recommendation.db_approval import DatabaseApprovalQueue
+from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
 from app.config import IMPORT_SCHEMA_VERSION
 from app.database import ProjectExport, ProjectReport
 from app.editor.service import (
@@ -67,6 +69,15 @@ def _project_service(request: Request) -> ProjectService:
 
 def _effective_service(request: Request) -> EffectiveProductCardService:
     return EffectiveProductCardService(request.app.state.db)
+
+
+def _approval_queue(request: Request) -> DatabaseApprovalQueue:
+    queue = getattr(request.app.state, "ai_queue", None)
+    if isinstance(queue, DatabaseApprovalQueue):
+        return queue
+    queue = DatabaseApprovalQueue(request.app.state.db)
+    request.app.state.ai_queue = queue
+    return queue
 
 
 def _project_to_dict(project) -> dict[str, Any]:
@@ -139,6 +150,40 @@ def _artifact_to_dict(record) -> dict[str, Any]:
         "manifest": json.loads(getattr(record, "manifest_json", None) or "{}"),
         "status": record.status,
         "created_at": record.created_at.isoformat() if record.created_at else None,
+    }
+
+
+def _seo_suggestion_preview(product_id: int, suggestion: AISuggestion) -> dict[str, Any]:
+    return {
+        "product_id": str(product_id),
+        "product_name": str(suggestion.metadata.get("product_name") or product_id),
+        "field": suggestion.field,
+        "suggestion_type": suggestion.suggestion_type,
+        "before": suggestion.before,
+        "after": suggestion.after,
+        "reason": suggestion.reason,
+        "confidence": suggestion.confidence,
+        "source_finding": suggestion.source_finding,
+        "metadata": suggestion.metadata,
+        "status": "draft",
+    }
+
+
+def _approval_to_dict(item) -> dict[str, Any]:
+    suggestion = item.suggestion
+    return {
+        "approval_id": item.approval_id,
+        "product_id": item.product_id,
+        "product_name": str(suggestion.metadata.get("product_name") or item.product_id),
+        "field": suggestion.field,
+        "suggestion_type": suggestion.suggestion_type,
+        "before": suggestion.before,
+        "after": suggestion.after,
+        "reason": suggestion.reason,
+        "confidence": suggestion.confidence,
+        "source_finding": suggestion.source_finding,
+        "metadata": suggestion.metadata,
+        "status": "pending" if item.approved is None else ("approved" if item.approved else "rejected"),
     }
 
 
@@ -554,6 +599,143 @@ async def api_project_quality(project_id: str, product_id: int, request: Request
         raise _editor_error(exc) from exc
 
 
+@router.get("/api/projects/{project_id}/products/{product_id}/seo")
+async def api_project_seo(project_id: str, product_id: int, request: Request):
+    try:
+        return await _effective_service(request).seo(project_id, product_id)
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.get("/api/projects/{project_id}/products/{product_id}/semantic-core")
+async def api_project_semantic_core(project_id: str, product_id: int, request: Request):
+    """Возвращает семантическое ядро для effective snapshot. Не мутирует БД."""
+    try:
+        card = await _effective_service(request).get_effective_card(project_id, product_id)
+        from app.effective_card.service import _unified_from_snapshot
+        from app.semantic_core import build_semantic_core
+        unified = _unified_from_snapshot(card.effective_snapshot, product_id)
+        core = build_semantic_core(
+            name=unified.name,
+            description=unified.description,
+            attributes=dict(unified.attributes) if unified.attributes else None,
+            category=unified.category,
+            tags=unified.tags,
+            brand=unified.brand,
+        )
+        return {
+            "project_id": project_id,
+            "product_id": product_id,
+            "primary_terms": core.primary_terms,
+            "secondary_terms": core.secondary_terms,
+            "long_tail_terms": core.long_tail_terms,
+            "brand_terms": core.brand_terms,
+            "attribute_terms": core.attribute_terms,
+            "category_terms": core.category_terms,
+            "forbidden_terms": core.forbidden_terms,
+            "noisy_terms": core.noisy_terms,
+            "total_terms": core.total_terms,
+            "coverage_score": core.coverage_score,
+            "junk_ratio": core.junk_ratio,
+        }
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.get("/projects/{project_id}/products/{product_id}/semantic-core", response_class=HTMLResponse)
+async def project_product_semantic_core_html(project_id: str, product_id: int, request: Request):
+    """Возвращает HTML-фрагмент семантического ядра для HTMX."""
+    try:
+        card = await _effective_service(request).get_effective_card(project_id, product_id)
+        from app.effective_card.service import _unified_from_snapshot
+        from app.semantic_core import build_semantic_core
+        unified = _unified_from_snapshot(card.effective_snapshot, product_id)
+        core = build_semantic_core(
+            name=unified.name,
+            description=unified.description,
+            attributes=dict(unified.attributes) if unified.attributes else None,
+            category=unified.category,
+            tags=unified.tags,
+            brand=unified.brand,
+        )
+        return templates.TemplateResponse(
+            request,
+            "semantic_core_section.html",
+            {
+                "primary_terms": core.primary_terms,
+                "secondary_terms": core.secondary_terms,
+                "long_tail_terms": core.long_tail_terms,
+                "total_terms": core.total_terms,
+                "coverage_score": core.coverage_score,
+                "junk_ratio": core.junk_ratio,
+            },
+        )
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/keywords/import")
+async def api_import_keywords(project_id: str, request: Request, file: UploadFile | None = PROJECT_OPTIONAL_UPLOAD_FILE):
+    """Импорт ключевых слов из CSV. Не мутирует БД -- только парсинг."""
+    try:
+        await _project_service(request).get_project(project_id)
+        if file is None:
+            raise HTTPException(status_code=400, detail="Загрузите CSV-файл с ключевыми словами.")
+        content = await file.read()
+        from app.keyword_sources import ManualCSVSource
+        from app.products.schema import UnifiedProduct
+        source = ManualCSVSource(content)
+        product = UnifiedProduct(name="", source_id="", source_type="csv_import")
+        keywords = source.get_keywords(product)
+        return {"project_id": project_id, "keywords": keywords, "count": len(keywords)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.get("/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+async def api_project_seo_suggestions(project_id: str, product_id: int, request: Request):
+    """Preview SEO suggestions without mutating the approval queue."""
+    try:
+        suggestions = await _effective_service(request).seo_suggestions(project_id, product_id)
+        return [_seo_suggestion_preview(product_id, suggestion) for suggestion in suggestions]
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
+@router.post("/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+async def api_queue_project_seo_suggestions(project_id: str, product_id: int, request: Request):
+    """Queue factual SEO suggestions for the existing approval workflow."""
+    try:
+        suggestions = await _effective_service(request).seo_suggestions(project_id, product_id)
+        if not suggestions:
+            if _is_hx(request):
+                return HTMLResponse(
+                    '<div class="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">'
+                    "Нет безопасных предложений для согласования."
+                    "</div>"
+                )
+            return {"queued": 0, "items": []}
+        result = AIRecommendationResult(
+            product_id=str(product_id),
+            suggestions=suggestions,
+            summary="SEO-аудит карточки товара",
+            overall_confidence=round(sum(s.confidence for s in suggestions) / len(suggestions), 2),
+            model_used="deterministic_seo_audit",
+        )
+        queued = await _approval_queue(request).add(result)
+        if _is_hx(request):
+            return HTMLResponse(
+                '<div class="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">'
+                f"Поставлено в согласование: {len(queued)}."
+                "</div>"
+            )
+        return {"queued": len(queued), "items": [_approval_to_dict(item) for item in queued]}
+    except Exception as exc:
+        raise _editor_error(exc) from exc
+
+
 @router.post("/api/projects/{project_id}/products/{product_id}/drafts")
 async def api_project_create_draft(project_id: str, product_id: int, request: Request):
     body = await _request_data(request)
@@ -883,22 +1065,24 @@ async def project_import_page(project_id: str, request: Request):
 @router.get("/projects/{project_id}/products", response_class=HTMLResponse)
 async def project_products_page(project_id: str, request: Request):
     project = await _project_service(request).get_project(project_id)
-    products = await _effective_service(request).list_effective_cards(project_id)
+    products_with_seo = await _effective_service(request).list_effective_cards_with_seo_summary(project_id)
     return templates.TemplateResponse(
         request,
         "project_products.html",
-        {"project": project, "products": products, "active": "projects"},
+        {"project": project, "products": products_with_seo, "active": "projects"},
     )
 
 
 @router.get("/projects/{project_id}/products/{product_id}", response_class=HTMLResponse)
 async def project_product_detail_page(project_id: str, product_id: int, request: Request):
     project = await _project_service(request).get_project(project_id)
-    card = await _effective_service(request).get_effective_card(project_id, product_id)
+    service = _effective_service(request)
+    card = await service.get_effective_card(project_id, product_id)
+    seo = await service.seo(project_id, product_id)
     return templates.TemplateResponse(
         request,
         "project_product_detail.html",
-        {"project": project, "card": card, "active": "projects"},
+        {"project": project, "card": card, "seo": seo["effective"], "active": "projects"},
     )
 
 

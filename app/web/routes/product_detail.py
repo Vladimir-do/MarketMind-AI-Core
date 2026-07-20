@@ -13,6 +13,7 @@ from app.editor.service import ProductCardEditorService
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
 from app.products.versioning import ProductVersion, ProductVersionBuilder, persisted_record_to_version
+from app.seo_intelligence import audit_unified_product_seo
 from app.timeline.repository import TimelineRepository
 from app.timeline.service import TimelineService
 from app.web.app import templates
@@ -194,6 +195,32 @@ def _analysis_to_dict(analysis):
     }
 
 
+def _seo_to_dict(seo):
+    return {
+        "score": seo.score,
+        "tier": seo.tier,
+        "ready": seo.ready,
+        "findings": [
+            {
+                "rule": f.rule,
+                "field": f.field,
+                "severity": f.severity,
+                "message": f.message,
+            }
+            for f in seo.findings
+        ],
+        "recommendations": [
+            {
+                "field": r.field,
+                "action": r.action,
+                "priority": r.priority,
+                "reason": r.reason,
+            }
+            for r in seo.recommendations
+        ],
+    }
+
+
 async def _get_product_history_events(
     request: Request,
     product: Product,
@@ -320,6 +347,7 @@ async def product_detail_page(product_id: int, request: Request):
     unified = _build_unified(product, last_price)
     analyzer = ProductAnalyzer()
     analysis = analyzer.analyze(unified)
+    seo = audit_unified_product_seo(unified)
 
     suggestions = [r for r in approval_records if r["status"] == "pending"]
 
@@ -334,6 +362,8 @@ async def product_detail_page(product_id: int, request: Request):
             "unified": unified,
             "analysis": analysis,
             "analysis_dict": _analysis_to_dict(analysis),
+            "seo": seo,
+            "seo_dict": _seo_to_dict(seo),
             "suggestions": suggestions,
             "approval_records": approval_records,
             "history_events": history_events,
@@ -388,6 +418,74 @@ async def api_product_analysis(product_id: int, request: Request):
     analyzer = ProductAnalyzer()
     analysis = analyzer.analyze(unified)
     return _analysis_to_dict(analysis)
+
+
+@router.get("/api/products/{product_id}/seo")
+async def api_product_seo(product_id: int, request: Request):
+    product = await _get_product(request, product_id)
+    last_price = await db_get_last_price(request, product_id)
+    unified = _build_unified(product, last_price)
+    return _seo_to_dict(audit_unified_product_seo(unified))
+
+
+@router.get("/api/products/{product_id}/semantic-core")
+async def api_product_semantic_core(product_id: int, request: Request):
+    """Возвращает семантическое ядро товара. Не мутирует БД."""
+    product = await _get_product(request, product_id)
+    last_price = await db_get_last_price(request, product_id)
+    unified = _build_unified(product, last_price)
+    from app.semantic_core import build_semantic_core
+    core = build_semantic_core(
+        name=unified.name,
+        description=unified.description,
+        attributes=dict(unified.attributes) if unified.attributes else None,
+        category=unified.category,
+        tags=unified.tags,
+        brand=unified.brand,
+    )
+    return {
+        "product_id": product_id,
+        "primary_terms": core.primary_terms,
+        "secondary_terms": core.secondary_terms,
+        "long_tail_terms": core.long_tail_terms,
+        "brand_terms": core.brand_terms,
+        "attribute_terms": core.attribute_terms,
+        "category_terms": core.category_terms,
+        "forbidden_terms": core.forbidden_terms,
+        "noisy_terms": core.noisy_terms,
+        "total_terms": core.total_terms,
+        "coverage_score": core.coverage_score,
+        "junk_ratio": core.junk_ratio,
+    }
+
+
+@router.get("/products/{product_id}/semantic-core", response_class=HTMLResponse)
+async def product_semantic_core_html(product_id: int, request: Request):
+    """Возвращает HTML-фрагмент семантического ядра для HTMX."""
+    product = await _get_product(request, product_id)
+    last_price = await db_get_last_price(request, product_id)
+    unified = _build_unified(product, last_price)
+    from app.semantic_core import build_semantic_core
+    core = build_semantic_core(
+        name=unified.name,
+        description=unified.description,
+        attributes=dict(unified.attributes) if unified.attributes else None,
+        category=unified.category,
+        tags=unified.tags,
+        brand=unified.brand,
+    )
+    return templates.TemplateResponse(
+        request,
+        "semantic_core_section.html",
+        {
+            "primary_terms": core.primary_terms,
+            "secondary_terms": core.secondary_terms,
+            "long_tail_terms": core.long_tail_terms,
+            "total_terms": core.total_terms,
+            "coverage_score": core.coverage_score,
+            "junk_ratio": core.junk_ratio,
+        },
+    )
 
 
 @router.get("/api/products/{product_id}/suggestions")

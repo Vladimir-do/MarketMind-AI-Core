@@ -6,6 +6,7 @@ import csv
 import io
 import json
 import uuid
+from collections import Counter
 from datetime import UTC, datetime
 from html import escape
 from typing import Any
@@ -13,7 +14,9 @@ from typing import Any
 from sqlalchemy import select
 
 from app.database import ClientProject, Database, ProjectReport
-from app.effective_card.service import EffectiveProductCardService
+from app.effective_card.service import EffectiveProductCardService, _unified_from_snapshot
+from app.semantic_core import build_semantic_core
+from app.seo_intelligence import audit_unified_product_seo
 from app.workspace.files import project_artifact_path
 
 
@@ -31,8 +34,27 @@ class ClientDeliveryReportService:
                 raise ValueError("Проект не найден")
         cards = await self._effective.list_effective_cards(project_id, limit=500)
         qualities = [await self._effective.quality(project_id, card.product_id) for card in cards]
+        seo_results = [
+            audit_unified_product_seo(_unified_from_snapshot(card.effective_snapshot, card.product_id))
+            for card in cards
+        ]
+        semantic_results = [
+            build_semantic_core(
+                name=unified.name,
+                description=unified.description,
+                attributes=dict(unified.attributes) if unified.attributes else None,
+                category=unified.category,
+                tags=unified.tags,
+                brand=unified.brand,
+            )
+            for unified in [
+                _unified_from_snapshot(card.effective_snapshot, card.product_id)
+                for card in cards
+            ]
+        ]
         source_scores = [item["source"]["score"] for item in qualities]
         effective_scores = [item["effective"]["score"] for item in qualities]
+        seo_scores = [s.score for s in seo_results]
         changed = [card for card in cards if card.is_manually_modified]
         attention = [
             {
@@ -43,6 +65,51 @@ class ClientDeliveryReportService:
             for card in cards
             if card.warnings or (qualities[cards.index(card)]["effective"]["score"] < 60)
         ]
+        tier_counts = Counter(s.tier for s in seo_results)
+        worst_seo = sorted(
+            [
+                {
+                    "product_id": cards[i].product_id,
+                    "title": cards[i].effective_snapshot.get("title") or "Без названия",
+                    "score": seo_results[i].score,
+                    "tier": seo_results[i].tier,
+                }
+                for i in range(len(cards))
+            ],
+            key=lambda x: x["score"],
+        )[:10]
+        problem_counter: Counter = Counter()
+        for s in seo_results:
+            for finding in s.findings:
+                problem_counter[finding.rule] += 1
+        semantic_term_counter: Counter = Counter()
+        for semantic in semantic_results:
+            semantic_term_counter.update(semantic.primary_terms)
+            semantic_term_counter.update(semantic.secondary_terms)
+            semantic_term_counter.update(semantic.attribute_terms)
+        seo_summary = {
+            "average_score": _avg(seo_scores),
+            "distribution": {
+                "strong": tier_counts.get("strong", 0),
+                "usable": tier_counts.get("usable", 0),
+                "needs_work": tier_counts.get("needs_work", 0),
+                "weak": tier_counts.get("weak", 0),
+            },
+            "worst_cards": worst_seo,
+            "top_problems": [
+                {"rule": rule, "count": count}
+                for rule, count in problem_counter.most_common(10)
+            ],
+            "semantic": {
+                "average_coverage_score": _avg_float([s.coverage_score for s in semantic_results]),
+                "average_junk_ratio": _avg_float([s.junk_ratio for s in semantic_results]),
+                "cards_without_primary_terms": sum(1 for s in semantic_results if not s.primary_terms),
+                "top_terms": [
+                    {"term": term, "count": count}
+                    for term, count in semantic_term_counter.most_common(10)
+                ],
+            },
+        }
         return {
             "project_id": project_id,
             "project_name": project.name,
@@ -60,6 +127,7 @@ class ClientDeliveryReportService:
             "requires_review": attention[:50],
             "created_exports": [],
             "warnings": [],
+            "seo_summary": seo_summary,
         }
 
     async def create_report(self, project_id: str, *, file_format: str = "html") -> ProjectReport:
@@ -103,6 +171,10 @@ class ClientDeliveryReportService:
 
 def _avg(values: list[int]) -> float:
     return round(sum(values) / len(values), 1) if values else 0.0
+
+
+def _avg_float(values: list[float]) -> float:
+    return round(sum(values) / len(values), 3) if values else 0.0
 
 
 def _top_problems(qualities: list[dict[str, Any]]) -> list[str]:

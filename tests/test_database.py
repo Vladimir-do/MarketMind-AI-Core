@@ -117,6 +117,36 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(latest.id, second.id)
         self.assertNotEqual(latest.id, first.id)
 
+    async def test_job_records_track_lifecycle(self):
+        job = await self.db.create_job("import_products", {"project_id": "p1"}, job_id="job-1")
+        self.assertEqual(job.status, "queued")
+        self.assertEqual(job.progress, 0)
+        self.assertEqual(json.loads(job.payload_json), {"project_id": "p1"})
+
+        started = await self.db.start_job("job-1")
+        self.assertEqual(started.status, "running")
+        self.assertIsNotNone(started.started_at)
+
+        progress = await self.db.update_job_progress("job-1", 45)
+        self.assertEqual(progress.progress, 45)
+
+        finished = await self.db.finish_job("job-1", {"imported": 3})
+        self.assertEqual(finished.status, "succeeded")
+        self.assertEqual(finished.progress, 100)
+        self.assertEqual(json.loads(finished.result_json), {"imported": 3})
+
+        jobs = await self.db.get_recent_jobs(job_type="import_products")
+        self.assertEqual([item.job_id for item in jobs], ["job-1"])
+
+    async def test_job_records_capture_failures(self):
+        await self.db.create_job("parse_marketplace", {"url": "https://example.test"}, job_id="job-2")
+
+        failed = await self.db.fail_job("job-2", RuntimeError("blocked"))
+
+        self.assertEqual(failed.status, "failed")
+        self.assertEqual(failed.error_class, "RuntimeError")
+        self.assertEqual(failed.error_text, "blocked")
+
     async def test_record_scrape_attempt_stores_measurable_signal(self):
         await self.db.record_scrape_attempt(
             url="https://www.ozon.ru/product/test",

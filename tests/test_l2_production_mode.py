@@ -101,6 +101,9 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("/tmp", layout.home.as_posix())
         status = await system_status(self.db)
         self.assertEqual(status["mode"]["mode"], "work")
+        self.assertEqual(status["database_backend"], "sqlite")
+        self.assertTrue(any(component["technology"].startswith("FastAPI") for component in status["stack"]))
+        self.assertTrue(any(check["key"] == "database-backend" for check in status["readiness"]))
         self.assertFalse([item for item in status["warnings"] if "/tmp" in item])
 
     async def test_backup_checksum_restore_and_protective_copy(self):

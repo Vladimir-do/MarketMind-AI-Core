@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app.config import _normalize_proxy
+from app.config import _database_url_from_env, _normalize_proxy
 
 
 class ConfigTests(unittest.TestCase):
@@ -26,6 +26,19 @@ class ConfigTests(unittest.TestCase):
             _normalize_proxy("http://user:pass@127.0.0.1:8080"),
             "http://user:pass@127.0.0.1:8080",
         )
+
+    def test_empty_database_url_uses_sqlite_default(self):
+        with patch.dict("os.environ", {"DATABASE_URL": ""}):
+            self.assertTrue(_database_url_from_env().startswith("sqlite+aiosqlite:///"))
+
+    def test_legacy_sqlite_url_is_upgraded_to_async_driver(self):
+        with patch.dict("os.environ", {"DATABASE_URL": "sqlite:///local.db"}):
+            self.assertEqual(_database_url_from_env(), "sqlite+aiosqlite:///local.db")
+
+    def test_postgresql_database_url_is_preserved(self):
+        url = "postgresql+asyncpg://user:pass@localhost/marketmind"
+        with patch.dict("os.environ", {"DATABASE_URL": url}):
+            self.assertEqual(_database_url_from_env(), url)
 
     def test_config_proxy_ignores_placeholder_env(self):
         with patch.dict(

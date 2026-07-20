@@ -62,6 +62,7 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Тестовый товар Ozon", resp.text)
         self.assertIn("Карточка товара", resp.text)
+        self.assertIn("SEO-аудит карточки", resp.text)
 
     async def test_product_detail_api(self):
         pid = await self._get_product_id("Ozon")
@@ -104,6 +105,111 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("recommendations", data)
         self.assertIsInstance(data["findings"], list)
         self.assertIsInstance(data["recommendations"], list)
+
+    async def test_страница_товара_содержит_seo_блок(self):
+        pid = await self._get_product_id("Ozon")
+        resp = await self.client.get(f"/products/{pid}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("SEO-аудит карточки", resp.text)
+
+    async def test_seo_api_возвращает_полную_структуру(self):
+        pid = await self._get_product_id("Ozon")
+        resp = await self.client.get(f"/api/products/{pid}/seo")
+        self.assertEqual(resp.status_code, 200)
+        данные = resp.json()
+
+        self.assertIsInstance(данные["score"], int)
+        self.assertGreaterEqual(данные["score"], 0)
+        self.assertLessEqual(данные["score"], 100)
+        self.assertIn(данные["tier"], {"strong", "usable", "needs_work", "weak"})
+        self.assertIsInstance(данные["ready"], bool)
+        self.assertIsInstance(данные["findings"], list)
+        self.assertIsInstance(данные["recommendations"], list)
+
+        for находка in данные["findings"]:
+            self.assertIn("rule", находка)
+            self.assertIn("field", находка)
+            self.assertIn("severity", находка)
+            self.assertIn("message", находка)
+            self.assertIn(находка["severity"], {"critical", "warning", "info"})
+
+        for rec in данные["recommendations"]:
+            self.assertIn("field", rec)
+            self.assertIn("action", rec)
+            self.assertIn("priority", rec)
+            self.assertIn("reason", rec)
+            self.assertIn(rec["priority"], {1, 2, 3})
+
+    async def test_seo_api_404_для_несуществующего_товара(self):
+        resp = await self.client.get("/api/products/99999/seo")
+        self.assertEqual(resp.status_code, 404)
+
+    async def test_seo_страница_показывает_блок_аудита(self):
+        pid = await self._get_product_id("Ozon")
+        resp = await self.client.get(f"/products/{pid}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("SEO-аудит карточки", resp.text)
+
+    async def test_seo_балл_отображается_на_странице(self):
+        pid = await self._get_product_id("Ozon")
+        seo_resp = await self.client.get(f"/api/products/{pid}/seo")
+        балл = seo_resp.json()["score"]
+
+        страница = await self.client.get(f"/products/{pid}")
+        self.assertEqual(страница.status_code, 200)
+        self.assertIn(str(балл), страница.text)
+
+    async def test_seo_метка_уровня_на_странице(self):
+        pid = await self._get_product_id("Ozon")
+        seo_resp = await self.client.get(f"/api/products/{pid}/seo")
+        уровень = seo_resp.json()["tier"]
+
+        метки = {
+            "strong": "Сильная карточка",
+            "usable": "Можно использовать",
+            "needs_work": "Нужна доработка",
+            "weak": "Слабая SEO-база",
+        }
+        ожидаемая_метка = метки.get(уровень, "")
+        страница = await self.client.get(f"/products/{pid}")
+        self.assertEqual(страница.status_code, 200)
+        if ожидаемая_метка:
+            self.assertIn(ожидаемая_метка, страница.text)
+
+    async def test_seo_рекомендации_на_странице(self):
+        pid = await self._get_product_id("Ozon")
+        seo_resp = await self.client.get(f"/api/products/{pid}/seo")
+        рекомендации = seo_resp.json()["recommendations"]
+
+        страница = await self.client.get(f"/products/{pid}")
+        self.assertEqual(страница.status_code, 200)
+        if рекомендации:
+            self.assertIn(рекомендации[0]["action"], страница.text)
+        else:
+            self.assertIn("Критичных SEO-рекомендаций нет", страница.text)
+
+    async def test_seo_разные_товары_имеют_разные_баллы(self):
+        pid1 = await self._get_product_id("Ozon")
+        pid2 = await self._get_product_id("WB")
+        seo1 = (await self.client.get(f"/api/products/{pid1}/seo")).json()
+        seo2 = (await self.client.get(f"/api/products/{pid2}/seo")).json()
+        self.assertIsInstance(seo1["score"], int)
+        self.assertIsInstance(seo2["score"], int)
+        self.assertNotEqual(pid1, pid2)
+
+    async def test_product_semantic_core_endpoint_возвращает_данные(self):
+        pid = await self._get_product_id("Ozon")
+        resp = await self.client.get(f"/api/products/{pid}/semantic-core")
+        self.assertEqual(resp.status_code, 200)
+        данные = resp.json()
+        self.assertEqual(данные["product_id"], pid)
+        self.assertIn("primary_terms", данные)
+        self.assertIn("coverage_score", данные)
+        self.assertIsInstance(данные["coverage_score"], float)
+
+    async def test_product_semantic_core_404(self):
+        resp = await self.client.get("/api/products/99999/semantic-core")
+        self.assertEqual(resp.status_code, 404)
 
     async def test_product_detail_suggestions(self):
         pid = await self._get_product_id("Ozon")

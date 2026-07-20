@@ -73,6 +73,110 @@
     </div>
   </div>
 
+  {# ── SEO-аудит ───────────────────────────────────────────────────── #}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">SEO-аудит карточки</h2>
+    <div class="flex items-start gap-4">
+      <div class="relative w-20 h-20 shrink-0">
+        <svg class="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
+          <path class="text-gray-200" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          <path stroke-width="3" fill="none"
+                stroke="{% if seo.score >= 85 %}#22c55e{% elif seo.score >= 70 %}#3b82f6{% elif seo.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"
+                stroke-dasharray="{{ seo.score }}, 100"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center text-lg font-bold">{{ seo.score }}</div>
+      </div>
+      <div class="flex-1">
+        <div class="text-sm text-gray-500 mb-2">Уровень:
+          <span class="font-medium
+            {% if seo.tier == 'strong' %}text-green-600
+            {% elif seo.tier == 'usable' %}text-blue-600
+            {% elif seo.tier == 'needs_work' %}text-yellow-600
+            {% else %}text-red-600{% endif %}">
+            {% if seo.tier == 'strong' %}Сильная карточка
+            {% elif seo.tier == 'usable' %}Можно использовать
+            {% elif seo.tier == 'needs_work' %}Нужна доработка
+            {% else %}Слабая SEO-база{% endif %}
+          </span>
+        </div>
+        {% if seo.recommendations %}
+        <div class="grid gap-2">
+          {% for r in seo.recommendations[:5] %}
+          <div class="border rounded p-3 text-sm">
+            <div class="font-medium">{{ r.action }}</div>
+            <div class="text-gray-500 mt-1">{{ r.reason }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-sm text-green-700">Критичных SEO-рекомендаций нет.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ── Сравнение source vs effective SEO ──────────────────────────── #}
+    {% if seo.source_score is defined and seo.effective_score is defined %}
+    <div class="mt-5 pt-4 border-t">
+      <h3 class="text-sm font-semibold mb-3">Сравнение SEO-оценок</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-4">
+          <div class="relative w-14 h-14 shrink-0">
+            <svg class="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+              <path class="text-gray-200" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path stroke-width="3" fill="none"
+                    stroke="{% if seo.source_score >= 85 %}#22c55e{% elif seo.source_score >= 70 %}#3b82f6{% elif seo.source_score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"
+                    stroke-dasharray="{{ seo.source_score }}, 100"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center text-sm font-bold">{{ seo.source_score }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500">Исходная оценка</div>
+            <div class="font-semibold">Source SEO</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-4">
+          <div class="relative w-14 h-14 shrink-0">
+            <svg class="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+              <path class="text-gray-200" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path stroke-width="3" fill="none"
+                    stroke="{% if seo.effective_score >= 85 %}#22c55e{% elif seo.effective_score >= 70 %}#3b82f6{% elif seo.effective_score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"
+                    stroke-dasharray="{{ seo.effective_score }}, 100"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center text-sm font-bold">{{ seo.effective_score }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500">Эффективная оценка</div>
+            <div class="font-semibold">Effective SEO</div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 text-sm text-center">
+        {% set diff = seo.effective_score - seo.source_score %}
+        {% if diff > 0 %}
+          <span class="text-green-600 font-semibold">&#9650; +{{ diff }} &mdash; SEO улучшился</span>
+        {% elif diff < 0 %}
+          <span class="text-red-600 font-semibold">&#9660; {{ diff }} &mdash; SEO ухудшился</span>
+        {% else %}
+          <span class="text-gray-500">&mdash; оценка не изменилась</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Семантическое ядро ──────────────────────────────────────────── #}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">Семантическое ядро</h2>
+    <div hx-get="/products/{{ product.id }}/semantic-core"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div class="text-sm text-gray-400">Загрузка...</div>
+    </div>
+  </div>
+
   {# ── Найденные проблемы ──────────────────────────────────────────── #}
   {% if analysis.findings %}
   <div class="bg-white rounded-lg shadow p-6">

@@ -8,11 +8,19 @@ from typing import Any
 
 from sqlalchemy import desc, select
 
+from app.ai_recommendation.suggestions import AISuggestion
 from app.database import Database, ProductCardVersion, ProjectProduct
 from app.editor.schemas import normalize_card_payload
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
 from app.projects.service import ProjectNotFoundError
+from app.seo_history import SEOHistoryService
+from app.seo_intelligence import (
+    FORBIDDEN_MARKETING_WORDS,
+    GENERIC_PRODUCT_TYPES,
+    SEOFinding,
+    audit_unified_product_seo,
+)
 
 
 @dataclass(frozen=True)
@@ -39,8 +47,9 @@ class EffectiveProductCard:
 class EffectiveProductCardService:
     """Builds project-specific effective cards from source data and applied versions."""
 
-    def __init__(self, db: Database) -> None:
+    def __init__(self, db: Database, seo_history: SEOHistoryService | None = None) -> None:
         self._db = db
+        self._seo_history = seo_history
 
     async def get_effective_card(self, project_id: str, product_id: int) -> EffectiveProductCard:
         async with self._db.session() as session:
@@ -63,6 +72,19 @@ class EffectiveProductCardService:
                 cards.append(self._build_card(project_product, version))
             return cards
 
+    async def list_effective_cards_with_seo_summary(self, project_id: str, *, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+        cards = await self.list_effective_cards(project_id, limit=limit, offset=offset)
+        result = []
+        for card in cards:
+            seo = audit_unified_product_seo(_unified_from_snapshot(card.effective_snapshot, card.product_id))
+            result.append({
+                "card": card,
+                "seo_score": seo.score,
+                "seo_tier": seo.tier,
+                "seo_ready": seo.ready,
+            })
+        return result
+
     async def quality(self, project_id: str, product_id: int) -> dict[str, Any]:
         card = await self.get_effective_card(project_id, product_id)
         analyzer = ProductAnalyzer()
@@ -76,6 +98,37 @@ class EffectiveProductCardService:
             "draft_preview": None,
             "warnings": card.warnings,
         }
+
+    async def seo(self, project_id: str, product_id: int) -> dict[str, Any]:
+        card = await self.get_effective_card(project_id, product_id)
+        source = audit_unified_product_seo(_unified_from_snapshot(card.source_snapshot, product_id))
+        effective = audit_unified_product_seo(_unified_from_snapshot(card.effective_snapshot, product_id))
+
+        history_items: list[dict[str, Any]] = []
+        if self._seo_history is not None:
+            snapshots = await self._seo_history.get_history(project_id, product_id, limit=5)
+            history_items = [s.to_dict() for s in snapshots]
+
+        return {
+            "project_id": project_id,
+            "product_id": product_id,
+            "source": _seo_to_dict(source),
+            "effective": _seo_to_dict(effective),
+            "warnings": card.warnings,
+            "history": history_items,
+        }
+
+    async def seo_suggestions(self, project_id: str, product_id: int) -> list[AISuggestion]:
+        """SEO-рекомендации в формате AISuggestion для approval workflow."""
+        card = await self.get_effective_card(project_id, product_id)
+        product = _unified_from_snapshot(card.effective_snapshot, product_id)
+        audit = audit_unified_product_seo(product)
+        suggestions = []
+        for finding in audit.findings:
+            suggestion = _finding_to_suggestion(card, finding)
+            if suggestion is not None:
+                suggestions.append(suggestion)
+        return suggestions
 
     async def draft_quality_preview(self, project_id: str, product_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         card = await self.get_effective_card(project_id, product_id)
@@ -154,6 +207,8 @@ def _unified_from_snapshot(snapshot: dict[str, Any], product_id: int) -> Unified
         price=snapshot.get("price"),
         image_urls=list(snapshot.get("image_urls") or []),
         attributes=dict(snapshot.get("attributes") or {}),
+        category=snapshot.get("category"),
+        tags=list(snapshot.get("tags") or []),
         marketplace=snapshot.get("marketplace"),
         availability=str(snapshot.get("availability") or "unknown"),
     )
@@ -172,6 +227,32 @@ def _analysis_to_dict(analysis) -> dict[str, Any]:
                 "category": item.category,
             }
             for item in analysis.findings
+        ],
+    }
+
+
+def _seo_to_dict(seo) -> dict[str, Any]:
+    return {
+        "score": seo.score,
+        "tier": seo.tier,
+        "ready": seo.ready,
+        "findings": [
+            {
+                "rule": item.rule,
+                "field": item.field,
+                "message": item.message,
+                "severity": item.severity,
+            }
+            for item in seo.findings
+        ],
+        "recommendations": [
+            {
+                "field": item.field,
+                "action": item.action,
+                "priority": item.priority,
+                "reason": item.reason,
+            }
+            for item in seo.recommendations
         ],
     }
 
@@ -216,3 +297,102 @@ def _source_column_for_field(field: str, source: dict[str, Any], source_provenan
 
 def _without_internal_fields(snapshot: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in snapshot.items() if not str(key).startswith("_")}
+
+
+# --- SEO Suggestions helpers ---
+
+_FINDING_TO_FIELD = {
+    "name": "title",
+    "description": "description",
+    "keywords": "tags",
+}
+
+
+def _finding_to_suggestion(card: EffectiveProductCard, finding: SEOFinding) -> AISuggestion | None:
+    """Convert a finding into a factual suggestion when a safe replacement exists."""
+    snapshot_field = _FINDING_TO_FIELD.get(finding.field)
+    if snapshot_field is None:
+        return None
+
+    snapshot = card.effective_snapshot
+    current_value = snapshot.get(snapshot_field, "")
+    if isinstance(current_value, list):
+        current_value = ", ".join(str(v) for v in current_value)
+    current_value = str(current_value or "")
+    metadata = {
+        "source": "seo_audit",
+        "project_id": card.project_id,
+        "project_product_id": card.project_product_id,
+        "product_name": snapshot.get("title") or str(card.product_id),
+    }
+
+    if finding.rule == "seo_title_forbidden_words":
+        after = _remove_forbidden_words(current_value)
+        if after == current_value:
+            return None
+        return AISuggestion(
+            field="title",
+            suggestion_type="rewrite",
+            before=current_value,
+            after=after,
+            reason=finding.message,
+            confidence=0.6,
+            source_finding=finding.rule,
+            metadata=metadata,
+        )
+
+    if finding.rule == "seo_description_forbidden_words":
+        after = _remove_forbidden_words(current_value)
+        if after == current_value:
+            return None
+        return AISuggestion(
+            field="description",
+            suggestion_type="rewrite",
+            before=current_value,
+            after=after,
+            reason=finding.message,
+            confidence=0.6,
+            source_finding=finding.rule,
+            metadata=metadata,
+        )
+
+    if finding.rule == "seo_keywords_few":
+        name = str(snapshot.get("title") or "")
+        extracted = _extract_keywords_from_name(name)
+        if not extracted:
+            return None
+        existing_tags = snapshot.get("tags") or []
+        if isinstance(existing_tags, str):
+            existing_tags = [t.strip() for t in existing_tags.split(",") if t.strip()]
+        new_tags = list(dict.fromkeys(existing_tags + extracted))
+        after = ", ".join(new_tags)
+        return AISuggestion(
+            field="tags",
+            suggestion_type="expand",
+            before=", ".join(existing_tags) if existing_tags else "",
+            after=after,
+            reason=finding.message,
+            confidence=0.5,
+            source_finding=finding.rule,
+            metadata=metadata,
+        )
+
+    return None
+
+
+def _remove_forbidden_words(text: str) -> str:
+    """Удаляет запрещённые маркетинговые слова из текста."""
+    words = text.split()
+    cleaned = []
+    for word in words:
+        clean = word.lower().rstrip(".,!?;:\"'()[]{}")
+        if clean not in FORBIDDEN_MARKETING_WORDS:
+            cleaned.append(word)
+    return " ".join(cleaned)
+
+
+def _extract_keywords_from_name(name: str) -> list[str]:
+    """Извлекает ключевые слова из названия товара."""
+    import re
+    tokens = re.findall(r"[A-Za-zА-Яа-яЁё0-9]{3,}", name.lower())
+    return [t for t in tokens if t not in GENERIC_PRODUCT_TYPES and not t.isdigit()][:6]

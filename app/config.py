@@ -126,7 +126,20 @@ IMPORT_MAX_ZIP_COMPRESSION_RATIO: int = int(os.getenv("IMPORT_MAX_ZIP_COMPRESSIO
 IMPORT_PREVIEW_ROWS: int = int(os.getenv("IMPORT_PREVIEW_ROWS", "5"))
 
 # ── База данных ───────────────────────────────────────────────────────────────
-DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{(RUNTIME_DATA_DIR / 'parser.db').as_posix()}")
+def _default_database_url() -> str:
+    return f"sqlite+aiosqlite:///{(RUNTIME_DATA_DIR / 'parser.db').as_posix()}"
+
+
+def _database_url_from_env() -> str:
+    raw = os.getenv("DATABASE_URL", "").strip()
+    if not raw:
+        return _default_database_url()
+    if raw.startswith("sqlite:///"):
+        return f"sqlite+aiosqlite:///{raw.removeprefix('sqlite:///')}"
+    return raw
+
+
+DATABASE_URL: str = _database_url_from_env()
 if DATABASE_URL.startswith("sqlite+aiosqlite:///"):
     _db_path = Path(DATABASE_URL.removeprefix("sqlite+aiosqlite:///"))
     if not _db_path.is_absolute():

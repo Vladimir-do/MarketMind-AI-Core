@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -385,6 +386,28 @@ class DomainEventRecord(Base):
     )
 
 
+class JobRecord(Base):
+    __tablename__ = "job_records"
+
+    job_id       = Column(String(64), primary_key=True)
+    job_type     = Column(String(80), nullable=False, index=True)
+    status       = Column(String(32), nullable=False, default="queued", index=True)
+    payload_json = Column(Text, nullable=False)
+    result_json  = Column(Text)
+    error_class  = Column(String(120))
+    error_text   = Column(Text)
+    progress     = Column(Integer, nullable=False, default=0)
+    created_at   = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    started_at   = Column(DateTime)
+    finished_at  = Column(DateTime)
+    updated_at   = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        Index("ix_job_records_status_updated", "status", "updated_at"),
+        Index("ix_job_records_type_created", "job_type", "created_at"),
+    )
+
+
 # ── Вспомогательные функции ───────────────────────────────────────────────────
 
 def url_to_hash(url: str) -> str:
@@ -621,6 +644,97 @@ class Database:
                 .limit(1)
             )
             return result.scalar_one_or_none()
+
+    async def create_job(self, job_type: str, payload: dict | None = None, *, job_id: str | None = None) -> JobRecord:
+        now = datetime.now(UTC)
+        record = JobRecord(
+            job_id=job_id or uuid.uuid4().hex,
+            job_type=job_type,
+            status="queued",
+            payload_json=json.dumps(payload or {}, ensure_ascii=False, sort_keys=True),
+            progress=0,
+            created_at=now,
+            updated_at=now,
+        )
+        async with self.session() as s:
+            s.add(record)
+            await s.commit()
+            await s.refresh(record)
+            return record
+
+    async def start_job(self, job_id: str) -> JobRecord | None:
+        now = datetime.now(UTC)
+        async with self.session() as s:
+            record = await s.get(JobRecord, job_id)
+            if record is None:
+                return None
+            record.status = "running"
+            record.started_at = record.started_at or now
+            record.updated_at = now
+            await s.commit()
+            await s.refresh(record)
+            return record
+
+    async def update_job_progress(self, job_id: str, progress: int) -> JobRecord | None:
+        async with self.session() as s:
+            record = await s.get(JobRecord, job_id)
+            if record is None:
+                return None
+            record.progress = max(0, min(100, int(progress)))
+            record.updated_at = datetime.now(UTC)
+            await s.commit()
+            await s.refresh(record)
+            return record
+
+    async def finish_job(self, job_id: str, result: dict | None = None) -> JobRecord | None:
+        now = datetime.now(UTC)
+        async with self.session() as s:
+            record = await s.get(JobRecord, job_id)
+            if record is None:
+                return None
+            record.status = "succeeded"
+            record.progress = 100
+            record.result_json = json.dumps(result or {}, ensure_ascii=False, sort_keys=True)
+            record.finished_at = now
+            record.updated_at = now
+            await s.commit()
+            await s.refresh(record)
+            return record
+
+    async def fail_job(self, job_id: str, error: Exception | str) -> JobRecord | None:
+        now = datetime.now(UTC)
+        error_class = error.__class__.__name__ if isinstance(error, Exception) else "JobError"
+        error_text = str(error)[:1000]
+        async with self.session() as s:
+            record = await s.get(JobRecord, job_id)
+            if record is None:
+                return None
+            record.status = "failed"
+            record.error_class = error_class
+            record.error_text = error_text
+            record.finished_at = now
+            record.updated_at = now
+            await s.commit()
+            await s.refresh(record)
+            return record
+
+    async def get_recent_jobs(
+        self,
+        *,
+        status: str | None = None,
+        job_type: str | None = None,
+        limit: int = 50,
+    ) -> list[JobRecord]:
+        from sqlalchemy import desc, select
+
+        stmt = select(JobRecord).order_by(desc(JobRecord.updated_at)).limit(limit)
+        if status:
+            stmt = stmt.where(JobRecord.status == status)
+        if job_type:
+            stmt = stmt.where(JobRecord.job_type == job_type)
+        async with self.session() as s:
+            result = await s.execute(stmt)
+            return result.scalars().all()
 
     async def get_product_by_hash(self, url_hash: str) -> Product | None:
         from sqlalchemy import select

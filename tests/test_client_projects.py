@@ -335,6 +335,215 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(card_b["effective_snapshot"]["title"], "Исходное B")
         self.assertNotEqual(legacy["name"], "Ручное название A")
 
+    async def test_project_effective_card_seo_is_project_scoped(self):
+        project_a = await self._create_project("SEO A")
+        project_b = await self._create_project("SEO B")
+        await self._import_csv(project_a, "Кабель USB-C для зарядки 1 м")
+        await self._import_csv(project_b, "Товар")
+        product_id = await self._product_id(project_a)
+
+        seo_a = await self.client.get(f"/api/projects/{project_a}/products/{product_id}/seo")
+        seo_b = await self.client.get(f"/api/projects/{project_b}/products/{product_id}/seo")
+        page = await self.client.get(f"/projects/{project_a}/products/{product_id}")
+
+        self.assertEqual(seo_a.status_code, 200)
+        self.assertEqual(seo_b.status_code, 200)
+        self.assertIn("effective", seo_a.json())
+        self.assertIn("recommendations", seo_a.json()["effective"])
+        self.assertNotEqual(seo_a.json()["effective"]["score"], seo_b.json()["effective"]["score"])
+        self.assertIn("SEO-аудит карточки", page.text)
+
+    async def test_project_seo_api_возвращает_полную_структуру(self):
+        project_id = await self._create_project("SEO Структура")
+        await self._import_csv(project_id, "Товар для проверки структуры SEO")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        self.assertEqual(data["project_id"], project_id)
+        self.assertEqual(data["product_id"], product_id)
+        self.assertIn("source", data)
+        self.assertIn("effective", data)
+        self.assertIn("warnings", data)
+
+        for key in ("source", "effective"):
+            section = data[key]
+            self.assertIn("score", section)
+            self.assertIn("tier", section)
+            self.assertIn("ready", section)
+            self.assertIn("findings", section)
+            self.assertIn("recommendations", section)
+            self.assertIsInstance(section["findings"], list)
+            self.assertIsInstance(section["recommendations"], list)
+            self.assertIsInstance(section["score"], int)
+            self.assertIn(section["tier"], {"strong", "usable", "needs_work", "weak"})
+            self.assertIsInstance(section["ready"], bool)
+
+    async def test_project_seo_source_отличается_от_effective_после_правки(self):
+        project_id = await self._create_project("SEO Правка")
+        await self._import_csv(project_id, "Товар для проверки source vs effective")
+        product_id = await self._product_id(project_id)
+
+        draft = await self.client.post(
+            f"/api/projects/{project_id}/products/{product_id}/drafts",
+            json={"payload": {"title": "Улучшенное SEO название для карточки товара на маркетплейсе"}},
+        )
+        self.assertEqual(draft.status_code, 200)
+        apply_resp = await self.client.post(
+            f"/api/projects/{project_id}/products/{product_id}/drafts/{draft.json()['draft_id']}/apply",
+            json={"revision": draft.json()["revision"], "comment": "SEO улучшение"},
+        )
+        self.assertEqual(apply_resp.status_code, 200)
+
+        seo = (await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo")).json()
+        self.assertIn("source", seo)
+        self.assertIn("effective", seo)
+        self.assertIsInstance(seo["source"]["findings"], list)
+        self.assertIsInstance(seo["effective"]["findings"], list)
+
+    async def test_project_seo_страница_показывает_балл_и_уровень(self):
+        project_id = await self._create_project("SEO Отрисовка")
+        await self._import_csv(project_id, "Кабель USB-C для зарядки 1 м")
+        product_id = await self._product_id(project_id)
+
+        page = await self.client.get(f"/projects/{project_id}/products/{product_id}")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("SEO-аудит карточки", page.text)
+        self.assertIn(
+            f'hx-post="/api/projects/{project_id}/products/{product_id}/seo-suggestions"',
+            page.text,
+        )
+        self.assertNotIn("/seo-suggestions/", page.text)
+
+    async def test_project_seo_балл_целое_число_в_диапазоне(self):
+        project_id = await self._create_project("SEO Диапазон")
+        await self._import_csv(project_id, "Товар для проверки диапазона оценки")
+        product_id = await self._product_id(project_id)
+
+        seo = (await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo")).json()
+        for key in ("source", "effective"):
+            балл = seo[key]["score"]
+            self.assertIsInstance(балл, int)
+            self.assertGreaterEqual(балл, 0)
+            self.assertLessEqual(балл, 100)
+
+    async def test_project_seo_находки_имеют_все_поля(self):
+        project_id = await self._create_project("SEO Поля")
+        await self._import_csv(project_id, "Товар для проверки полей находок")
+        product_id = await self._product_id(project_id)
+
+        seo = (await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo")).json()
+        for key in ("source", "effective"):
+            for находка in seo[key]["findings"]:
+                self.assertIn("rule", находка)
+                self.assertIn("field", находка)
+                self.assertIn("severity", находка)
+                self.assertIn("message", находка)
+                self.assertIn(находка["severity"], {"critical", "warning", "info"})
+            for rec in seo[key]["recommendations"]:
+                self.assertIn("field", rec)
+                self.assertIn("action", rec)
+                self.assertIn("priority", rec)
+                self.assertIn("reason", rec)
+                self.assertIn(rec["priority"], {1, 2, 3})
+
+    async def test_project_seo_404_для_несуществующего_товара(self):
+        project_id = await self._create_project("SEO 404")
+        resp = await self.client.get(f"/api/projects/{project_id}/products/99999/seo")
+        self.assertEqual(resp.status_code, 404)
+
+    async def test_project_seo_независимость_между_проектами(self):
+        project_a = await self._create_project("Независимость A")
+        project_b = await self._create_project("Независимость B")
+        await self._import_csv(project_a, "Кабель USB-C для зарядки 1 м")
+        await self._import_csv(project_b, "Товар")
+        product_id = await self._product_id(project_a)
+
+        seo_a = (await self.client.get(f"/api/projects/{project_a}/products/{product_id}/seo")).json()
+        seo_b = (await self.client.get(f"/api/projects/{project_b}/products/{product_id}/seo")).json()
+
+        self.assertNotEqual(seo_a["effective"]["score"], seo_b["effective"]["score"])
+
+    async def test_project_semantic_core_endpoint_возвращает_данные(self):
+        project_id = await self._create_project("Semantic Core")
+        await self._import_csv(project_id, "Кабель USB-C для зарядки 1 м")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/semantic-core")
+        self.assertEqual(resp.status_code, 200)
+        данные = resp.json()
+
+        self.assertEqual(данные["project_id"], project_id)
+        self.assertEqual(данные["product_id"], product_id)
+        self.assertIn("primary_terms", данные)
+        self.assertIn("secondary_terms", данные)
+        self.assertIn("long_tail_terms", данные)
+        self.assertIn("coverage_score", данные)
+        self.assertIn("junk_ratio", данные)
+        self.assertIsInstance(данные["primary_terms"], list)
+        self.assertIsInstance(данные["coverage_score"], float)
+        self.assertGreaterEqual(данные["coverage_score"], 0)
+        self.assertLessEqual(данные["coverage_score"], 1)
+
+    async def test_project_semantic_core_не_мутирует_бд(self):
+        project_id = await self._create_project("Semantic No Mutate")
+        await self._import_csv(project_id, "Товар для проверки")
+        product_id = await self._product_id(project_id)
+
+        до = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/effective-card")
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/semantic-core")
+        после = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/effective-card")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(до.json()["effective_snapshot"], после.json()["effective_snapshot"])
+
+    async def test_project_seo_read_не_пишет_history(self):
+        from app.effective_card.service import EffectiveProductCardService
+        from app.seo_history import SEOHistoryService
+
+        project_id = await self._create_project("SEO History Read")
+        await self._import_csv(project_id, "Товар для проверки history")
+        product_id = await self._product_id(project_id)
+        history = SEOHistoryService()
+        service = EffectiveProductCardService(self.db, seo_history=history)
+
+        result = await service.seo(project_id, product_id)
+
+        self.assertEqual(result["history"], [])
+        self.assertEqual(await history.get_history(project_id, product_id), [])
+
+    async def test_список_товаров_проекта_содержит_seo_балл_и_уровень(self):
+        project_id = await self._create_project("SEO Список")
+        await self._import_csv(project_id, "Кабель USB-C для зарядки 1 м")
+        await self._import_csv(project_id, "Товар без данных")
+
+        страница = await self.client.get(f"/projects/{project_id}/products")
+        self.assertEqual(страница.status_code, 200)
+        self.assertIn("SEO", страница.text)
+
+    async def test_список_товаров_seo_балл_в_диапазоне(self):
+        project_id = await self._create_project("SEO Диапазон Список")
+        await self._import_csv(project_id, "Товар для проверки SEO в списке")
+        product_id = await self._product_id(project_id)
+
+        seo = (await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo")).json()
+        балл = seo["effective"]["score"]
+        self.assertIsInstance(балл, int)
+        self.assertGreaterEqual(балл, 0)
+        self.assertLessEqual(балл, 100)
+
+    async def test_список_товаров_seo_уровень_отображается(self):
+        project_id = await self._create_project("SEO Уровень Список")
+        await self._import_csv(project_id, "Кабель USB-C для зарядки 1 м")
+
+        страница = await self.client.get(f"/projects/{project_id}/products")
+        self.assertEqual(страница.status_code, 200)
+        ожидаемые_метки = {"Сильная", "ОК", "Доработка", "Слабая"}
+        найденные = ожидаемые_метки & set(страница.text.split())
+        self.assertTrue(найденные, f"Ни одна метка уровня не найдена в {страница.text[:500]}")
+
     async def test_export_uses_effective_card_and_sanitizes_formula_values(self):
         from app.exports.safety import sanitize_spreadsheet_cell
 
@@ -362,6 +571,33 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sanitize_spreadsheet_cell("@SUM(A1:A2)"), "'@SUM(A1:A2)")
         self.assertEqual(sanitize_spreadsheet_cell("  =1+1"), "'  =1+1")
         self.assertEqual(sanitize_spreadsheet_cell("\t=1+1"), "'\t=1+1")
+
+    async def test_export_preview_contains_seo_fields(self):
+        project_id = await self._create_project("Export SEO")
+        await self._import_csv(project_id, "Кабель USB-C для зарядки 1 м")
+
+        preview = await self.client.get(f"/api/projects/{project_id}/export-preview")
+        self.assertEqual(preview.status_code, 200)
+        items = preview.json()["items"]
+        self.assertEqual(len(items), 1)
+        item = items[0]
+
+        self.assertIn("seo_score", item)
+        self.assertIn("seo_tier", item)
+        self.assertIn("seo_ready", item)
+        self.assertIn("seo_recommendations", item)
+        self.assertIn("seo_critical_issues", item)
+        self.assertIn("seo_warning_issues", item)
+
+        self.assertIsInstance(item["seo_score"], int)
+        self.assertGreaterEqual(item["seo_score"], 0)
+        self.assertLessEqual(item["seo_score"], 100)
+
+        self.assertIn(item["seo_tier"], {"strong", "usable", "needs_work", "weak"})
+
+        self.assertIn(item["seo_ready"], {"да", "нет"})
+        self.assertIsInstance(item["seo_critical_issues"], int)
+        self.assertIsInstance(item["seo_warning_issues"], int)
 
     async def test_json_and_xlsx_exports_use_effective_card_and_manifest_checksum(self):
         project_id = await self._create_project("Formats")
@@ -545,6 +781,48 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(created.status_code, 200)
         self.assertIn("reports/", created.json()["relative_path"])
 
+    async def test_report_preview_содержит_seo_сводку(self):
+        project_id = await self._create_project("SEO Отчёт")
+        await self._import_csv(project_id, "Кабель USB-C для зарядки 1 м")
+
+        preview = await self.client.get(f"/api/projects/{project_id}/report-preview")
+        self.assertEqual(preview.status_code, 200)
+        данные = preview.json()
+
+        self.assertIn("seo_summary", данные)
+        сводка = данные["seo_summary"]
+        self.assertIn("average_score", сводка)
+        self.assertIn("distribution", сводка)
+        self.assertIn("worst_cards", сводка)
+        self.assertIn("top_problems", сводка)
+
+        self.assertIsInstance(сводка["average_score"], (int, float))
+        self.assertGreaterEqual(сводка["average_score"], 0)
+        self.assertLessEqual(сводка["average_score"], 100)
+
+        распределение = сводка["distribution"]
+        for уровень in ("strong", "usable", "needs_work", "weak"):
+            self.assertIn(уровень, распределение)
+            self.assertIsInstance(распределение[уровень], int)
+
+        self.assertIsInstance(сводка["worst_cards"], list)
+        if сводка["worst_cards"]:
+            карточка = сводка["worst_cards"][0]
+            self.assertIn("product_id", карточка)
+            self.assertIn("title", карточка)
+            self.assertIn("score", карточка)
+            self.assertIn("tier", карточка)
+
+        self.assertIsInstance(сводка["top_problems"], list)
+        self.assertIn("semantic", сводка)
+        semantic = сводка["semantic"]
+        self.assertIn("average_coverage_score", semantic)
+        self.assertIn("average_junk_ratio", semantic)
+        self.assertIn("cards_without_primary_terms", semantic)
+        self.assertIn("top_terms", semantic)
+        self.assertGreaterEqual(semantic["average_coverage_score"], 0)
+        self.assertLessEqual(semantic["average_coverage_score"], 1)
+
     async def test_unsupported_import_format_returns_422(self):
         project_id = await self._create_project("Bad file")
         response = await self.client.post(
@@ -552,6 +830,185 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
             files={"file": ("bad.exe", b"not a table", "application/octet-stream")},
         )
         self.assertEqual(response.status_code, 422)
+
+    async def test_xlsx_export_contains_seo_headers(self):
+        """XLSX-экспорт содержит SEO-заголовки."""
+        project_id = await self._create_project("SEO XLSX")
+        await self._import_csv(project_id, "SEO-товар")
+        xlsx_export = await self.client.post(
+            f"/api/projects/{project_id}/exports",
+            json={"file_format": "xlsx"},
+        )
+        self.assertEqual(xlsx_export.status_code, 200)
+        path = Path(os.environ["MARKETMIND_WORKSPACE_DIR"]) / "projects" / project_id / xlsx_export.json()["relative_path"]
+        wb = openpyxl.load_workbook(path)
+        headers = [cell.value for cell in wb.active[1]]
+        self.assertIn("seo_score", headers)
+        self.assertIn("seo_level", headers)
+        self.assertIn("seo_ready", headers)
+        self.assertIn("seo_recommendations", headers)
+        self.assertIn("seo_critical_issues", headers)
+        self.assertIn("seo_warning_issues", headers)
+        wb.close()
+
+    async def test_csv_export_contains_seo_score_and_can_be_read_back(self):
+        """CSV-экспорт содержит seo_score и читается обратно."""
+        project_id = await self._create_project("SEO CSV")
+        await self._import_csv(project_id, "CSV SEO-товар")
+        export = await self.client.post(
+            f"/api/projects/{project_id}/exports",
+            json={"file_format": "csv"},
+        )
+        self.assertEqual(export.status_code, 200)
+        path = Path(os.environ["MARKETMIND_WORKSPACE_DIR"]) / "projects" / project_id / export.json()["relative_path"]
+        rows = list(csv.DictReader(io.StringIO(path.read_text(encoding="utf-8-sig"))))
+        self.assertEqual(len(rows), 1)
+        self.assertIn("seo_score", rows[0])
+        self.assertIn("seo_tier", rows[0])
+        self.assertIn("seo_ready", rows[0])
+        self.assertIn("seo_recommendations", rows[0])
+        self.assertTrue(rows[0]["seo_score"].isdigit())
+
+    async def test_seo_recommendations_formula_values_are_sanitized(self):
+        """Значения с формулами в SEO-рекомендациях санитизируются."""
+        from app.exports.safety import sanitize_spreadsheet_cell
+        self.assertEqual(sanitize_spreadsheet_cell("=HOOK()"), "'=HOOK()")
+        self.assertEqual(sanitize_spreadsheet_cell("+CMD()"), "'+CMD()")
+        self.assertEqual(sanitize_spreadsheet_cell("-EXEC()"), "'-EXEC()")
+        self.assertEqual(sanitize_spreadsheet_cell("@SYSTEM()"), "'@SYSTEM()")
+        self.assertEqual(sanitize_spreadsheet_cell("Сильная"), "Сильная")
+
+    # --- SEO Suggestions (Phase 5) ---
+
+    async def test_seo_suggestions_endpoint_returns_list(self):
+        """Endpoint seo-suggestions возвращает список."""
+        project_id = await self._create_project("SEO Sug")
+        await self._import_csv(project_id, "Кабель USB-C для зарядки 1 м")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIsInstance(data, list)
+
+    async def test_seo_suggestions_contain_required_fields(self):
+        """Каждая SEO suggestion содержит все обязательные поля."""
+        project_id = await self._create_project("SEO Fields")
+        await self._import_csv(project_id, "Товар для SEO полей")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        self.assertEqual(resp.status_code, 200)
+        for item in resp.json():
+            self.assertIn("product_id", item)
+            self.assertIn("field", item)
+            self.assertIn("suggestion_type", item)
+            self.assertIn("before", item)
+            self.assertIn("after", item)
+            self.assertIn("reason", item)
+            self.assertIn("confidence", item)
+            self.assertIn("source_finding", item)
+            self.assertIn("status", item)
+
+    async def test_seo_suggestions_type_is_rewrite_or_expand(self):
+        """suggestion_type равен 'rewrite' или 'expand'."""
+        project_id = await self._create_project("SEO Type")
+        await self._import_csv(project_id, "Товар для проверки типа")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        self.assertEqual(resp.status_code, 200)
+        for item in resp.json():
+            self.assertIn(item["suggestion_type"], {"rewrite", "expand"})
+
+    async def test_seo_suggestions_before_not_equal_after(self):
+        """before отличается от after в каждой SEO suggestion."""
+        project_id = await self._create_project("SEO Diff")
+        await self._import_csv(project_id, "Товар для проверки отличий")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        self.assertEqual(resp.status_code, 200)
+        for item in resp.json():
+            self.assertNotEqual(item["before"], item["after"], "before и after не должны совпадать")
+
+    async def test_seo_suggestions_confidence_in_range(self):
+        """confidence находится в диапазоне 0.3-0.7."""
+        project_id = await self._create_project("SEO Conf")
+        await self._import_csv(project_id, "Товар для проверки confidence")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        self.assertEqual(resp.status_code, 200)
+        for item in resp.json():
+            self.assertGreaterEqual(item["confidence"], 0.3)
+            self.assertLessEqual(item["confidence"], 0.7)
+
+    async def test_seo_suggestions_preview_status_is_draft(self):
+        """GET seo-suggestions возвращает черновой preview без записи в approval queue."""
+        project_id = await self._create_project("SEO Pending")
+        await self._import_csv(project_id, "Товар для проверки статуса")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        self.assertEqual(resp.status_code, 200)
+        for item in resp.json():
+            self.assertEqual(item["status"], "draft")
+            self.assertNotIn("approval_id", item)
+
+    async def test_seo_suggestions_post_queues_pending_approvals(self):
+        """POST seo-suggestions создаёт реальные pending-записи approval workflow."""
+        project_id = await self._create_project("SEO Queue")
+        await self._import_csv(project_id, "лучший кабель USB-C для зарядки 1 м")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.post(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertGreater(data["queued"], 0)
+        self.assertEqual(data["queued"], len(data["items"]))
+        self.assertTrue(all(item["status"] == "pending" for item in data["items"]))
+        self.assertTrue(all(item["approval_id"] for item in data["items"]))
+
+        queued = await self.client.get("/api/suggestions?status=pending")
+        self.assertEqual(queued.status_code, 200)
+        approval_ids = {item["approval_id"] for item in queued.json()}
+        self.assertTrue({item["approval_id"] for item in data["items"]}.issubset(approval_ids))
+
+    async def test_seo_suggestions_htmx_post_returns_html_and_queues(self):
+        """HTMX-кнопка согласования использует тот же реальный approval workflow."""
+        project_id = await self._create_project("SEO HTMX Queue")
+        await self._import_csv(project_id, "лучший кабель USB-C для зарядки 1 м")
+        product_id = await self._product_id(project_id)
+
+        resp = await self.client.post(
+            f"/api/projects/{project_id}/products/{product_id}/seo-suggestions",
+            headers={"HX-Request": "true"},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/html", resp.headers["content-type"])
+        self.assertIn("Поставлено в согласование", resp.text)
+        queued = await self.client.get("/api/suggestions?status=pending")
+        self.assertGreater(len(queued.json()), 0)
+
+    async def test_seo_suggestions_no_auto_apply(self):
+        """SEO suggestions не применяются автоматически -- эффективная карточка не меняется."""
+        project_id = await self._create_project("SEO NoAuto")
+        await self._import_csv(project_id, "Товар без автоприменения")
+        product_id = await self._product_id(project_id)
+
+        card_before = (await self.client.get(f"/api/projects/{project_id}/products/{product_id}/effective-card")).json()
+        _ = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
+        card_after = (await self.client.get(f"/api/projects/{project_id}/products/{product_id}/effective-card")).json()
+
+        self.assertEqual(card_before["effective_snapshot"], card_after["effective_snapshot"])
+
+    async def test_seo_suggestions_404_for_nonexistent_product(self):
+        """SEO suggestions возвращают 404 для несуществующего товара."""
+        project_id = await self._create_project("SEO 404")
+        resp = await self.client.get(f"/api/projects/{project_id}/products/99999/seo-suggestions")
+        self.assertEqual(resp.status_code, 404)
 
 
 if __name__ == "__main__":

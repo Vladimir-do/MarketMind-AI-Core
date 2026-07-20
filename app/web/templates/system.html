@@ -17,6 +17,7 @@
 <section class="bg-white border rounded p-5 mb-5">
   <h2 class="font-semibold mb-3">Пути и ресурсы</h2>
   <dl class="grid gap-2 text-sm">
+    <div><dt class="font-medium">Backend БД</dt><dd class="text-gray-700">{{ status.database_backend }}</dd></div>
     <div><dt class="font-medium">Рабочая БД</dt><dd class="text-gray-700 break-all">{{ status.database_path }}</dd></div>
     <div><dt class="font-medium">Workspace</dt><dd class="text-gray-700 break-all">{{ status.workspace_path }}</dd></div>
     <div><dt class="font-medium">Runtime home</dt><dd class="text-gray-700 break-all">{{ status.runtime_home }}</dd></div>
@@ -26,6 +27,45 @@
     <div><dt class="font-medium">Активных проектов</dt><dd class="text-gray-700">{{ status.active_project_count }}</dd></div>
     <div><dt class="font-medium">Последняя резервная копия</dt><dd class="text-gray-700">{{ status.last_backup.name if status.last_backup else "нет" }}</dd></div>
   </dl>
+</section>
+
+<section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">Runtime stack</h2>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="py-2 pr-4">Слой</th>
+          <th class="py-2 pr-4">Технология</th>
+          <th class="py-2 pr-4">Версия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for component in status.stack %}
+        <tr class="border-b last:border-b-0">
+          <td class="py-2 pr-4 text-gray-600">{{ component.layer }}</td>
+          <td class="py-2 pr-4">{{ component.technology }}</td>
+          <td class="py-2 pr-4 text-gray-700">{{ component.version }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">Production readiness</h2>
+  <div class="grid gap-2">
+    {% for check in status.readiness %}
+    <div class="border rounded p-3 {% if check.status == 'ok' %}border-green-200 bg-green-50{% elif check.status == 'action' %}border-red-200 bg-red-50{% else %}border-yellow-200 bg-yellow-50{% endif %}">
+      <div class="flex items-center justify-between gap-3">
+        <div class="font-medium">{{ check.title }}</div>
+        <div class="text-xs uppercase tracking-wide">{{ check.status }}</div>
+      </div>
+      <div class="text-sm text-gray-700 mt-1">{{ check.detail }}</div>
+    </div>
+    {% endfor %}
+  </div>
 </section>
 
 <section class="bg-white border rounded p-5 mb-5">

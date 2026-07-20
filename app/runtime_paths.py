@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 
 from app.config import DATABASE_URL, MARKETMIND_WORKSPACE_DIR, PROJECT_ROOT, RUNTIME_DATA_DIR
 from app.database import ClientProject, Database
+from app.stack_status import database_backend, readiness_checks, runtime_stack
 
 LOW_SPACE_BYTES = 1024 * 1024 * 1024
 WORK_MODE_MESSAGE = "РАБОЧИЙ РЕЖИМ. ДАННЫЕ СОХРАНЯЮТСЯ"
@@ -111,6 +112,7 @@ async def system_status(db: Database) -> dict:
         warnings.append("Осталось мало свободного места.")
     return {
         "mode": runtime_banner(),
+        "database_backend": database_backend(),
         "database_path": str(db_path) if db_path else DATABASE_URL,
         "workspace_path": str(workspace_path),
         "runtime_home": str(layout.home),
@@ -120,6 +122,8 @@ async def system_status(db: Database) -> dict:
         "schema_version": read_schema_version(db_path),
         "project_count": int(total_projects or 0),
         "active_project_count": int(active_projects or 0),
+        "stack": runtime_stack(),
+        "readiness": readiness_checks(schema_version=read_schema_version(db_path)),
         "warnings": warnings,
     }
 
