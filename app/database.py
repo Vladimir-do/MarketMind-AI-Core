@@ -361,6 +361,59 @@ class ProductCardVersion(Base):
     )
 
 
+class ContentPipelineArtifact(Base):
+    __tablename__ = "content_pipeline_artifacts"
+
+    artifact_id       = Column(String(64), primary_key=True)
+    project_id        = Column(String(64), ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False)
+    project_product_id = Column(String(64), ForeignKey("project_products.project_product_id", ondelete="CASCADE"), nullable=False)
+    product_id        = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    artifact_type     = Column(String(32), nullable=False)  # content_strategy | semantic_plan | fact_check_report | quality_report
+    version_number    = Column(Integer, nullable=False)
+    payload_json      = Column(Text, nullable=False)
+    schema_version    = Column(Integer, nullable=False, default=1)
+    prompt_id         = Column(String(64))
+    prompt_version    = Column(String(16))
+    model_used        = Column(String(64))
+    job_id            = Column(String(64), ForeignKey("job_records.job_id", ondelete="SET NULL"))
+    created_at        = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        Index(
+            "ix_cpa_project_product_type_version",
+            "project_id", "project_product_id", "artifact_type", "version_number",
+            unique=True,
+        ),
+        Index("ix_cpa_product_type_created", "product_id", "artifact_type", "created_at"),
+    )
+
+
+class CompetitorSnapshot(Base):
+    __tablename__ = "competitor_snapshots"
+
+    snapshot_id       = Column(String(64), primary_key=True)
+    batch_id          = Column(String(64), nullable=False)
+    project_id        = Column(String(64), ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False)
+    project_product_id = Column(String(64), ForeignKey("project_products.project_product_id", ondelete="CASCADE"), nullable=False)
+    product_id        = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    marketplace       = Column(String(32), nullable=False)
+    competitor_name   = Column(Text, nullable=False)
+    competitor_url    = Column(Text, nullable=False)
+    price             = Column(Integer)
+    old_price         = Column(Integer)
+    rating            = Column(Float)
+    reviews_count     = Column(Integer)
+    reviews_json      = Column(Text)
+    search_query      = Column(Text, nullable=False)
+    created_at        = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        Index("ix_competitor_snapshots_batch", "batch_id"),
+        Index("ix_competitor_snapshots_project_product_created", "project_id", "project_product_id", "created_at"),
+        Index("ix_competitor_snapshots_product_id", "product_id"),
+    )
+
+
 class DomainEventRecord(Base):
     __tablename__ = "domain_event_records"
 
