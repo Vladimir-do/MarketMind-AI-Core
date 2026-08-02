@@ -31,7 +31,7 @@ _PROVIDER_MODELS: dict[ProviderType, str] = {
     ProviderType.ollama: "llama3",
     ProviderType.claude: "claude-3-haiku-20240307",
     ProviderType.grok: "grok-1",
-    ProviderType.gemini: "gemini-1.5-flash",
+    ProviderType.gemini: "gemini-2.5-flash",
     ProviderType.groq: "llama-3.3-70b-versatile",
 }
 
