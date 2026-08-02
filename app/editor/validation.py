@@ -61,6 +61,14 @@ def validate_card_payload(payload: dict[str, Any]) -> ValidationResult:
             issues.append(ValidationIssue("attributes", "Характеристика или значение слишком длинные"))
             break
 
+    selling_points = data.get("selling_points") or []
+    if len(selling_points) > 20:
+        issues.append(ValidationIssue("selling_points", "Нельзя указать больше 20 преимуществ"))
+    for point in selling_points:
+        if len(str(point)) > 300:
+            issues.append(ValidationIssue("selling_points", "Преимущество не должно быть длиннее 300 символов"))
+            break
+
     text = f"{title} {description or ''}".lower()
     for phrase in _BANNED_PHRASES:
         if phrase in text:

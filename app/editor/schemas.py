@@ -19,6 +19,7 @@ class EditableProductCard:
     attributes: dict[str, str] = field(default_factory=dict)
     marketplace: str = "unknown"
     external_product_id: str | None = None
+    selling_points: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -91,6 +92,18 @@ def normalize_card_payload(payload: dict[str, Any]) -> dict[str, Any]:
             if clean_key and clean_value:
                 attrs[clean_key] = clean_value
         result["attributes"] = attrs
+    if "selling_points" in result:
+        raw_points = result.get("selling_points") or []
+        if isinstance(raw_points, str):
+            raw_points = raw_points.split("\n")
+        seen_points: set[str] = set()
+        points = []
+        for item in raw_points:
+            text = " ".join(str(item).strip().split())
+            if text and text not in seen_points:
+                seen_points.add(text)
+                points.append(text)
+        result["selling_points"] = points
     if "price" in result and result["price"] not in (None, ""):
         result["price"] = int(result["price"])
     return result
