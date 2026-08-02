@@ -646,6 +646,9 @@ async def api_project_market_analysis(project_id: str, request: Request):
         )
         rows = market_analysis_products_to_rows(analysis)
         if not rows:
+            message = "Рынок ответил пустой выдачей. Попробуйте более широкий запрос или другой маркетплейс."
+            if analysis.ozon_blocked_message:
+                message = analysis.ozon_blocked_message + " Попробуйте Wildberries или Яндекс Маркет."
             response = {
                 "status": "empty",
                 "project_id": project_id,
@@ -656,7 +659,7 @@ async def api_project_market_analysis(project_id: str, request: Request):
                 "total_products": 0,
                 "changed_products": 0,
                 "errors": 0,
-                "message": "Рынок ответил пустой выдачей. Попробуйте более широкий запрос или другой маркетплейс.",
+                "message": message,
             }
             if _is_hx(request):
                 return templates.TemplateResponse(request, "project_market_analysis_result.html", response)

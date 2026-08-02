@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from app.parsers.base import ProductData
 from app.parsers.router import search_all_marketplaces
 from app.parsers.wildberries import WildberriesParser
+from app.searcher import ozon_search_blocked_message
 
 SUPPORTED_MARKET_ANALYSIS_MARKETPLACES = {"wildberries", "ozon", "yandex_market", "all"}
 TOO_BROAD_MARKET_ANALYSIS_QUERIES = {
@@ -50,6 +51,7 @@ class MarketAnalysisResult:
     marketplace: str
     products: list[ProductData]
     executed_queries: list[str] = field(default_factory=list)
+    ozon_blocked_message: str | None = None
 
     @property
     def found_count(self) -> int:
@@ -128,11 +130,14 @@ async def run_market_analysis(query: str, *, marketplace: str = "wildberries", m
         if len(products) >= bounded_limit:
             break
 
+    ozon_message = ozon_search_blocked_message() if normalized_marketplace in ("ozon", "all") else None
+
     return MarketAnalysisResult(
         query=normalized_query,
         marketplace=normalized_marketplace,
         products=products,
         executed_queries=search_queries,
+        ozon_blocked_message=ozon_message,
     )
 
 
