@@ -5,7 +5,7 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.database import Database
+from tests.helpers import reload_app_modules
 
 
 class _FakeGeminiResponse:
@@ -87,7 +87,9 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             return _FakeGeminiSession(response=response)
 
         job_id = f"test-429-{uuid.uuid4().hex[:8]}"
-        db = Database()
+        _, database = reload_app_modules(database_url="sqlite+aiosqlite://")
+        db = database.Database()
+        await db.init()
         mock_app = MagicMock()
         mock_app.state.db = db
         mock_app.state.ai_queue = None
@@ -120,7 +122,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(job.status, "failed")
         self.assertIn("429", job.error_text)
-        self.assertIn("квот", job.error_text.lower())
+        self.assertIn("quota", job.error_text.lower())
         self.assertNotIn("TimeoutError", job.error_text)
         self.assertNotIn("test-key", job.error_text)
 
@@ -139,7 +141,9 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             return _FakeGeminiSession(exc=TimeoutError("connection timed out"))
 
         job_id = f"test-timeout-{uuid.uuid4().hex[:8]}"
-        db = Database()
+        _, database = reload_app_modules(database_url="sqlite+aiosqlite://")
+        db = database.Database()
+        await db.init()
         mock_app = MagicMock()
         mock_app.state.db = db
         mock_app.state.ai_queue = None
@@ -196,7 +200,9 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             return _FakeGeminiSession(response=error_response)
 
         job_id = f"test-noapproval-{uuid.uuid4().hex[:8]}"
-        db = Database()
+        _, database = reload_app_modules(database_url="sqlite+aiosqlite://")
+        db = database.Database()
+        await db.init()
         mock_app = MagicMock()
         mock_app.state.db = db
         mock_app.state.ai_queue = None

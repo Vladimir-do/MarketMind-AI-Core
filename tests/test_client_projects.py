@@ -1,14 +1,15 @@
-import json
 import csv
 import io
+import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import openpyxl
 
+from app.ai_recommendation.provider import AIResponse
 from app.parsers.base import ProductData
 from tests.helpers import reload_app_modules
 
@@ -35,33 +36,41 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.app = create_app()
         self.app.state.db = self.db
         self.client = AsyncClient(transport=ASGITransport(app=self.app), base_url="http://testserver")
-        self.ask_ai_patch = patch(
-            "app.ai_recommendation.job_queue.ask_ai",
-            new=AsyncMock(
-                return_value=json.dumps(
-                    [
-                        {
-                            "field": "title",
-                            "suggestion_type": "improve",
-                            "before": "Старый заголовок",
-                            "after": "Новый улучшенный заголовок",
-                            "reason": "SEO оптимизация заголовка",
-                            "confidence": 0.85,
-                            "source_finding": "seo_title_forbidden_words",
-                        },
-                        {
-                            "field": "description",
-                            "suggestion_type": "expand",
-                            "before": "Краткое описание",
-                            "after": "Развёрнутое описание с характеристиками и преимуществами товара",
-                            "reason": "Описание нужно расширить для поиска и конверсии",
-                            "confidence": 0.78,
-                            "source_finding": "seo_description_forbidden_words",
-                        },
-                    ],
-                    ensure_ascii=False,
-                )
+        fake_response = AIResponse(
+            text=json.dumps(
+                [
+                    {
+                        "field": "title",
+                        "suggestion_type": "improve",
+                        "before": "Старый заголовок",
+                        "after": "Новый улучшенный заголовок",
+                        "reason": "SEO оптимизация заголовка",
+                        "confidence": 0.85,
+                        "source_finding": "seo_title_forbidden_words",
+                    },
+                    {
+                        "field": "description",
+                        "suggestion_type": "expand",
+                        "before": "Краткое описание",
+                        "after": "Развёрнутое описание с характеристиками и преимуществами товара",
+                        "reason": "Описание нужно расширить для поиска и конверсии",
+                        "confidence": 0.78,
+                        "source_finding": "seo_description_forbidden_words",
+                    },
+                ],
+                ensure_ascii=False,
             ),
+            model="mock-model",
+        )
+        fake_provider = MagicMock()
+        fake_provider.is_available.return_value = True
+        fake_provider.name.return_value = "mock"
+        fake_provider.complete = AsyncMock(return_value=fake_response)
+        # job_queue.py вызывает create_configured_provider() + provider.complete(...)
+        # (ask_ai() больше не используется этим модулем).
+        self.ask_ai_patch = patch(
+            "app.ai_recommendation.job_queue.create_configured_provider",
+            return_value=fake_provider,
         )
         self.ask_ai_patch.start()
 
