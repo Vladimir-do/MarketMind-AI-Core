@@ -42,6 +42,7 @@ def main():
     parser.add_argument("--ai-test", action="store_true", help="Test AI recommendation layer end-to-end with sample data")
     parser.add_argument("--web", action="store_true", help="Запустить веб-интерфейс (FastAPI)")
     parser.add_argument("--port", type=int, default=None, help="Порт для --web (по умолчанию 8000)")
+    parser.add_argument("--host", default="0.0.0.0", help="Хост для --web (по умолчанию 0.0.0.0)")
     args = parser.parse_args()
 
     # Run Alembic migrations if requested
@@ -268,7 +269,7 @@ def main():
         from app.web.app import create_app
 
         application = create_app()
-        uvicorn.run(application, host="0.0.0.0", port=args.port or 8000)
+        uvicorn.run(application, host=args.host, port=args.port or 8000)
 
     elif args.enrich:
         if not args.out:
