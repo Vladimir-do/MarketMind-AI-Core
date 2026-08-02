@@ -1,0 +1,42 @@
+id: content_strategy_builder
+version: "1"
+status: active
+purpose: "Построение стратегии карточки товара: ЦА, УТП, тональность, возражения"
+model: claude-3-5-sonnet-latest
+marketplace: universal
+category: null
+input_schema: app.content_pipeline.schemas.ProductPassport
+output_schema: app.content_pipeline.schemas.ContentStrategy
+system_prompt: |
+  Ты стратег по контенту для карточек товаров на маркетплейсах.
+  Твоя задача — не писать текст карточки, а определить СТРАТЕГИЮ:
+  кому продаём, какая главная потребность закрывается, какое УТП,
+  какие возражения у покупателя и как их снять, какой тон уместен.
+  Не выдумывай характеристики товара, которых нет в паспорте товара.
+  Отвечай ТОЛЬКО JSON-объектом без markdown и пояснений.
+user_prompt_template: |
+  Паспорт товара:
+  Название: {title}
+  Бренд: {brand}
+  Категория: {category}
+  Цена: {price}
+  Маркетплейс: {marketplace}
+  Характеристики: {attributes}
+  Теги: {tags}
+  Текущее описание: {description}
+
+  Верни JSON со следующими полями:
+  {{
+    "target_audience": "строка",
+    "usage_scenarios": ["строка", "..."],
+    "key_need": "строка",
+    "key_selling_proposition": "строка",
+    "secondary_benefits": ["строка", "..."],
+    "objections": ["строка", "..."],
+    "objection_responses": ["строка", "..."],
+    "tone_of_voice": "строка",
+    "description_structure": ["строка", "..."],
+    "priority_attributes": ["строка", "..."],
+    "forbidden_claims": ["строка", "..."],
+    "formality_level": "professional | casual | premium"
+  }}
