@@ -1,0 +1,52 @@
+<div id="ai-suggestions-panel" class="bg-white rounded-lg shadow p-6">
+  <div class="flex items-center justify-between gap-3 mb-3">
+    <h2 class="text-xl font-bold">ИИ-предложения</h2>
+    <button hx-post="/api/products/{{ product.id }}/ai-suggestions"
+            hx-target="#ai-suggestions-panel"
+            hx-swap="outerHTML"
+            class="px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+      В очередь
+    </button>
+  </div>
+
+  {% if ai_message %}
+  <div class="mb-4 rounded border p-3 text-sm {{ 'border-green-200 bg-green-50 text-green-800' if ai_message_type == 'success' else 'border-yellow-200 bg-yellow-50 text-yellow-900' }}">
+    {{ ai_message }}
+    {% if job_id %}
+    <div class="mt-1 text-xs text-gray-500">Job: {{ job_id }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if suggestions %}
+  <div class="space-y-3">
+    {% for s in suggestions %}
+    <div class="border rounded p-4 flex items-start gap-4" id="suggestion-{{ s.approval_id }}">
+      <div class="flex-1">
+        <div class="text-sm font-medium text-gray-700">Поле: {{ s.field }}</div>
+        <div class="text-xs text-gray-400 mb-2">{{ s.suggestion_type }} &middot; уверенность {{ (s.confidence * 100)|int }}%</div>
+        <div class="flex gap-4 text-sm">
+          <div class="bg-red-50 border border-red-200 rounded px-3 py-1 flex-1">
+            <div class="text-xs text-red-500 mb-1">Было</div>
+            <div class="text-red-700">{{ s.before_value or '(пусто)' }}</div>
+          </div>
+          <div class="bg-green-50 border border-green-200 rounded px-3 py-1 flex-1">
+            <div class="text-xs text-green-500 mb-1">Стало</div>
+            <div class="text-green-700">{{ s.after_value }}</div>
+          </div>
+        </div>
+        <div class="text-xs text-gray-400 mt-2">{{ s.reason }}</div>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        <button hx-post="/suggestions/{{ s.approval_id }}/approve" hx-target="#suggestion-{{ s.approval_id }}" hx-swap="outerHTML"
+                class="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">Принять</button>
+        <button hx-post="/suggestions/{{ s.approval_id }}/reject" hx-target="#suggestion-{{ s.approval_id }}" hx-swap="outerHTML"
+                class="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">Отклонить</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-sm text-gray-500">Пока нет ИИ-предложений для этой карточки.</div>
+  {% endif %}
+</div>

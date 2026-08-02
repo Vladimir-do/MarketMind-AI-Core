@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Отчёт проекта - MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Отчёт проекта</h1>
+<p class="text-gray-600 mb-4">{{ project.name }}</p>
+<div class="grid md:grid-cols-4 gap-3 mb-6">
+  <div class="bg-white border rounded p-4"><div class="text-sm text-gray-500">Товаров</div><div class="text-2xl font-bold">{{ report.total_products }}</div></div>
+  <div class="bg-white border rounded p-4"><div class="text-sm text-gray-500">Score до</div><div class="text-2xl font-bold">{{ report.average_source_quality_score }}</div></div>
+  <div class="bg-white border rounded p-4"><div class="text-sm text-gray-500">Score после</div><div class="text-2xl font-bold">{{ report.average_effective_quality_score }}</div></div>
+  <div class="bg-white border rounded p-4"><div class="text-sm text-gray-500">Изменено</div><div class="text-2xl font-bold">{{ report.changed_cards }}</div></div>
+</div>
+<section class="bg-white border rounded p-5">
+  <h2 class="font-semibold mb-2">Основные проблемы</h2>
+  <ul class="list-disc ml-5">
+    {% for item in report.top_problems %}<li>{{ item }}</li>{% else %}<li>Критичных проблем не найдено</li>{% endfor %}
+  </ul>
+</section>
+<section class="bg-white border rounded p-5 mt-5">
+  <h2 class="font-semibold mb-2">Сформировать файл отчёта</h2>
+  <div class="flex gap-2">
+    <form method="post" action="/projects/{{ project.project_id }}/reports">
+      <input type="hidden" name="file_format" value="html">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать HTML</button>
+    </form>
+    <form method="post" action="/projects/{{ project.project_id }}/reports">
+      <input type="hidden" name="file_format" value="json">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать JSON</button>
+    </form>
+    <form method="post" action="/projects/{{ project.project_id }}/reports">
+      <input type="hidden" name="file_format" value="csv">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Создать CSV</button>
+    </form>
+  </div>
+</section>
+<section id="report-list" class="bg-white border rounded p-5 mt-5">
+  {% include "project_reports_list.html" %}
+</section>
+{% endblock %}

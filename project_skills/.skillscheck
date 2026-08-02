@@ -1,0 +1,5 @@
+skillpack_enabled=true
+entrypoint=project_skills/SKILLPACK.md
+index=project_skills/skills_index.json
+validator=project_skills/validate_skills.py
+

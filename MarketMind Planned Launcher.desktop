@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=MarketMind AI
+Comment=Плановый запуск MarketMind AI
+Exec=/mnt/steam/Proekt/MarketMind-AI-Core-main/scripts/marketmind_launcher.sh
+Path=/mnt/steam/Proekt/MarketMind-AI-Core-main
+Icon=utilities-terminal
+Terminal=true
+Categories=Development;Utility;

@@ -1,0 +1,22 @@
+SKU;Название;Описание;Бренд;Категория;Цена;Остаток;Ссылка;Изображение;Комментарий клиента;Неизвестная колонка
+SKU-001;Кружка керамическая 330 мл;Белая кружка для офиса;ДомМаркет;Посуда;350;25;https://example.test/products/1;https://example.test/img/1.jpg;Готово к публикации;Подарочная упаковка
+SKU-002;Набор полотенец;"";ТекстильПлюс;Текстиль;1290;12;https://example.test/products/2;https://example.test/img/2.jpg;Пустое описание нужно заполнить;Цвет: серый
+SKU-003;Органайзер для кабелей;"Описание с ""кавычками"" внутри";CablePro;Аксессуары;490;40;https://example.test/products/3;https://example.test/img/3.jpg;Проверить фото;Материал: пластик
+SKU-004;Блокнот A5;"Первая строка
+Вторая строка";PaperLine;Канцелярия;210;100;https://example.test/products/4;https://example.test/img/4.jpg;Есть перенос строки;Линовка: точка
+SKU-005;Лампа настольная;Светодиодная лампа;LightHome;Свет;1890;8;https://example.test/products/5;https://example.test/img/5.jpg;Проверить гарантию;Мощность: 8 Вт
+SKU-006;Чехол для телефона;Мягкий силиконовый чехол;CaseBox;Аксессуары;=1+1;15;https://example.test/products/6;https://example.test/img/6.jpg;Опасная формула в цене;Цвет: чёрный
+SKU-007;Подставка для ноутбука;Алюминиевая подставка;StandPro;Компьютеры;710;7;https://example.test/products/7;https://example.test/img/7.jpg;Отрицательное число для проверки;-10
+SKU-008;Термос 1 л;Держит тепло до 12 часов;ТеплоДом;Посуда;1490;18;https://example.test/products/8;https://example.test/img/8.jpg;Обычная строка;Объём: 1 л
+SKU-009;Рюкзак городской;Длинное описание: удобный городской рюкзак с отделением для ноутбука, плотной спинкой, двумя боковыми карманами, усиленными молниями и светоотражающими элементами для ежедневного использования.;BagCity;Сумки;2990;5;https://example.test/products/9;https://example.test/img/9.jpg;Длинное описание;Объём: 20 л
+SKU-010;Коврик для мыши;Большой игровой коврик;GameDesk;Компьютеры;;30;https://example.test/products/10;https://example.test/img/10.jpg;Пустая цена;Размер: XL
+SKU-011;Футляр для очков;Жёсткий футляр;OpticBox;Аксессуары;abc;20;https://example.test/products/11;https://example.test/img/11.jpg;Неправильная цена;Материал: экокожа
+SKU-012;Набор маркеров;12 цветов;ColorPen;Канцелярия;390;50;https://example.test/products/12;https://example.test/img/12.jpg;Готово;Количество: 12
+SKU-013;Контейнер пищевой;Пластиковый контейнер;KitchenPro;Кухня;250;60;https://example.test/products/13;https://example.test/img/13.jpg;Готово;Объём: 0.8 л
+SKU-014;Форма для выпечки;Силиконовая форма;BakeTime;Кухня;520;14;https://example.test/products/14;https://example.test/img/14.jpg;Готово;Диаметр: 24 см
+SKU-015;Перчатки хозяйственные;Латексные перчатки;CleanLine;Бытовая химия;180;90;https://example.test/products/15;https://example.test/img/15.jpg;Готово;Размер: M
+SKU-016;Щётка для обуви;Деревянная щётка;ShoeCare;Дом;320;31;https://example.test/products/16;https://example.test/img/16.jpg;Готово;Материал: дерево
+SKU-017;Держатель для полотенец;Металлический держатель;BathFix;Ванная;790;16;https://example.test/products/17;https://example.test/img/17.jpg;Готово;Крепление: настенное
+SKU-018;Плед флисовый;Мягкий плед;SoftHome;Текстиль;1690;11;https://example.test/products/18;https://example.test/img/18.jpg;Готово;Размер: 150x200
+SKU-019;Корзина для белья;Складная корзина;CleanBox;Дом;990;9;https://example.test/products/19;https://example.test/img/19.jpg;Готово;Объём: 45 л
+SKU-001;Дубликат SKU;Повтор артикула для проверки;ДомМаркет;Посуда;360;5;https://example.test/products/20;https://example.test/img/20.jpg;Дубликат;Повтор

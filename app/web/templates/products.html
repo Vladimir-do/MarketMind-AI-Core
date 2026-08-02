@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Товары — MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Товары</h1>
+
+<form class="mb-4" hx-get="/products" hx-target="#product-table" hx-trigger="keyup delay:300ms" hx-include="[name='q']">
+  <input type="text" name="q" value="{{ q }}" placeholder="Поиск по названию…"
+         class="border rounded px-3 py-2 w-80">
+</form>
+
+<div id="product-table">
+<table class="w-full bg-white rounded-lg shadow text-sm">
+  <thead>
+    <tr class="border-b text-left text-gray-500">
+      <th class="p-3">Название</th>
+      <th class="p-3">Маркетплейс</th>
+      <th class="p-3 text-right">Цена</th>
+      <th class="p-3">Наличие</th>
+      <th class="p-3">Проверка</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in products %}
+    <tr class="border-b hover:bg-gray-50">
+      <td class="p-3"><a href="/products/{{ p.id }}" class="text-blue-600 hover:underline">{{ p.name }}</a></td>
+      <td class="p-3">{{ p.marketplace }}</td>
+      <td class="p-3 text-right">{% if p.current_price is not none %}{{ p.current_price }} ₽{% else %}—{% endif %}</td>
+      <td class="p-3">{{ p.availability }}</td>
+      <td class="p-3 text-gray-500">{% if p.last_check %}{{ p.last_check[:16] }}{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+    {% if not products %}
+    <tr><td colspan="5" class="p-6 text-center text-gray-400">Товаров нет</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

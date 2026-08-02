@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}MarketMind AI{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/vendor/htmx.min.js" defer></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="border-b px-4 py-2 text-center text-sm font-semibold {{ runtime_banner.css }}">
+    {{ runtime_banner.message }}
+  </div>
+  <div class="flex min-h-screen">
+    <nav class="w-56 bg-gray-900 text-white p-4 flex flex-col gap-1">
+      <div class="text-lg font-bold mb-4 px-2">MarketMind AI</div>
+      <a href="/" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'dashboard' %}bg-gray-700{% endif %}">Панель управления</a>
+      <a href="/projects" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'projects' %}bg-gray-700{% endif %}">Проекты</a>
+      <a href="/system" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'system' %}bg-gray-700{% endif %}">Состояние системы</a>
+      <div class="mt-4 px-3 text-xs uppercase tracking-wide text-gray-400">Legacy</div>
+      <a href="/products" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'products' %}bg-gray-700{% endif %}">Глобальные товары</a>
+      <a href="/import" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'import' %}bg-gray-700{% endif %}">Legacy импорт</a>
+      <a href="/suggestions" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'suggestions' %}bg-gray-700{% endif %}">Предложения AI</a>
+      <a href="/reports" class="px-3 py-2 rounded hover:bg-gray-700 {% if active == 'reports' %}bg-gray-700{% endif %}">Legacy отчёты</a>
+    </nav>
+    <main class="flex-1 p-6">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

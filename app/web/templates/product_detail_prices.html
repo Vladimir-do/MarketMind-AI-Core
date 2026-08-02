@@ -1,0 +1,22 @@
+{% if price_history %}
+<table class="w-full text-sm">
+  <thead>
+    <tr class="border-b text-left text-gray-500">
+      <th class="p-2">Дата</th>
+      <th class="p-2 text-right">Цена</th>
+      <th class="p-2">Наличие</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in price_history %}
+    <tr class="border-b hover:bg-gray-50">
+      <td class="p-2 text-gray-500">{{ p.recorded_at.strftime('%d.%m.%Y %H:%M') if p.recorded_at else '—' }}</td>
+      <td class="p-2 text-right font-medium">{% if p.price is not none %}{{ p.price }} ₽{% else %}—{% endif %}</td>
+      <td class="p-2">{{ p.availability_status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="text-center text-gray-400 py-4">История цен отсутствует</div>
+{% endif %}

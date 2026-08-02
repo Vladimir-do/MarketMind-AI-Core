@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name or 'Товар' }} — MarketMind AI{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+  {# ── Header ──────────────────────────────────────────────────────── #}
+  <div class="flex items-center gap-3">
+    <a href="/products" class="text-blue-600 hover:underline text-sm">&larr; К списку товаров</a>
+  </div>
+
+  {# ── Карточка товара ─────────────────────────────────────────────── #}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h1 class="text-2xl font-bold mb-4">Карточка товара</h1>
+    <div class="flex gap-6">
+      <img src="{{ product_image_src }}" alt="{{ product.name }}" class="w-40 h-40 object-contain rounded border bg-white">
+      <div class="flex-1 space-y-2">
+        <div class="text-lg font-semibold">{{ product.name or 'Без названия' }}</div>
+        <div class="text-sm text-gray-500">Маркетплейс: <span class="font-medium text-gray-700">{{ marketplace_name }}</span></div>
+        <div class="text-sm text-gray-500">Цена: <span class="font-bold text-lg">{% if last_price and last_price.price is not none %}{{ last_price.price }} ₽{% else %}—{% endif %}</span></div>
+        <div class="text-sm text-gray-500">Наличие: <span class="font-medium text-gray-700">{{ last_price.availability_status if last_price else '—' }}</span></div>
+        <div class="text-sm text-gray-500">Добавлен: {{ product.first_seen.strftime('%d.%m.%Y %H:%M') if product.first_seen else '—' }}</div>
+        <div class="text-sm text-gray-500">Проверен: {{ product.last_check.strftime('%d.%m.%Y %H:%M') if product.last_check else '—' }}</div>
+        <div class="text-sm text-gray-500">
+          <a href="{{ product.url }}" target="_blank" class="text-blue-600 hover:underline">Открыть на маркетплейсе &rarr;</a>
+        </div>
+        <div class="text-sm text-gray-500">
+          <a href="/products/{{ product.id }}/versions" class="text-blue-600 hover:underline">Посмотреть версии карточки &rarr;</a>
+        </div>
+        <div class="text-sm text-gray-500">
+          <a href="/products/{{ product.id }}/edit" class="text-blue-600 hover:underline">Открыть редактор карточки &rarr;</a>
+        </div>
+        <div class="text-sm text-gray-500">
+          <a href="/products/{{ product.id }}/audit" class="text-blue-600 hover:underline">Журнал действий &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Оценка качества ─────────────────────────────────────────────── #}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">Оценка качества карточки</h2>
+    <div class="flex items-center gap-4">
+      <div class="relative w-20 h-20">
+        <svg class="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
+          <path class="text-gray-200" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          <path stroke-width="3" fill="none"
+                stroke="{% if analysis.score >= 90 %}#22c55e{% elif analysis.score >= 75 %}#3b82f6{% elif analysis.score >= 50 %}#f59e0b{% elif analysis.score >= 25 %}#f97316{% else %}#ef4444{% endif %}"
+                stroke-dasharray="{{ analysis.score }}, 100"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center text-lg font-bold">{{ analysis.score }}</div>
+      </div>
+      <div>
+        <div class="text-sm text-gray-500">Уровень:
+          <span class="font-medium
+            {% if analysis.tier == 'excellent' %}text-green-600
+            {% elif analysis.tier == 'good' %}text-blue-600
+            {% elif analysis.tier == 'fair' %}text-yellow-600
+            {% elif analysis.tier == 'poor' %}text-orange-600
+            {% else %}text-red-600{% endif %}">
+            {% if analysis.tier == 'excellent' %}Отлично
+            {% elif analysis.tier == 'good' %}Хорошо
+            {% elif analysis.tier == 'fair' %}Удовлетворительно
+            {% elif analysis.tier == 'poor' %}Плохо
+            {% else %}Критично{% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── SEO-аудит ───────────────────────────────────────────────────── #}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">SEO-аудит карточки</h2>
+    <div class="flex items-start gap-4">
+      <div class="relative w-20 h-20 shrink-0">
+        <svg class="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
+          <path class="text-gray-200" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          <path stroke-width="3" fill="none"
+                stroke="{% if seo.score >= 85 %}#22c55e{% elif seo.score >= 70 %}#3b82f6{% elif seo.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"
+                stroke-dasharray="{{ seo.score }}, 100"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center text-lg font-bold">{{ seo.score }}</div>
+      </div>
+      <div class="flex-1">
+        <div class="text-sm text-gray-500 mb-2">Уровень:
+          <span class="font-medium
+            {% if seo.tier == 'strong' %}text-green-600
+            {% elif seo.tier == 'usable' %}text-blue-600
+            {% elif seo.tier == 'needs_work' %}text-yellow-600
+            {% else %}text-red-600{% endif %}">
+            {% if seo.tier == 'strong' %}Сильная карточка
+            {% elif seo.tier == 'usable' %}Можно использовать
+            {% elif seo.tier == 'needs_work' %}Нужна доработка
+            {% else %}Слабая SEO-база{% endif %}
+          </span>
+        </div>
+        {% if seo.recommendations %}
+        <div class="grid gap-2">
+          {% for r in seo.recommendations[:5] %}
+          <div class="border rounded p-3 text-sm">
+            <div class="font-medium">{{ r.action }}</div>
+            <div class="text-gray-500 mt-1">{{ r.reason }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-sm text-green-700">Критичных SEO-рекомендаций нет.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ── Сравнение source vs effective SEO ──────────────────────────── #}
+    {% if seo.source_score is defined and seo.effective_score is defined %}
+    <div class="mt-5 pt-4 border-t">
+      <h3 class="text-sm font-semibold mb-3">Сравнение SEO-оценок</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-4">
+          <div class="relative w-14 h-14 shrink-0">
+            <svg class="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+              <path class="text-gray-200" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path stroke-width="3" fill="none"
+                    stroke="{% if seo.source_score >= 85 %}#22c55e{% elif seo.source_score >= 70 %}#3b82f6{% elif seo.source_score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"
+                    stroke-dasharray="{{ seo.source_score }}, 100"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center text-sm font-bold">{{ seo.source_score }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500">Исходная оценка</div>
+            <div class="font-semibold">Source SEO</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-4">
+          <div class="relative w-14 h-14 shrink-0">
+            <svg class="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+              <path class="text-gray-200" stroke-width="3" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path stroke-width="3" fill="none"
+                    stroke="{% if seo.effective_score >= 85 %}#22c55e{% elif seo.effective_score >= 70 %}#3b82f6{% elif seo.effective_score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"
+                    stroke-dasharray="{{ seo.effective_score }}, 100"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center text-sm font-bold">{{ seo.effective_score }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500">Эффективная оценка</div>
+            <div class="font-semibold">Effective SEO</div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 text-sm text-center">
+        {% set diff = seo.effective_score - seo.source_score %}
+        {% if diff > 0 %}
+          <span class="text-green-600 font-semibold">&#9650; +{{ diff }} &mdash; SEO улучшился</span>
+        {% elif diff < 0 %}
+          <span class="text-red-600 font-semibold">&#9660; {{ diff }} &mdash; SEO ухудшился</span>
+        {% else %}
+          <span class="text-gray-500">&mdash; оценка не изменилась</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Семантическое ядро ──────────────────────────────────────────── #}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">Семантическое ядро</h2>
+    <div hx-get="/products/{{ product.id }}/semantic-core"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div class="text-sm text-gray-400">Загрузка...</div>
+    </div>
+  </div>
+
+  {# ── Найденные проблемы ──────────────────────────────────────────── #}
+  {% if analysis.findings %}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">Найденные проблемы</h2>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b text-left text-gray-500">
+          <th class="p-2">Поле</th>
+          <th class="p-2">Описание</th>
+          <th class="p-2">Категория</th>
+          <th class="p-2">Важность</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in analysis.findings %}
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-2 font-medium">{{ f.field }}</td>
+          <td class="p-2">{{ f.message }}</td>
+          <td class="p-2 text-gray-500">{{ f.category }}</td>
+          <td class="p-2">
+            <span class="px-2 py-0.5 rounded text-xs font-medium
+              {% if f.severity == 'critical' %}bg-red-100 text-red-700
+              {% elif f.severity == 'warning' %}bg-yellow-100 text-yellow-700
+              {% else %}bg-blue-100 text-blue-700{% endif %}">
+              {% if f.severity == 'critical' %}Критично
+              {% elif f.severity == 'warning' %}Внимание
+              {% else %}Инфо{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {# ── AI-предложения ──────────────────────────────────────────────── #}
+  {% include "product_ai_suggestions.html" %}
+
+  {# ── История изменений ───────────────────────────────────────────── #}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">История изменений</h2>
+    {% include "product_history.html" %}
+  </div>
+
+  {# ── История цены ────────────────────────────────────────────────── #}
+  {% if price_history %}
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">История цены</h2>
+    <canvas id="priceChart" height="100"></canvas>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+    (function() {
+      const prices = [{% for p in price_history %}{{ p.price if p.price is not none else 'null' }}{% if not loop.last %},{% endif %}{% endfor %}];
+      const labels = [{% for p in price_history %}"{{ p.recorded_at.strftime('%d.%m %H:%M') if p.recorded_at else '' }}"{% if not loop.last %},{% endif %}{% endfor %}];
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.reverse(),
+          datasets: [{
+            label: 'Цена (₽)',
+            data: prices.reverse(),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            fill: true,
+            tension: 0.3,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: false, ticks: { callback: v => v + ' ₽' } },
+            x: { ticks: { maxTicksLimit: 10 } }
+          }
+        }
+      });
+    })();
+    </script>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

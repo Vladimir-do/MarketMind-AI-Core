@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Предложения AI — MarketMind AI{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Предложения AI</h1>
+  <p class="text-sm text-gray-500 mt-1">AI предлагает изменения. Данные товара меняются только после решения человека.</p>
+</div>
+
+<div class="grid grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Всего</div>
+    <div class="text-2xl font-bold">{{ stats.total }}</div>
+  </div>
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Ожидают</div>
+    <div class="text-2xl font-bold text-yellow-600">{{ stats.pending }}</div>
+  </div>
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Одобрено</div>
+    <div class="text-2xl font-bold text-green-600">{{ stats.approved }}</div>
+  </div>
+  <div class="bg-white rounded-lg shadow p-4">
+    <div class="text-sm text-gray-500">Отклонено</div>
+    <div class="text-2xl font-bold text-red-600">{{ stats.rejected }}</div>
+  </div>
+</div>
+
+<div class="bg-white rounded-lg shadow mb-6">
+  <div class="px-4 py-3 border-b">
+    <h2 class="font-semibold">AI-задачи</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="text-left px-4 py-2">Задача</th>
+          <th class="text-left px-4 py-2">Тип</th>
+          <th class="text-left px-4 py-2">Статус</th>
+          <th class="text-left px-4 py-2">Прогресс</th>
+          <th class="text-left px-4 py-2">Результат</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr class="border-t">
+          <td class="px-4 py-2 font-mono text-xs">{{ job.job_id }}</td>
+          <td class="px-4 py-2">{{ job.job_type }}</td>
+          <td class="px-4 py-2">
+            {% if job.status == "queued" %}
+            <span class="text-yellow-600">queued</span>
+            {% elif job.status == "running" %}
+            <span class="text-blue-600">running</span>
+            {% elif job.status == "succeeded" %}
+            <span class="text-green-600">succeeded</span>
+            {% else %}
+            <span class="text-red-600">failed</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2">{{ job.progress }}%</td>
+          <td class="px-4 py-2 text-xs text-gray-600">
+            {% if job.diagnostics %}
+              <div class="space-y-1">
+                <div class="font-medium text-red-700">{{ job.diagnostics.error_type or job.error_class }}: {{ job.diagnostics.error_message or job.error_text }}</div>
+                <div>Провайдер: <span class="font-mono">{{ job.diagnostics.provider or '—' }}</span></div>
+                <div>Модель: <span class="font-mono">{{ job.diagnostics.model or '—' }}</span></div>
+                <div>Стадия: <span class="font-mono">{{ job.diagnostics.stage or '—' }}</span>{% if job.diagnostics.status_code %}, HTTP {{ job.diagnostics.status_code }}{% endif %}</div>
+                <div>Время: {{ job.diagnostics.latency_ms or 0 }} мс</div>
+              </div>
+            {% elif job.status == 'succeeded' and job.result %}
+              {% if job.result.queued is defined %}Создано предложений: {{ job.result.queued }}{% else %}Выполнено{% endif %}
+              {% if job.result.provider %}<div>Провайдер: {{ job.result.provider }}</div>{% endif %}
+              {% if job.result.model_used %}<div>Модель: {{ job.result.model_used }}</div>{% endif %}
+            {% elif job.error_text %}
+              <span class="text-red-700">{{ job.error_class }}: {{ job.error_text }}</span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not jobs %}
+        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Задач пока нет</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="flex gap-2 mb-4">
+  <a href="/suggestions/list?status=all" hx-get="/suggestions/list?status=all" hx-target="#suggestions-table" class="px-3 py-1 rounded bg-blue-600 text-white text-sm">Все</a>
+  <a href="/suggestions/list?status=pending" hx-get="/suggestions/list?status=pending" hx-target="#suggestions-table" class="px-3 py-1 rounded bg-gray-200 text-sm">Ожидают</a>
+  <a href="/suggestions/list?status=approved" hx-get="/suggestions/list?status=approved" hx-target="#suggestions-table" class="px-3 py-1 rounded bg-gray-200 text-sm">Одобрено</a>
+  <a href="/suggestions/list?status=rejected" hx-get="/suggestions/list?status=rejected" hx-target="#suggestions-table" class="px-3 py-1 rounded bg-gray-200 text-sm">Отклонено</a>
+</div>
+
+<div class="bg-white rounded-lg shadow">
+  <div id="suggestions-table">
+    {% include "suggestions_table.html" %}
+  </div>
+</div>
+
+<div id="detail-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+    <div id="detail-content"></div>
+    <button onclick="document.getElementById('detail-modal').classList.add('hidden')" class="mt-4 text-sm text-gray-500 hover:text-gray-700">Закрыть</button>
+  </div>
+</div>
+{% endblock %}

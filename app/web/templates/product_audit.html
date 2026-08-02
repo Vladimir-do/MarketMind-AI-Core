@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Журнал действий — MarketMind AI{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <a href="/products/{{ product_id }}" class="text-blue-600 hover:underline text-sm">&larr; К карточке товара</a>
+  <div class="bg-white rounded-lg shadow p-6">
+    <h1 class="text-2xl font-bold mb-3">Журнал действий</h1>
+    {% if events %}
+    <div class="space-y-3">
+      {% for event in events %}
+      <div class="border rounded p-4">
+        <div class="font-semibold">{{ event.event_type }}</div>
+        <div class="text-xs text-gray-500">
+          {{ event.occurred_at.strftime('%d.%m.%Y %H:%M') if event.occurred_at else '—' }}
+          · Источник: {{ event.source }}
+          · Actor: {{ event.actor.actor_id if event.actor else 'system' }}
+        </div>
+        {% if event.payload.get('comment') or event.payload.get('reason') %}
+        <div class="text-sm text-gray-600 mt-2">{{ event.payload.get('comment') or event.payload.get('reason') }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-sm text-gray-500 border rounded p-4 bg-gray-50">Действий редактора пока нет.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

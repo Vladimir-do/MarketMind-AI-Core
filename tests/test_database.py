@@ -1,0 +1,483 @@
+import json
+import os
+import tempfile
+import unittest
+import asyncio
+from pathlib import Path
+
+from tests.helpers import reload_app_modules
+
+
+class DatabaseTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        asyncio.get_running_loop().slow_callback_duration = 10
+        self.tmp = tempfile.TemporaryDirectory()
+        db_path = Path(self.tmp.name) / "parser_test.db"
+        self.jsonl_path = Path(self.tmp.name) / "scrape_attempts.jsonl"
+        self.block_jsonl_path = Path(self.tmp.name) / "blocked_patterns.jsonl"
+        os.environ["SCRAPE_ATTEMPTS_JSONL"] = str(self.jsonl_path)
+        os.environ["BLOCK_PATTERNS_JSONL"] = str(self.block_jsonl_path)
+        _, database = reload_app_modules(f"sqlite+aiosqlite:///{db_path.as_posix()}")
+        self.database_module = database
+        self.db = database.Database()
+        await self.db.init()
+
+    async def asyncTearDown(self):
+        await self.db._engine.dispose()
+        os.environ.pop("SCRAPE_ATTEMPTS_JSONL", None)
+        os.environ.pop("BLOCK_PATTERNS_JSONL", None)
+        os.environ.pop("ADAPTIVE_COOLDOWN_STEPS", None)
+        os.environ.pop("ADAPTIVE_PREDICTIVE_HEAT_THRESHOLD", None)
+        os.environ.pop("ADAPTIVE_API_BLOCK_THRESHOLD", None)
+        self.tmp.cleanup()
+
+    async def test_save_product_creates_history_only_when_price_or_status_changes(self):
+        product, changed = await self.db.save_product(
+            "https://example.com/item",
+            {
+                "name": "Phone Stand",
+                "price": 1000,
+                "availability": "in_stock",
+                "image_url": "https://example.com/image.jpg",
+            },
+        )
+        self.assertTrue(changed)
+
+        same_product, changed = await self.db.save_product(
+            "https://example.com/item",
+            {
+                "name": "Phone Stand",
+                "price": 1000,
+                "availability": "in_stock",
+                "image_url": "https://example.com/image.jpg",
+            },
+        )
+        self.assertEqual(product.id, same_product.id)
+        self.assertFalse(changed)
+
+        _, changed = await self.db.save_product(
+            "https://example.com/item",
+            {
+                "name": "Phone Stand",
+                "price": 900,
+                "availability": "in_stock",
+                "image_url": "https://example.com/image.jpg",
+            },
+        )
+        self.assertTrue(changed)
+
+        products = await self.db.get_all_products()
+        self.assertEqual(len(products), 1)
+        last = await self.db.get_last_price(product.id)
+        self.assertEqual(last.price, 900)
+
+    def test_url_hash_is_stable(self):
+        url_to_hash = self.database_module.url_to_hash
+        self.assertEqual(url_to_hash("x"), url_to_hash("x"))
+        self.assertNotEqual(url_to_hash("x"), url_to_hash("y"))
+        self.assertEqual(len(url_to_hash("x")), 32)
+
+    async def test_save_product_keeps_existing_image_when_update_has_none(self):
+        product, _ = await self.db.save_product(
+            "https://example.com/item",
+            {
+                "name": "Phone Stand",
+                "price": 1000,
+                "availability": "in_stock",
+                "image_url": "https://example.com/image.jpg",
+            },
+        )
+
+        await self.db.save_product(
+            "https://example.com/item",
+            {
+                "name": "Phone Stand",
+                "price": 950,
+                "availability": "in_stock",
+                "image_url": None,
+            },
+        )
+
+        products = await self.db.get_all_products()
+        self.assertEqual(products[0].id, product.id)
+        self.assertEqual(products[0].image_url, "https://example.com/image.jpg")
+
+    async def test_get_latest_product_returns_most_recently_checked(self):
+        first, _ = await self.db.save_product(
+            "https://example.com/first",
+            {"name": "First", "price": 100, "availability": "in_stock"},
+        )
+        second, _ = await self.db.save_product(
+            "https://example.com/second",
+            {"name": "Second", "price": 200, "availability": "in_stock"},
+        )
+
+        latest = await self.db.get_latest_product()
+
+        self.assertEqual(latest.id, second.id)
+        self.assertNotEqual(latest.id, first.id)
+
+    async def test_job_records_track_lifecycle(self):
+        job = await self.db.create_job("import_products", {"project_id": "p1"}, job_id="job-1")
+        self.assertEqual(job.status, "queued")
+        self.assertEqual(job.progress, 0)
+        self.assertEqual(json.loads(job.payload_json), {"project_id": "p1"})
+
+        started = await self.db.start_job("job-1")
+        self.assertEqual(started.status, "running")
+        self.assertIsNotNone(started.started_at)
+
+        progress = await self.db.update_job_progress("job-1", 45)
+        self.assertEqual(progress.progress, 45)
+
+        finished = await self.db.finish_job("job-1", {"imported": 3})
+        self.assertEqual(finished.status, "succeeded")
+        self.assertEqual(finished.progress, 100)
+        self.assertEqual(json.loads(finished.result_json), {"imported": 3})
+
+        jobs = await self.db.get_recent_jobs(job_type="import_products")
+        self.assertEqual([item.job_id for item in jobs], ["job-1"])
+
+    async def test_job_records_capture_failures(self):
+        await self.db.create_job("parse_marketplace", {"url": "https://example.test"}, job_id="job-2")
+
+        failed = await self.db.fail_job("job-2", RuntimeError("blocked"))
+
+        self.assertEqual(failed.status, "failed")
+        self.assertEqual(failed.error_class, "RuntimeError")
+        self.assertEqual(failed.error_text, "blocked")
+
+    async def test_record_scrape_attempt_stores_measurable_signal(self):
+        await self.db.record_scrape_attempt(
+            url="https://www.ozon.ru/product/test",
+            marketplace="ozon",
+            source="api",
+            status="blocked",
+            http_status=403,
+            latency_ms=123,
+            error_class=None,
+            error_text="403 forbidden",
+            errors=["403 forbidden"],
+            warnings=["api blocked"],
+            confidence=0.2,
+            next_best_strategy="browser_if_allowed",
+        )
+
+        attempts = await self.db.get_recent_scrape_attempts()
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(attempts[0].marketplace, "ozon")
+        self.assertEqual(attempts[0].source, "api")
+        self.assertEqual(attempts[0].status, "blocked")
+        self.assertEqual(attempts[0].site, "www.ozon.ru")
+        self.assertEqual(attempts[0].task_type, "marketplace_product")
+        self.assertEqual(attempts[0].parser_used, "ozon")
+        self.assertFalse(attempts[0].success)
+        self.assertEqual(attempts[0].http_status, 403)
+        self.assertEqual(attempts[0].latency_ms, 123)
+        self.assertEqual(attempts[0].errors, '["403 forbidden"]')
+        self.assertEqual(attempts[0].warnings, '["api blocked"]')
+        self.assertEqual(attempts[0].confidence, 0.2)
+        self.assertEqual(attempts[0].next_best_strategy, "browser_if_allowed")
+
+        lines = self.jsonl_path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(lines), 1)
+        payload = json.loads(lines[0])
+        self.assertEqual(payload["marketplace"], "ozon")
+        self.assertEqual(payload["source"], "api")
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["site"], "www.ozon.ru")
+        self.assertEqual(payload["task_type"], "marketplace_product")
+        self.assertEqual(payload["parser_used"], "ozon")
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["http_status"], 403)
+        self.assertEqual(payload["latency_ms"], 123)
+        self.assertEqual(payload["errors"], '["403 forbidden"]')
+        self.assertEqual(payload["warnings"], '["api blocked"]')
+        self.assertEqual(payload["confidence"], 0.2)
+        self.assertEqual(payload["next_best_strategy"], "browser_if_allowed")
+        self.assertIn("recorded_at", payload)
+
+        patterns = await self.db.get_recent_blocked_patterns(marketplace="ozon")
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(patterns[0].trigger, "http_403")
+        self.assertEqual(patterns[0].source, "api")
+        self.assertTrue(self.block_jsonl_path.exists())
+
+    async def test_recommend_scrape_strategy_skips_recent_browser_block(self):
+        await self.db.record_blocked_pattern(
+            url="https://www.ozon.ru/product/test",
+            marketplace="ozon",
+            source="browser",
+            status="blocked",
+            trigger="abt-challenge",
+            strategy="incident=fab_chlg_1",
+            cooldown_sec=600,
+        )
+
+        decision = await self.db.recommend_scrape_strategy(
+            "ozon",
+            url="https://www.ozon.ru/product/test",
+        )
+
+        self.assertTrue(decision["skip"])
+        self.assertTrue(decision["skip_browser"])
+        self.assertEqual(decision["strategy"], "defer_same_url")
+
+    async def test_recommend_scrape_strategy_skips_browser_after_repeated_browser_blocks(self):
+        for idx in range(3):
+            await self.db.record_blocked_pattern(
+                url=f"https://www.ozon.ru/product/{idx}",
+                marketplace="ozon",
+                source="browser",
+                status="blocked",
+                trigger="abt-challenge",
+            )
+
+        decision = await self.db.recommend_scrape_strategy(
+            "ozon",
+            url="https://www.ozon.ru/product/new",
+        )
+
+        self.assertFalse(decision["skip"])
+        self.assertTrue(decision["skip_browser"])
+        self.assertEqual(decision["strategy"], "api_only_browser_cooldown")
+
+    async def test_recommend_scrape_strategy_skips_browser_after_three_recent_browser_failures(self):
+        for idx, status in enumerate(("blocked", "error", "parse_error")):
+            await self.db.record_scrape_attempt(
+                url=f"https://www.ozon.ru/product/browser-fail-{idx}",
+                marketplace="ozon",
+                source="browser",
+                status=status,
+                latency_ms=100 + idx,
+                warnings=["browser did not help"],
+            )
+
+        decision = await self.db.recommend_scrape_strategy(
+            "ozon",
+            url="https://www.ozon.ru/product/new",
+        )
+
+        self.assertFalse(decision["skip"])
+        self.assertTrue(decision["skip_browser"])
+        self.assertEqual(decision["strategy"], "api_only_browser_cooldown")
+        self.assertEqual(decision["next_best_strategy"], "api_or_structured_source_only")
+        self.assertIn("3 recent browser failures", decision["reason"])
+
+    async def test_marketplace_health_scores_reputation_and_dynamic_cooldown(self):
+        os.environ["ADAPTIVE_COOLDOWN_STEPS"] = "1:300,2:1800,3:7200"
+        await self.db.record_scrape_attempt(
+            url="https://www.ozon.ru/product/ok",
+            marketplace="ozon",
+            source="browser",
+            status="ok",
+            latency_ms=100,
+            proxy="http://proxy-1",
+            browser_profile="profile_1",
+        )
+        for idx in range(3):
+            await self.db.record_blocked_pattern(
+                url=f"https://www.ozon.ru/product/blocked-{idx}",
+                marketplace="ozon",
+                source="browser",
+                status="blocked",
+                trigger="abt-challenge",
+                proxy="http://proxy-2",
+                browser_profile="profile_2",
+            )
+
+        health = await self.db.get_marketplace_health("ozon")
+
+        self.assertGreater(health["heat_score"], 0)
+        self.assertEqual(health["dynamic_cooldown_sec"], 7200)
+        self.assertEqual(health["preferred_browser_profile"], "profile_1")
+        self.assertTrue(health["browser_reputation"]["profile_2"]["heavily_blocked"])
+        self.assertTrue(health["proxy_reputation"]["http://proxy-2"]["heavily_blocked"])
+        self.assertIn("browser", health["source_scores"])
+
+    async def test_recommend_scrape_strategy_can_disable_api_route(self):
+        os.environ["ADAPTIVE_API_BLOCK_THRESHOLD"] = "3"
+        for idx in range(3):
+            await self.db.record_blocked_pattern(
+                url=f"https://www.wildberries.ru/catalog/{idx}/detail.aspx",
+                marketplace="wildberries",
+                source="api",
+                status="blocked",
+                trigger="http_403",
+            )
+
+        decision = await self.db.recommend_scrape_strategy(
+            "wildberries",
+            url="https://www.wildberries.ru/catalog/999/detail.aspx",
+        )
+
+        self.assertTrue(decision["skip_api"])
+        self.assertEqual(decision["strategy"], "self_heal_disable_api")
+        self.assertGreaterEqual(decision["cooldown_sec"], 7200)
+
+    async def test_recommend_scrape_strategy_predicts_high_heat_before_next_browser_try(self):
+        os.environ["ADAPTIVE_PREDICTIVE_HEAT_THRESHOLD"] = "0.7"
+        await self.db.record_blocked_pattern(
+            url="https://market.yandex.ru/product--phone/123",
+            marketplace="yandex_market",
+            source="browser",
+            status="blocked",
+            trigger="captcha",
+        )
+
+        decision = await self.db.recommend_scrape_strategy(
+            "yandex_market",
+            url="https://market.yandex.ru/product--phone/456",
+        )
+
+        self.assertEqual(decision["strategy"], "predictive_heat_cooldown")
+        self.assertTrue(decision["skip_browser"])
+        self.assertGreaterEqual(decision["heat_score"], 0.7)
+
+    async def test_subscribers_are_persisted_without_duplicates(self):
+        await self.db.add_subscriber(123)
+        await self.db.add_subscriber(123)
+        await self.db.add_subscriber(456)
+
+        self.assertEqual(await self.db.get_subscribers(), [123, 456])
+        self.assertEqual(await self.db.get_subscriber_count(), 2)
+
+        await self.db.remove_subscriber(123)
+
+        self.assertEqual(await self.db.get_subscribers(), [456])
+        self.assertEqual(await self.db.get_subscriber_count(), 1)
+
+    async def test_record_scrape_attempt_writes_both_rows_atomically(self):
+        """ScrapeAttempt + BlockedPattern must appear together when trigger is set."""
+        await self.db.record_scrape_attempt(
+            url="https://www.ozon.ru/product/atomic-test",
+            marketplace="ozon",
+            source="api",
+            status="blocked",
+            latency_ms=50,
+            trigger="http_403",
+            http_status=403,
+        )
+
+        attempts = await self.db.get_recent_scrape_attempts(marketplace="ozon")
+        patterns = await self.db.get_recent_blocked_patterns(marketplace="ozon")
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(attempts[0].url, "https://www.ozon.ru/product/atomic-test")
+        self.assertEqual(patterns[0].url, "https://www.ozon.ru/product/atomic-test")
+        self.assertEqual(patterns[0].trigger, "http_403")
+
+    async def test_record_scrape_attempt_rolls_back_when_blocked_pattern_fails(self):
+        """If the BlockedPattern insert fails, ScrapeAttempt must NOT be saved."""
+        from app.database import BlockedPattern
+        import contextlib
+
+        original_session_factory = self.db._session_factory
+
+        class _FailingSession:
+            def __init__(self, real_session):
+                self._real = real_session
+
+            def add(self, obj):
+                if isinstance(obj, BlockedPattern):
+                    raise RuntimeError("simulated BlockedPattern insert failure")
+                self._real.add(obj)
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        real_cm_factory = original_session_factory  # capture BEFORE patching
+
+        @contextlib.asynccontextmanager
+        async def _patched_factory():
+            async with real_cm_factory() as real_s:
+                yield _FailingSession(real_s)
+
+        self.db._session_factory = _patched_factory
+
+        try:
+            with self.assertRaises(RuntimeError):
+                await self.db.record_scrape_attempt(
+                    url="https://www.ozon.ru/product/rollback-test",
+                    marketplace="ozon",
+                    source="api",
+                    status="blocked",
+                    latency_ms=50,
+                    trigger="http_403",
+                )
+
+            attempts = await self.db.get_recent_scrape_attempts(marketplace="ozon")
+            self.assertEqual(len(attempts), 0, "ScrapeAttempt must not persist after rollback")
+        finally:
+            self.db._session_factory = original_session_factory
+
+
+class ProxyMaskingTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        db_path = Path(self.tmp.name) / "proxy_mask_test.db"
+        self.jsonl_path = Path(self.tmp.name) / "scrape_attempts.jsonl"
+        self.block_jsonl_path = Path(self.tmp.name) / "blocked_patterns.jsonl"
+        os.environ["SCRAPE_ATTEMPTS_JSONL"] = str(self.jsonl_path)
+        os.environ["BLOCK_PATTERNS_JSONL"] = str(self.block_jsonl_path)
+        _, database = reload_app_modules(f"sqlite+aiosqlite:///{db_path.as_posix()}")
+        self.db = database.Database()
+        await self.db.init()
+
+    async def asyncTearDown(self):
+        await self.db._engine.dispose()
+        os.environ.pop("SCRAPE_ATTEMPTS_JSONL", None)
+        os.environ.pop("BLOCK_PATTERNS_JSONL", None)
+        self.tmp.cleanup()
+
+    async def test_record_scrape_attempt_masks_proxy_credentials(self):
+        await self.db.record_scrape_attempt(
+            url="https://www.ozon.ru/product/test1",
+            marketplace="ozon",
+            source="api",
+            status="ok",
+            latency_ms=100,
+            proxy="socks5://user:pass@10.0.0.1:1080",
+        )
+        attempts = await self.db.get_recent_scrape_attempts(marketplace="ozon")
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(attempts[0].proxy, "socks5://***@10.0.0.1:1080")
+
+    async def test_record_blocked_pattern_masks_proxy_credentials(self):
+        await self.db.record_blocked_pattern(
+            url="https://www.ozon.ru/product/test2",
+            marketplace="ozon",
+            source="api",
+            status="blocked",
+            trigger="http_403",
+            proxy="socks5://user:pass@10.0.0.1:1080",
+        )
+        attempts = await self.db.get_recent_blocked_patterns(marketplace="ozon")
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(attempts[0].proxy, "socks5://***@10.0.0.1:1080")
+
+    async def test_record_scrape_attempt_preserves_no_credential_proxy(self):
+        await self.db.record_scrape_attempt(
+            url="https://www.ozon.ru/product/test3",
+            marketplace="ozon",
+            source="api",
+            status="ok",
+            latency_ms=100,
+            proxy="socks5://10.0.0.1:1080",
+        )
+        attempts = await self.db.get_recent_scrape_attempts(marketplace="ozon")
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(attempts[0].proxy, "socks5://10.0.0.1:1080")
+
+    async def test_record_scrape_attempt_none_proxy_stays_none(self):
+        await self.db.record_scrape_attempt(
+            url="https://www.ozon.ru/product/test4",
+            marketplace="ozon",
+            source="api",
+            status="ok",
+            latency_ms=100,
+            proxy=None,
+        )
+        attempts = await self.db.get_recent_scrape_attempts(marketplace="ozon")
+        self.assertEqual(len(attempts), 1)
+        self.assertIsNone(attempts[0].proxy)

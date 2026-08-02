@@ -1,0 +1,24 @@
+%% MarketMind AI - recovery loop
+flowchart LR
+    request["Task execution<br/>scrape / card / export"] --> attempt["Record attempt<br/>status / source / latency"]
+    attempt --> classify["Classify outcome<br/>ok / blocked / parse_error / network"]
+
+    classify -->|ok| success["Persist result<br/>clear failure state"]
+    classify -->|blocked or network| block_memory["Save block memory<br/>trigger / marketplace / strategy"]
+    classify -->|parse or validation error| failure["Save LastFailureMemory<br/>warnings / metrics / files"]
+
+    block_memory --> strategy["Recommend next strategy<br/>cooldown / skip / fallback"]
+    failure --> repair_task["Repair task<br/>regression-first plan"]
+
+    strategy --> retry{"Safe to retry?"}
+    retry -->|yes| fallback["Fallback execution<br/>structured source / browser / API / defer"]
+    retry -->|no| stop["Visible diagnostic<br/>do not invent data"]
+
+    repair_task --> regression["Regression test or focused reproduction"]
+    regression --> fix["Smallest safe fix"]
+    fix --> verify["Verify with measurable signal"]
+    verify --> lesson["Skillpack lesson decision"]
+
+    fallback --> attempt
+    stop --> lesson
+    success --> lesson

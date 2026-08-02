@@ -1,0 +1,27 @@
+%% MarketMind AI - marketplace layer
+flowchart TB
+    url["Marketplace URL / search query"] --> router["Parser router<br/>detect marketplace"]
+
+    router --> ozon["Ozon layer"]
+    router --> wb["Wildberries layer"]
+    router --> ym["Yandex Market layer"]
+    router --> generic["Generic scraping layer"]
+
+    ozon --> ozon_fetch["Playwright / HTML / API extraction"]
+    wb --> wb_fetch["API / basket candidates / cloud fallback"]
+    ym --> ym_fetch["HTML / JSON-LD extraction"]
+    generic --> generic_fetch["Page classification<br/>catalog / single / article / unknown"]
+
+    ozon_fetch --> normalize["Normalize to ProductData"]
+    wb_fetch --> normalize
+    ym_fetch --> normalize
+    generic_fetch --> normalize
+
+    normalize --> validate["Validate fields<br/>title / price / availability / image"]
+    validate --> history["Price history<br/>database"]
+    validate --> exports["Exports<br/>CSV / XLSX / HTML"]
+    validate --> cards["Card workflows<br/>Ozon draft / enrichment"]
+
+    validate --> telemetry["Scrape telemetry<br/>http_status / latency / error / source"]
+    telemetry --> resilience["Adaptive resilience<br/>block memory / cooldown / strategy"]
+    resilience --> router

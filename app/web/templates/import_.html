@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Импорт — MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Импорт товаров</h1>
+
+<div class="max-w-xl">
+
+  <!-- Шаблоны для скачивания -->
+  <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+    <p class="text-sm font-medium text-blue-800 mb-2">Скачать шаблон</p>
+    <div class="flex gap-3">
+      <a href="/api/import/template/csv"
+         class="px-4 py-2 bg-white border border-blue-300 rounded text-sm text-blue-700 hover:bg-blue-100">
+        Шаблон CSV
+      </a>
+      <a href="/api/import/template/xlsx"
+         class="px-4 py-2 bg-white border border-blue-300 rounded text-sm text-blue-700 hover:bg-blue-100">
+        Шаблон Excel
+      </a>
+    </div>
+  </div>
+
+  <!-- Загрузка демо-данных -->
+  <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+    <p class="text-sm font-medium text-green-800 mb-2">Быстрый старт</p>
+    <button hx-post="/api/import/demo" hx-target="#result" hx-swap="innerHTML"
+            class="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+      Загрузить демо-данные (22 товара)
+    </button>
+  </div>
+
+  <!-- Загрузка файла -->
+  <form hx-post="/api/import/file" hx-encoding="multipart/form-data" hx-target="#result" hx-swap="innerHTML"
+        class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 cursor-pointer">
+    <p class="text-gray-500 mb-3">Перетащите CSV или XLSX файл</p>
+    <input type="file" name="file" accept=".csv,.xlsx,.xls" class="mb-3">
+    <br>
+    <button type="submit" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Импортировать</button>
+  </form>
+
+  <div id="result" class="mt-4"></div>
+
+  {% if total_products %}
+  <div class="mt-8">
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <h2 class="text-lg font-semibold">Сохранённые товары</h2>
+      <a href="/products" class="text-sm text-blue-700 hover:underline">Открыть весь список</a>
+    </div>
+    <div class="mb-3 text-sm text-gray-600">Всего в базе: {{ total_products }}</div>
+    <div class="overflow-hidden border border-gray-200 rounded">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-600">
+          <tr>
+            <th class="px-3 py-2 font-medium">Товар</th>
+            <th class="px-3 py-2 font-medium">Цена</th>
+            <th class="px-3 py-2 font-medium">Статус</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 bg-white">
+          {% for product in products %}
+          <tr>
+            <td class="px-3 py-2">
+              <a href="{{ product.url }}" class="text-blue-700 hover:underline" target="_blank" rel="noopener">
+                {{ product.name }}
+              </a>
+            </td>
+            <td class="px-3 py-2">{{ product.price if product.price is not none else "—" }}</td>
+            <td class="px-3 py-2">{{ product.availability }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

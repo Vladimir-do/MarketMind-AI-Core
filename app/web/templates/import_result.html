@@ -1,0 +1,7 @@
+{% set ok = result.status == "completed" %}
+<div class="rounded border {{ 'border-green-200 bg-green-50 text-green-900' if ok else 'border-red-200 bg-red-50 text-red-900' }} p-4">
+  <div class="font-semibold">{{ result.message }}</div>
+  <div class="mt-2 text-sm">
+    Статус: {{ result.status }} · Товаров: {{ result.total_products }} · Ошибок: {{ result.errors }}
+  </div>
+</div>

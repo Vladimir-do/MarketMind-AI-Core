@@ -1,0 +1,101 @@
+- skill_id: market.search
+  name: Ozon Marketplace Search
+  category: marketplace
+  status: available
+  provides:
+    - search_results
+  quality:
+    reliability: 0.72
+    speed: 0.62
+    reuse: 0.82
+    complexity: 0.42
+    cost: 0.20
+    token_usage: 0.04
+    risk: 0.58
+  failure_patterns:
+    - site: ozon
+      trigger: abt-challenge
+      recovery: market.search.cooldown
+      cooldown_seconds: 1200
+
+- skill_id: market.update
+  name: Tracked Products Update Worker
+  category: marketplace
+  status: available
+  provides:
+    - price_history
+  quality:
+    reliability: 0.84
+    speed: 0.58
+    reuse: 0.86
+    complexity: 0.55
+    cost: 0.24
+    token_usage: 0.04
+    risk: 0.36
+
+- skill_id: market.analytics
+  name: Marketplace Competitor Analytics
+  category: marketplace
+  status: available
+  requires:
+    - market.search
+    - quality.self_critic
+  provides:
+    - competitor_report
+  quality:
+    reliability: 0.75
+    speed: 0.54
+    reuse: 0.78
+    complexity: 0.62
+    cost: 0.35
+    token_usage: 0.32
+    risk: 0.32
+
+- skill_id: ozon.card.generate
+  name: Ozon Card Draft Generator
+  category: card_generation
+  status: available
+  requires:
+    - quality.self_critic
+  provides:
+    - ozon_card_draft
+  quality:
+    reliability: 0.86
+    speed: 0.74
+    reuse: 0.88
+    complexity: 0.50
+    cost: 0.26
+    token_usage: 0.30
+    risk: 0.22
+
+- skill_id: batch.cards
+  name: Batch Ozon Card Files
+  category: batch
+  status: available
+  requires:
+    - ozon.card.generate
+    - xlsx.export
+    - json.export
+  provides:
+    - batch_card_files
+  quality:
+    reliability: 0.83
+    speed: 0.66
+    reuse: 0.84
+    complexity: 0.58
+    cost: 0.24
+    token_usage: 0.18
+    risk: 0.24
+
+- skill_id: intent.unknown
+  name: Unknown Intent Fallback
+  category: intent
+  status: missing
+  quality:
+    reliability: 0.10
+    speed: 0.90
+    reuse: 0.20
+    complexity: 0.10
+    cost: 0.01
+    token_usage: 0.01
+    risk: 0.90

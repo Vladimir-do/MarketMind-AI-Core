@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Новый проект - MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Новый проект</h1>
+<form class="bg-white border rounded p-5 max-w-xl space-y-4" hx-post="/api/projects" hx-target="#result" hx-swap="innerHTML">
+  <label class="block">
+    <span class="text-sm text-gray-700">Название проекта</span>
+    <input name="name" class="w-full border rounded px-3 py-2" required>
+  </label>
+  <label class="block">
+    <span class="text-sm text-gray-700">Заказчик</span>
+    <input name="client_name" class="w-full border rounded px-3 py-2">
+  </label>
+  <label class="block">
+    <span class="text-sm text-gray-700">Маркетплейс</span>
+    <select name="marketplace" class="w-full border rounded px-3 py-2">
+      <option value="unknown">Не указан</option>
+      <option value="ozon">Ozon</option>
+      <option value="wildberries">Wildberries</option>
+      <option value="yandex_market">Яндекс Маркет</option>
+    </select>
+  </label>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded">Создать</button>
+  <div id="result"></div>
+</form>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Анализ рынка - MarketMind AI{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <a href="/projects/{{ project.project_id }}" class="text-sm text-blue-700 hover:underline">← К проекту</a>
+  <h1 class="text-2xl font-bold mt-2">Анализ рынка</h1>
+  <p class="text-gray-600">Проект: {{ project.name }}</p>
+</div>
+
+<section class="bg-white border rounded p-5 max-w-5xl">
+  <form
+    hx-post="/api/projects/{{ project.project_id }}/market-analysis"
+    hx-target="#market-analysis-result"
+    hx-indicator="#market-analysis-loading"
+    class="grid gap-4"
+  >
+    <div>
+      <label class="block text-sm font-medium mb-1" for="query">Что анализируем</label>
+      <input
+        id="query"
+        name="query"
+        class="block w-full border rounded p-2"
+        placeholder="например: кабель менеджмент, органайзер проводов, миска для собак"
+        required
+      >
+    </div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1" for="marketplace">Маркетплейс</label>
+        <select id="marketplace" name="marketplace" class="block w-full border rounded p-2">
+          <option value="wildberries" {% if project.marketplace == "wildberries" %}selected{% endif %}>Wildberries</option>
+          <option value="ozon" {% if project.marketplace == "ozon" %}selected{% endif %}>Ozon</option>
+          <option value="yandex_market" {% if project.marketplace == "yandex_market" %}selected{% endif %}>Яндекс Маркет</option>
+          <option value="all">Все доступные</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1" for="max_results">Сколько товаров взять</label>
+        <input id="max_results" name="max_results" type="number" min="1" max="30" value="12" class="block w-full border rounded p-2">
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Запустить анализ рынка</button>
+      <span id="market-analysis-loading" class="htmx-indicator text-sm text-gray-600">Ищу товары на маркетплейсе...</span>
+    </div>
+  </form>
+  <div id="market-analysis-result" class="mt-5"></div>
+</section>
+{% endblock %}

@@ -1,0 +1,18 @@
+<section class="bg-white border rounded p-5">
+  <h2 class="font-semibold mb-3">Diff перед применением</h2>
+  {% if diff %}
+  <table class="w-full text-sm mb-4">
+    <thead class="bg-gray-100"><tr><th class="p-2 text-left">Поле</th><th class="p-2 text-left">Было</th><th class="p-2 text-left">Станет</th></tr></thead>
+    <tbody>{% for item in diff %}<tr class="border-t"><td class="p-2">{{ item.field }}</td><td class="p-2">{{ item.before }}</td><td class="p-2">{{ item.after }}</td></tr>{% endfor %}</tbody>
+  </table>
+  <form hx-post="/projects/{{ project_id }}/products/{{ product_id }}/manual-edit/apply" hx-target="#edit-apply-result">
+    <input type="hidden" name="current_version_id" value="{{ current_version_id or '' }}">
+    {% for key, value in payload.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    <label class="block mb-3 text-sm">Причина изменения<input name="comment" class="mt-1 w-full border rounded p-2" required></label>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded">Применить после проверки diff</button>
+  </form>
+  <div id="edit-apply-result" class="mt-4"></div>
+  {% else %}
+  <p class="text-gray-600">Изменений нет.</p>
+  {% endif %}
+</section>

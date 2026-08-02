@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Карточка проекта - MarketMind AI{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <a href="/projects/{{ project.project_id }}/products" class="text-blue-700 hover:underline">&larr; К товарам проекта</a>
+</div>
+<h1 class="text-2xl font-bold mb-4">{{ card.effective_snapshot.title or "Без названия" }}</h1>
+<div class="grid md:grid-cols-3 gap-3 mb-5">
+  <a class="bg-white border rounded p-4 hover:border-blue-400" href="/projects/{{ project.project_id }}/products/{{ card.product_id }}/edit">Ручная правка</a>
+  <a class="bg-white border rounded p-4 hover:border-blue-400" href="/projects/{{ project.project_id }}/products/{{ card.product_id }}/versions">Версии и откат</a>
+  <a class="bg-white border rounded p-4 hover:border-blue-400" href="/projects/{{ project.project_id }}/exports">Экспорт</a>
+</div>
+<section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">Effective Product Card</h2>
+  <dl class="grid md:grid-cols-2 gap-3 text-sm">
+    {% for key, value in card.effective_snapshot.items() %}
+    <div><dt class="text-gray-500">{{ key }}</dt><dd class="font-medium whitespace-pre-wrap">{{ value }}</dd></div>
+    {% endfor %}
+  </dl>
+</section>
+<section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">SEO-аудит карточки</h2>
+  <div class="grid md:grid-cols-[120px_1fr] gap-4">
+    <div>
+      <div class="text-3xl font-bold
+        {% if seo.score >= 85 %}text-green-600
+        {% elif seo.score >= 70 %}text-blue-600
+        {% elif seo.score >= 50 %}text-yellow-600
+        {% else %}text-red-600{% endif %}">
+        {{ seo.score }}
+      </div>
+      <div class="text-sm text-gray-500 mb-3">
+        {% if seo.tier == 'strong' %}Сильная
+        {% elif seo.tier == 'usable' %}Можно использовать
+        {% elif seo.tier == 'needs_work' %}Нужна доработка
+        {% else %}Слабая база{% endif %}
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+        <div class="h-full rounded-full transition-all
+          {% if seo.score >= 85 %}bg-green-500
+          {% elif seo.score >= 70 %}bg-blue-500
+          {% elif seo.score >= 50 %}bg-yellow-500
+          {% else %}bg-red-500{% endif %}"
+          style="width: {{ seo.score }}%"></div>
+      </div>
+    </div>
+    <div class="grid gap-2">
+      {% if seo.recommendations %}
+        {% for recommendation in seo.recommendations[:6] %}
+        <div class="border rounded p-3 text-sm">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold mb-1
+                {% if recommendation.severity is defined and recommendation.severity == 'critical' %}bg-red-100 text-red-700
+                {% elif recommendation.severity is defined and recommendation.severity == 'warning' %}bg-yellow-100 text-yellow-700
+                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                {% if recommendation.severity is defined and recommendation.severity == 'critical' %}Критично
+                {% elif recommendation.severity is defined and recommendation.severity == 'warning' %}Внимание
+                {% else %}Инфо{% endif %}
+              </span>
+              <div class="font-medium">{{ recommendation.action }}</div>
+              <div class="text-gray-600 mt-1">{{ recommendation.reason }}</div>
+            </div>
+            <button hx-post="/api/projects/{{ project.project_id }}/products/{{ card.product_id }}/seo-suggestions"
+                    hx-vals='{"action": "{{ recommendation.action }}"}'
+                    hx-target="closest div" hx-swap="outerHTML"
+                    class="shrink-0 px-2 py-1 text-xs text-blue-700 border border-blue-300 rounded hover:bg-blue-50 whitespace-nowrap"
+                    title="Поставить в очередь согласования">В очередь</button>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-sm text-green-700">Критичных SEO-рекомендаций нет.</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+<section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">Семантическое ядро</h2>
+  <div hx-get="/projects/{{ project.project_id }}/products/{{ card.product_id }}/semantic-core"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <div class="text-sm text-gray-400">Загрузка...</div>
+  </div>
+</section>
+<section class="bg-white border rounded p-5">
+  <h2 class="font-semibold mb-3">Происхождение полей</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-100"><tr><th class="p-2 text-left">Поле</th><th class="p-2 text-left">Источник</th><th class="p-2 text-left">Было</th><th class="p-2 text-left">Стало</th><th class="p-2 text-left">Версия</th></tr></thead>
+      <tbody>
+      {% for field, info in card.provenance.items() %}
+        <tr class="border-t"><td class="p-2">{{ field }}</td><td class="p-2">{{ info.source_type }}</td><td class="p-2">{{ info.original_value }}</td><td class="p-2">{{ info.normalized_value }}</td><td class="p-2">{{ info.version_id or "—" }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

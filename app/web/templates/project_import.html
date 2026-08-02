@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Импорт проекта - MarketMind AI{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Импорт товаров</h1>
+<p class="text-gray-600 mb-4">Проект: {{ project.name }}</p>
+<section class="bg-white border rounded p-5 max-w-5xl mb-4">
+  <h2 class="font-semibold mb-2">Быстрый старт</h2>
+  <p class="text-sm text-gray-600 mb-3">Добавить учебную линейку WB для проверки микрониши кабель-менеджмента без ручного CSV.</p>
+  <form hx-post="/api/projects/{{ project.project_id }}/sample-imports/wb-cable-management" hx-target="#sample-import-result">
+    <button class="bg-blue-600 text-white px-4 py-2 rounded">Добавить пример: кабель-менеджмент WB</button>
+  </form>
+  <div id="sample-import-result" class="mt-4"></div>
+</section>
+<section class="bg-white border rounded p-5 max-w-5xl mb-4">
+  <h2 class="font-semibold mb-2">Шаг 1. Preview файла</h2>
+  <p class="text-sm text-gray-600 mb-3">Preview ничего не записывает в товары проекта. Проверьте колонки, лист Excel, ошибки и предупреждения перед импортом.</p>
+  <form hx-post="/api/projects/{{ project.project_id }}/imports/preview" hx-encoding="multipart/form-data" hx-target="#preview-result">
+    <input type="file" name="file" class="block w-full border rounded p-2 mb-4" accept=".csv,.xlsx,.xlsm" required>
+    <button class="bg-gray-800 text-white px-4 py-2 rounded">Показать preview</button>
+  </form>
+  <div id="preview-result" class="mt-4"></div>
+</section>
+{% endblock %}

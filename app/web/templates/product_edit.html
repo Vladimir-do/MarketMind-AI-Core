@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Редактор карточки — MarketMind AI{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <div class="flex items-center gap-3">
+    <a href="/products/{{ product_id }}" class="text-blue-600 hover:underline text-sm">&larr; К карточке товара</a>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-6">
+    <h1 class="text-2xl font-bold mb-3">Редактор карточки товара</h1>
+    <p class="text-sm text-gray-600">
+      Изменения сохраняются как черновик. Карточка не меняется, пока пользователь явно не применит черновик.
+    </p>
+    <div class="mt-4 flex gap-3">
+      <a href="/products/{{ product_id }}/drafts" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+        Открыть черновики
+      </a>
+      <a href="/products/{{ product_id }}/audit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+        Журнал действий
+      </a>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-xl font-bold mb-3">Активные черновики</h2>
+    {% if drafts %}
+    <div class="space-y-3">
+      {% for draft in drafts %}
+      <div class="border rounded p-4">
+        <div class="font-medium">Черновик {{ draft.draft_id }}</div>
+        <div class="text-sm text-gray-500">Статус: {{ draft.status }} · Ревизия: {{ draft.revision }}</div>
+        {% if draft.comment %}
+        <div class="text-sm text-gray-600 mt-2">{{ draft.comment }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-sm text-gray-500 border rounded p-4 bg-gray-50">Активных черновиков пока нет.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
