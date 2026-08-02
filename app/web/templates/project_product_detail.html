@@ -76,6 +76,70 @@
   </div>
 </section>
 <section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">Content Intelligence Pipeline</h2>
+  {% if quality_report %}
+    <div class="grid md:grid-cols-[120px_1fr] gap-4 mb-4">
+      <div>
+        <div class="text-3xl font-bold
+          {% if quality_report.cqi >= 85 %}text-green-600
+          {% elif quality_report.cqi >= 70 %}text-blue-600
+          {% elif quality_report.cqi >= 50 %}text-yellow-600
+          {% else %}text-red-600{% endif %}">
+          {{ quality_report.cqi }}
+        </div>
+        <div class="text-sm text-gray-500">CQI</div>
+      </div>
+      <div class="text-sm grid gap-1">
+        <div>SEO: {{ quality_report.breakdown.seo }} · Маркетплейс: {{ quality_report.breakdown.marketplace }} · Факты: {{ quality_report.breakdown.facts }} · Читаемость: {{ quality_report.breakdown.readability }} · Визуал: {{ quality_report.breakdown.visual }}</div>
+        <div>Готовность к маркетплейсу: {{ "да" if quality_report.marketplace_ready else "нет" }}</div>
+      </div>
+    </div>
+  {% endif %}
+  {% if content_strategy %}
+    <div class="text-sm grid gap-1 mb-4">
+      <div><span class="text-gray-500">Целевая аудитория:</span> {{ content_strategy.target_audience }}</div>
+      <div><span class="text-gray-500">УТП:</span> {{ content_strategy.key_selling_proposition }}</div>
+      <div><span class="text-gray-500">Тон:</span> {{ content_strategy.tone_of_voice }}</div>
+    </div>
+  {% endif %}
+  {% if not quality_report and not content_strategy %}
+    <div class="text-sm text-gray-500 mb-3">Пайплайн ещё не запускался для этого товара.</div>
+  {% endif %}
+  <form method="post" action="/projects/{{ project.project_id }}/products/{{ card.product_id }}/content-pipeline/run">
+    <button class="bg-gray-800 text-white px-4 py-2 rounded text-sm">
+      {% if quality_report %}Перегенерировать{% else %}Запустить Content Pipeline{% endif %}
+    </button>
+  </form>
+</section>
+<section class="bg-white border rounded p-5 mb-5">
+  <h2 class="font-semibold mb-3">Конкуренты</h2>
+  {% if competitors %}
+    <div class="overflow-x-auto mb-3">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-100"><tr><th class="p-2 text-left">Маркетплейс</th><th class="p-2 text-left">Название</th><th class="p-2 text-left">Цена</th><th class="p-2 text-left">Рейтинг</th><th class="p-2 text-left">Отзывов</th></tr></thead>
+        <tbody>
+        {% for c in competitors %}
+          <tr class="border-t">
+            <td class="p-2">{{ c.marketplace }}</td>
+            <td class="p-2"><a href="{{ c.competitor_url }}" target="_blank" class="text-blue-700 hover:underline">{{ c.competitor_name }}</a></td>
+            <td class="p-2">{{ c.price or "—" }}</td>
+            <td class="p-2">{{ c.rating or "—" }}</td>
+            <td class="p-2">{{ c.reviews_count if c.reviews_count is not none else "—" }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-sm text-gray-500 mb-3">Конкурентный анализ ещё не запускался для этого товара.</div>
+  {% endif %}
+  <form method="post" action="/projects/{{ project.project_id }}/products/{{ card.product_id }}/competitors/refresh">
+    <button class="bg-gray-800 text-white px-4 py-2 rounded text-sm">
+      {% if competitors %}Обновить конкурентов{% else %}Найти конкурентов{% endif %}
+    </button>
+  </form>
+</section>
+<section class="bg-white border rounded p-5 mb-5">
   <h2 class="font-semibold mb-3">Семантическое ядро</h2>
   <div hx-get="/projects/{{ project.project_id }}/products/{{ card.product_id }}/semantic-core"
        hx-trigger="load"

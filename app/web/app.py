@@ -90,6 +90,8 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     from app.analytics.routes import router as analytics_router
+    from app.competitor_analysis.routes import router as competitor_analysis_router
+    from app.content_pipeline.routes import router as content_pipeline_router
     from app.web.routes.dashboard import router as dashboard_router
     from app.web.routes.editor import router as editor_router
     from app.web.routes.import_ import router as import_router
@@ -105,6 +107,8 @@ def create_app() -> FastAPI:
     app.include_router(import_router)
     app.include_router(projects_router)
     app.include_router(suggestions_router)
+    app.include_router(content_pipeline_router)
+    app.include_router(competitor_analysis_router)
     app.include_router(product_detail_router)
     app.include_router(editor_router)
     app.include_router(analytics_router)

@@ -71,7 +71,7 @@ async def _recent_jobs(request: Request, limit: int = 10) -> list[dict[str, Any]
     jobs = await db.get_recent_jobs(limit=limit)
     result = []
     for job in jobs:
-        if job.job_type not in {"seo_ai_suggestions", "ai_product_suggestions"}:
+        if job.job_type not in {"seo_ai_suggestions", "ai_product_suggestions", "content_pipeline", "competitor_analysis_refresh"}:
             continue
         parsed_result = None
         if job.result_json:
@@ -133,6 +133,8 @@ async def _reject_reason(request: Request) -> str:
 def _suggestion_payload(field: str, value: str) -> dict[str, Any]:
     if field == "tags":
         return {"tags": [item.strip() for item in value.replace(";", ",").split(",") if item.strip()]}
+    if field == "selling_points":
+        return {"selling_points": [item.strip() for item in value.split("\n") if item.strip()]}
     return {field: value}
 
 

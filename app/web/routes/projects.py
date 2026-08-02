@@ -1311,14 +1311,36 @@ async def project_products_page(project_id: str, request: Request):
 
 @router.get("/projects/{project_id}/products/{product_id}", response_class=HTMLResponse)
 async def project_product_detail_page(project_id: str, product_id: int, request: Request):
+    from app.competitor_analysis.store import CompetitorSnapshotStore
+    from app.content_pipeline.artifact_store import ArtifactStore
+
     project = await _project_service(request).get_project(project_id)
     service = _effective_service(request)
     card = await service.get_effective_card(project_id, product_id)
     seo = await service.seo(project_id, product_id)
+
+    artifact_store = ArtifactStore(request.app.state.db)
+    content_strategy = await artifact_store.get_latest(
+        project_id=project_id, project_product_id=card.project_product_id, artifact_type="content_strategy"
+    )
+    quality_report = await artifact_store.get_latest(
+        project_id=project_id, project_product_id=card.project_product_id, artifact_type="quality_report"
+    )
+    competitors = await CompetitorSnapshotStore(request.app.state.db).get_latest_batch(
+        project_id=project_id, project_product_id=card.project_product_id
+    )
     return templates.TemplateResponse(
         request,
         "project_product_detail.html",
-        {"project": project, "card": card, "seo": seo["effective"], "active": "projects"},
+        {
+            "project": project,
+            "card": card,
+            "seo": seo["effective"],
+            "active": "projects",
+            "content_strategy": ArtifactStore.payload_dict(content_strategy) if content_strategy else None,
+            "quality_report": ArtifactStore.payload_dict(quality_report) if quality_report else None,
+            "competitors": competitors,
+        },
     )
 
 
@@ -1395,6 +1417,9 @@ def _editable_payload(body: dict[str, Any]) -> dict[str, Any]:
     if "price" in body:
         raw_price = str(body.get("price") or "").strip()
         payload["price"] = int(float(raw_price.replace(",", "."))) if raw_price else None
+    if "selling_points" in body:
+        raw_points = body.get("selling_points") or ""
+        payload["selling_points"] = [item.strip() for item in str(raw_points).split("\n") if item.strip()]
     return payload
 
 

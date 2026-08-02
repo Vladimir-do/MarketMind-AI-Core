@@ -5,6 +5,7 @@
 <form class="bg-white border rounded p-5 max-w-3xl" hx-post="/projects/{{ project.project_id }}/products/{{ card.product_id }}/manual-edit/preview" hx-target="#edit-preview">
   <label class="block mb-3 text-sm">Название<input name="title" value="{{ card.effective_snapshot.title or '' }}" class="mt-1 w-full border rounded p-2"></label>
   <label class="block mb-3 text-sm">Описание<textarea name="description" class="mt-1 w-full border rounded p-2" rows="4">{{ card.effective_snapshot.description or '' }}</textarea></label>
+  <label class="block mb-3 text-sm">Преимущества (по одному в строке)<textarea name="selling_points" class="mt-1 w-full border rounded p-2" rows="4">{{ (card.effective_snapshot.selling_points or []) | join('\n') }}</textarea></label>
   <label class="block mb-3 text-sm">Бренд<input name="brand" value="{{ card.effective_snapshot.brand or '' }}" class="mt-1 w-full border rounded p-2"></label>
   <label class="block mb-3 text-sm">Цена<input name="price" value="{{ card.effective_snapshot.price or '' }}" class="mt-1 w-full border rounded p-2"></label>
   <label class="block mb-3 text-sm">Наличие<input name="availability" value="{{ card.effective_snapshot.availability or '' }}" class="mt-1 w-full border rounded p-2"></label>
