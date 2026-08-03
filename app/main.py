@@ -21,6 +21,10 @@ def _shutdown_handler(sig, frame):
 def main():
     parser = argparse.ArgumentParser(description="Агент мониторинга цен маркетплейсов")
     parser.add_argument("--telegram", action="store_true", help="Запустить Telegram-бота")
+    parser.add_argument(
+        "--add", nargs="+", metavar="URL",
+        help="Добавить товар(ы) по ссылке, обновить цены всех товаров и сгенерировать отчёт одной командой",
+    )
     parser.add_argument("--update",   action="store_true", help="Обновить цены всех товаров")
     parser.add_argument("--migrate", action="store_true", help="Применить Alembic миграции (alembic upgrade head)")
     parser.add_argument("--metrics", type=int, metavar="N", help="Показать последние N попыток парсинга")
@@ -55,7 +59,7 @@ def main():
             print("Alembic миграции применены успешно")
 
         asyncio.run(_run_migrations())
-        if not any([args.telegram, args.update, args.metrics, args.blocks,
+        if not any([args.telegram, args.add, args.update, args.metrics, args.blocks,
                     args.ozon_login, args.report, args.deploy_wb, args.enrich, args.ai_test, args.web]):
             return
 
@@ -83,6 +87,37 @@ def main():
                     pass
             _loop.close()
             _loop = None
+
+    elif args.add:
+        async def _add_and_report():
+            from datetime import datetime
+
+            from app.config import PROXY, REPORTS_DIR
+            from app.database import Database
+            from app.reporter import export_html_report
+            from app.worker import worker_add_urls, worker_update_all
+
+            db = Database()
+            await db.init()
+            proxy = PROXY if PROXY else None
+
+            async def _notify(text: str):
+                print(text)
+
+            try:
+                await worker_add_urls(db, args.add, _notify, proxy=proxy)
+                await worker_update_all(db, _notify, proxy=proxy)
+                buf = await export_html_report(db, embed_images=args.embed_images)
+                payload = buf.read()
+                filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+                out = REPORTS_DIR / filename
+                out.write_bytes(payload)
+            finally:
+                await db._engine.dispose()
+            print(f"Отчёт сохранён: {out.resolve()}")
+
+        asyncio.run(_add_and_report())
 
     elif args.update:
         async def _update():
