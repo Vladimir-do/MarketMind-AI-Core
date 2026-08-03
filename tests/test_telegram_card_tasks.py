@@ -15,14 +15,14 @@ class TelegramCardTaskTests(unittest.TestCase):
 
     def test_build_card_task_from_product_includes_price_image_and_source(self):
         product = SimpleNamespace(
-            name="РљР°Р±РµР»СЊ USB-C",
+            name="Кабель USB-C",
             image_url="https://example.com/image.jpg",
             url="https://example.com/product",
         )
 
         task = build_card_task_from_product(product, 299)
 
-        self.assertIn("РљР°Р±РµР»СЊ USB-C", task)
+        self.assertIn("Кабель USB-C", task)
         self.assertIn("299", task)
         self.assertIn("https://example.com/image.jpg", task)
         self.assertIn("https://example.com/product", task)

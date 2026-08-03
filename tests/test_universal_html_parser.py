@@ -37,7 +37,7 @@ class UniversalHtmlParserTests(unittest.TestCase):
     def test_price_without_title_has_low_confidence(self):
         result = UniversalHtmlParser().parse(
             "https://example.com/menu",
-            html="<html><body><div>350 в‚Ѕ</div></body></html>",
+            html="<html><body><div>350 ₽</div></body></html>",
         )
 
         self.assertTrue(result.success)
@@ -50,7 +50,7 @@ class UniversalHtmlParserTests(unittest.TestCase):
             [
                 NormalizedEntity(
                     entity_type="dish",
-                    title="РЁР°С€Р»С‹Рє",
+                    title="Шашлык",
                     price=350,
                     url="https://example.com/menu/shashlyk",
                     attributes={"url_source": "detail_link"},
@@ -65,7 +65,7 @@ class UniversalHtmlParserTests(unittest.TestCase):
     def test_ai_source_adds_warning(self):
         context = ParseContext(
             url="https://example.com/menu",
-            html="<html><body><div>РЁР°С€Р»С‹Рє 350 в‚Ѕ</div></body></html>",
+            html="<html><body><div>Шашлык 350 ₽</div></body></html>",
             parser_chain=["ai_enricher", "universal_html"],
         )
 

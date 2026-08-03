@@ -19,9 +19,9 @@ async def build_price_forecast_message(db: Database) -> str:
     products = await db.get_all_products()
 
     if not products:
-        return "рџ“­ Р‘Р°Р·Р° РїСѓСЃС‚Р°СЏ."
+        return "📭 База пустая."
 
-    lines = ["рџ”® <b>РџСЂРѕРіРЅРѕР· С†РµРЅ РЅР° 7 РґРЅРµР№:</b>\n"]
+    lines = ["🔮 <b>Прогноз цен на 7 дней:</b>\n"]
     for product in products[:10]:
         prices = await analyzer._get_prices(product.id)
         if len(prices) < 2:
@@ -31,15 +31,15 @@ async def build_price_forecast_message(db: Database) -> str:
         if not forecast:
             continue
         diff = forecast - current
-        arrow = "рџ“‰" if diff < 0 else "рџ“€" if diff > 0 else "вћЎпёЏ"
+        arrow = "📉" if diff < 0 else "📈" if diff > 0 else "➡️"
         pct = round(diff / current * 100, 1)
         lines.append(
             f"{arrow} <b>{html.escape(product.name[:45])}</b>\n"
-            f"   РЎРµР№С‡Р°СЃ: {current} в‚Ѕ в†' С‡РµСЂРµР· 7Рґ: {forecast} в‚Ѕ ({pct:+.1f}%)"
+            f"   Сейчас: {current} ₽ → через 7д: {forecast} ₽ ({pct:+.1f}%)"
         )
 
     if len(lines) == 1:
-        return "рџ“­ РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РґР°РЅРЅС‹С… РґР»СЏ РїСЂРѕРіРЅРѕР·Р°. РќСѓР¶РЅРѕ Р±РѕР»СЊС€Рµ РЅР°Р±Р»СЋРґРµРЅРёР№."
+        return "📭 Недостаточно данных для прогноза. Нужно больше наблюдений."
 
     return "\n".join(lines)
 
@@ -51,13 +51,13 @@ async def build_price_alerts_message(db: Database) -> str:
     alerts = await analyzer.price_alert_check()
 
     if not alerts:
-        return "вњ… РђРєС‚РёРІРЅС‹С… Р°Р»РµСЂС‚РѕРІ РЅРµС‚. Р’СЃРµ С†РµРЅС‹ РІ РЅРѕСЂРјРµ."
+        return "✅ Активных алертов нет. Все цены в норме."
 
-    lines = [f"рџљЁ <b>РђРєС‚РёРІРЅС‹Рµ Р°Р»РµСЂС‚С‹ ({len(alerts)}):</b>\n"]
+    lines = [f"🚨 <b>Активные алерты ({len(alerts)}):</b>\n"]
     for alert in alerts:
         lines.append(
             f"{alert['icon']} <b>{html.escape(str(alert['name']))}</b>\n"
-            f"   рџ’° {alert['price']} в‚Ѕ вЂ” {html.escape(str(alert['message']))}\n"
-            f"   <a href='{alert['url']}'>РћС‚РєСЂС‹С‚СЊ С‚РѕРІР°СЂ</a>"
+            f"   💰 {alert['price']} ₽ — {html.escape(str(alert['message']))}\n"
+            f"   <a href='{alert['url']}'>Открыть товар</a>"
         )
     return "\n".join(lines)

@@ -11,11 +11,11 @@ class TelegramAiReportTests(unittest.IsolatedAsyncioTestCase):
 
         message = await build_price_forecast_message(db)
 
-        self.assertIn("Р‘Р°Р·Р°", message)
+        self.assertIn("База", message)
 
     async def test_forecast_includes_product_with_enough_prices(self):
         db = SimpleNamespace(
-            get_all_products=AsyncMock(return_value=[SimpleNamespace(id=1, name="РўРѕРІР°СЂ")])
+            get_all_products=AsyncMock(return_value=[SimpleNamespace(id=1, name="Товар")])
         )
         analyzer = Mock()
         analyzer._get_prices = AsyncMock(return_value=[100, 110, 120])
@@ -23,8 +23,8 @@ class TelegramAiReportTests(unittest.IsolatedAsyncioTestCase):
         with patch("app.ai_analyzer.DeepAnalyzer", return_value=analyzer):
             message = await build_price_forecast_message(db)
 
-        self.assertIn("РџСЂРѕРіРЅРѕР·", message)
-        self.assertIn("РўРѕРІР°СЂ", message)
+        self.assertIn("Прогноз", message)
+        self.assertIn("Товар", message)
 
     async def test_alerts_reports_empty_list(self):
         analyzer = Mock()
@@ -33,4 +33,4 @@ class TelegramAiReportTests(unittest.IsolatedAsyncioTestCase):
         with patch("app.ai_analyzer.DeepAnalyzer", return_value=analyzer):
             message = await build_price_alerts_message(object())
 
-        self.assertIn("РђРєС‚РёРІРЅС‹С…", message)
+        self.assertIn("Активных", message)

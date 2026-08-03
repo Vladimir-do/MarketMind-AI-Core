@@ -30,12 +30,12 @@ def format_dt(value) -> str:
 
 def clip(value, limit: int = 80) -> str:
     text = str(value or "")
-    return text if len(text) <= limit else text[: limit - 1] + "вЂ¦"
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def format_recent_scrape_attempts(rows: Iterable) -> str:
     rows = list(rows)
-    lines = [f"<b>РџРѕСЃР»РµРґРЅРёРµ РїРѕРїС‹С‚РєРё РїР°СЂСЃРёРЅРіР°: {len(rows)}</b>"]
+    lines = [f"<b>Последние попытки парсинга: {len(rows)}</b>"]
     for item in rows:
         status = html.escape(str(item.status or item.fetch_status or "-"))
         marketplace = html.escape(str(item.marketplace or "-"))
@@ -96,22 +96,22 @@ def format_marketplace_health(items: Iterable[dict]) -> str:
 
 def format_product_list(products: Iterable, latest_by_product: dict) -> str:
     products = list(products)
-    lines = [f"рџ“¦ <b>РћС‚СЃР»РµР¶РёРІР°РµС‚СЃСЏ {len(products)} С‚РѕРІР°СЂРѕРІ:</b>\n"]
+    lines = [f"📦 <b>Отслеживается {len(products)} товаров:</b>\n"]
     for product in products:
         last = latest_by_product.get(product.id)
-        price_str = f"{last.price} в‚Ѕ" if last and last.price else "вЂ”"
-        icon = "вњ…" if last and last.availability_status == "in_stock" else "вќЊ"
-        lines.append(f"{icon} <a href='{product.url}'>{product.name[:50]}</a> вЂ” {price_str}")
+        price_str = f"{last.price} ₽" if last and last.price else "—"
+        icon = "✅" if last and last.availability_status == "in_stock" else "❌"
+        lines.append(f"{icon} <a href='{product.url}'>{product.name[:50]}</a> — {price_str}")
     return "\n".join(lines)
 
 
 def format_status_message(n_products: int, n_history: int, n_subscribers: int, ai_available: bool) -> str:
     return (
-        f"рџ“Љ <b>РЎС‚Р°С‚РёСЃС‚РёРєР°</b>\n\n"
-        f"РўРѕРІР°СЂРѕРІ: <b>{n_products}</b>\n"
-        f"Р—Р°РїРёСЃРµР№ РёСЃС‚РѕСЂРёРё: <b>{n_history}</b>\n"
-        f"РџРѕРґРїРёСЃС‡РёРєРѕРІ: <b>{n_subscribers}</b>\n"
-        f"AI-Р°РіРµРЅС‚: {'вњ… Р°РєС‚РёРІРµРЅ' if ai_available else 'вќЊ РЅРµС‚ API РєР»СЋС‡Р°'}"
+        f"📊 <b>Статистика</b>\n\n"
+        f"Товаров: <b>{n_products}</b>\n"
+        f"Записей истории: <b>{n_history}</b>\n"
+        f"Подписчиков: <b>{n_subscribers}</b>\n"
+        f"AI-агент: {'✅ активен' if ai_available else '❌ нет API ключа'}"
     )
 
 
@@ -126,20 +126,20 @@ def format_network_diagnostics(
     tcp_ok, tcp_msg = tcp_result
     https_ok, https_msg = https_result
     lines = [
-        "рџЊђ <b>РЎРµС‚РµРІР°СЏ РґРёР°РіРЅРѕСЃС‚РёРєР°</b>",
+        "🌐 <b>Сетевая диагностика</b>",
         "",
         f"Telegram proxy: <code>{html.escape(telegram_proxy)}</code>",
         f"Marketplace proxy: <code>{html.escape(marketplace_proxy)}</code>",
         "",
-        f"DNS api.telegram.org: {'вњ…' if dns_ok else 'вќЊ'} {html.escape(dns_msg)}",
-        f"TCP api.telegram.org:443: {'вњ…' if tcp_ok else 'вќЊ'} {html.escape(tcp_msg)}",
-        f"HTTPS api.telegram.org: {'вњ…' if https_ok else 'вќЊ'} {html.escape(https_msg)}",
+        f"DNS api.telegram.org: {'✅' if dns_ok else '❌'} {html.escape(dns_msg)}",
+        f"TCP api.telegram.org:443: {'✅' if tcp_ok else '❌'} {html.escape(tcp_msg)}",
+        f"HTTPS api.telegram.org: {'✅' if https_ok else '❌'} {html.escape(https_msg)}",
     ]
     if not (dns_ok and tcp_ok and https_ok):
         lines.extend(
             [
                 "",
-                "РџРѕРґСЃРєР°Р·РєР°: РµСЃР»Рё РµСЃС‚СЊ вќЊ, РїСЂРѕРІРµСЂСЊС‚Рµ VPN/РїСЂРѕРєСЃРё/С„Р°РµСЂРІРѕР» Рё РїРѕРїСЂРѕР±СѓР№С‚Рµ СЃРЅРѕРІР°.",
+                "Подсказка: если есть ❌, проверьте VPN/прокси/фаервол и попробуйте снова.",
             ]
         )
     return "\n".join(lines)
