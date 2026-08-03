@@ -34,6 +34,12 @@ run_web() {
   "$PYTHON_BIN" -m app.main --web --host 127.0.0.1 --port "$port"
 }
 
+run_telegram() {
+  echo "Запуск Telegram-бота (нужен BOT_TOKEN в .env)."
+  echo "Остановка: Ctrl+C"
+  "$PYTHON_BIN" -m app.main --telegram
+}
+
 run_metrics() { "$PYTHON_BIN" -m app.main --metrics "${MARKETMIND_METRICS_LIMIT:-20}"; }
 run_blocks() { "$PYTHON_BIN" -m app.main --blocks "${MARKETMIND_BLOCKS_LIMIT:-20}"; }
 run_ozon_login() { "$PYTHON_BIN" -m app.main --ozon-login; }
@@ -53,6 +59,7 @@ Database: $DATABASE_URL
 3. Показать последние метрики парсинга
 4. Показать последние блокировки
 5. Ozon login / сохранить браузерный профиль
+6. Запустить Telegram-бота
 0. Выход
 MENU
   read -r -p "Выбери пункт: " choice
@@ -63,6 +70,7 @@ MENU
     3) run_metrics; pause ;;
     4) run_blocks; pause ;;
     5) run_ozon_login; pause ;;
+    6) run_telegram; pause ;;
     0) exit 0 ;;
     *) echo "Неизвестный пункт: $choice"; pause ;;
   esac
