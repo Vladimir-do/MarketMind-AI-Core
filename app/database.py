@@ -1376,16 +1376,22 @@ class Database:
         Возвращает (product, price_changed).
         """
         from sqlalchemy import desc, select
+        from sqlalchemy.exc import IntegrityError
 
         url_hash = url_to_hash(url)
         now = datetime.now(UTC)
+
+        def _touch_existing(p: Product) -> None:
+            p.last_check = now
+            p.name = data.get("name", p.name)
+            p.image_url = data.get("image_url") or p.image_url
 
         async with self.session() as s:
             result = await s.execute(select(Product).where(Product.url_hash == url_hash))
             product = result.scalar_one_or_none()
 
             if not product:
-                product = Product(
+                new_product = Product(
                     url_hash=url_hash,
                     url=url,
                     name=data.get("name"),
@@ -1393,13 +1399,22 @@ class Database:
                     first_seen=now,
                     last_check=now,
                 )
-                s.add(product)
-                await s.flush()
-                is_new = True
+                s.add(new_product)
+                try:
+                    await s.flush()
+                    product = new_product
+                    is_new = True
+                except IntegrityError:
+                    # A concurrent scrape of the same URL won the insert race
+                    # (url_hash UNIQUE). Recover by reusing the row it created
+                    # instead of propagating an unhandled exception.
+                    await s.rollback()
+                    result = await s.execute(select(Product).where(Product.url_hash == url_hash))
+                    product = result.scalar_one()
+                    _touch_existing(product)
+                    is_new = False
             else:
-                product.last_check = now
-                product.name = data.get("name", product.name)
-                product.image_url = data.get("image_url") or product.image_url
+                _touch_existing(product)
                 is_new = False
 
             # Последняя запись истории

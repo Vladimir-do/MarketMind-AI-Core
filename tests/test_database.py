@@ -102,6 +102,62 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(products[0].id, product.id)
         self.assertEqual(products[0].image_url, "https://example.com/image.jpg")
 
+    async def test_save_product_recovers_from_concurrent_insert_race(self):
+        """Two concurrent scrapes of the same URL: the loser must not crash,
+        it must recover and reuse the row the winner already committed."""
+        import contextlib
+
+        url = "https://example.com/race-item"
+        winner, _ = await self.db.save_product(
+            url,
+            {"name": "Winner", "price": 100, "availability": "in_stock"},
+        )
+
+        class _EmptyFirstSelectSession:
+            """Makes the very first SELECT in save_product() report 'not found',
+            as it would under real concurrency where the SELECT ran before the
+            other transaction's INSERT became visible."""
+
+            def __init__(self, real_session):
+                self._real = real_session
+                self._select_calls = 0
+
+            async def execute(self, *args, **kwargs):
+                self._select_calls += 1
+                if self._select_calls == 1:
+                    class _EmptyResult:
+                        def scalar_one_or_none(self):
+                            return None
+                    return _EmptyResult()
+                return await self._real.execute(*args, **kwargs)
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        original_session_factory = self.db._session_factory
+        real_cm_factory = original_session_factory
+
+        @contextlib.asynccontextmanager
+        async def _patched_factory():
+            async with real_cm_factory() as real_s:
+                yield _EmptyFirstSelectSession(real_s)
+
+        self.db._session_factory = _patched_factory
+        try:
+            loser, changed = await self.db.save_product(
+                url,
+                {"name": "Loser", "price": 150, "availability": "in_stock"},
+            )
+        finally:
+            self.db._session_factory = original_session_factory
+
+        self.assertEqual(loser.id, winner.id, "must reuse the winner's row, not raise or duplicate")
+        products = await self.db.get_all_products()
+        self.assertEqual(len(products), 1, "the losing insert must not create a duplicate product")
+        self.assertTrue(changed, "the loser's price update should still be recorded as a change")
+        last = await self.db.get_last_price(winner.id)
+        self.assertEqual(last.price, 150)
+
     async def test_get_latest_product_returns_most_recently_checked(self):
         first, _ = await self.db.save_product(
             "https://example.com/first",
