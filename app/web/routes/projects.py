@@ -10,11 +10,10 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy import select
 
-from app.ai_recommendation.db_approval import DatabaseApprovalQueue
 from app.ai_recommendation.job_queue import process_project_seo_suggestion_job
 from app.ai_recommendation.suggestions import AISuggestion
 from app.config import IMPORT_SCHEMA_VERSION
@@ -130,15 +129,6 @@ def _effective_service(request: Request) -> EffectiveProductCardService:
     return EffectiveProductCardService(request.app.state.db)
 
 
-def _approval_queue(request: Request) -> DatabaseApprovalQueue:
-    queue = getattr(request.app.state, "ai_queue", None)
-    if isinstance(queue, DatabaseApprovalQueue):
-        return queue
-    queue = DatabaseApprovalQueue(request.app.state.db)
-    request.app.state.ai_queue = queue
-    return queue
-
-
 def _project_to_dict(project) -> dict[str, Any]:
     return {
         "project_id": project.project_id,
@@ -242,24 +232,6 @@ def _job_to_dict(record) -> dict[str, Any]:
         "started_at": record.started_at.isoformat() if record.started_at else None,
         "finished_at": record.finished_at.isoformat() if record.finished_at else None,
         "updated_at": record.updated_at.isoformat() if record.updated_at else None,
-    }
-
-
-def _approval_to_dict(item) -> dict[str, Any]:
-    suggestion = item.suggestion
-    return {
-        "approval_id": item.approval_id,
-        "product_id": item.product_id,
-        "product_name": str(suggestion.metadata.get("product_name") or item.product_id),
-        "field": suggestion.field,
-        "suggestion_type": suggestion.suggestion_type,
-        "before": suggestion.before,
-        "after": suggestion.after,
-        "reason": suggestion.reason,
-        "confidence": suggestion.confidence,
-        "source_finding": suggestion.source_finding,
-        "metadata": suggestion.metadata,
-        "status": "pending" if item.approved is None else ("approved" if item.approved else "rejected"),
     }
 
 
@@ -881,8 +853,18 @@ async def api_project_seo_suggestions(project_id: str, product_id: int, request:
 
 
 @router.post("/api/projects/{project_id}/products/{product_id}/seo-suggestions")
-async def api_queue_project_seo_suggestions(project_id: str, product_id: int, request: Request):
-    """Queue factual SEO suggestions for the existing approval workflow."""
+async def api_queue_project_seo_suggestions(
+    project_id: str, product_id: int, request: Request, background_tasks: BackgroundTasks
+):
+    """Queue factual SEO suggestions for the existing approval workflow.
+
+    Runs the AI call in the background (like the product-level
+    /api/products/{id}/ai-suggestions endpoint) instead of awaiting it inline
+    -- an LLM round-trip can take up to the provider's timeout (60s default),
+    long enough to risk a client/proxy timeout on a synchronous request.
+    Suggestions appear in the approval queue (/suggestions) once the job
+    completes; this endpoint only confirms the job was queued.
+    """
     try:
         form = await request.form()
         action = str(form.get("action", "")).strip()
@@ -907,59 +889,24 @@ async def api_queue_project_seo_suggestions(project_id: str, product_id: int, re
             project_id,
             product_id,
         )
-        try:
-            result = await process_project_seo_suggestion_job(
-                request.app,
-                job.job_id,
-                project_id,
-                product_id,
-                action=action,
-            )
-        except Exception as exc:
-            error_text = str(exc).strip() or exc.__class__.__name__
-            logger.info(
-                "Suggestion returned to frontend task_id=%s project_id=%s product_id=%s stage=failed error=%s",
-                job.job_id,
-                project_id,
-                product_id,
-                error_text,
-            )
-            if _is_hx(request):
-                return HTMLResponse(
-                    '<div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">'
-                    f"Ошибка генерации AI: {error_text}. Job: {job.job_id}"
-                    "</div>"
-                )
-            return {
-                "success": False,
-                "task_id": job.job_id,
-                "status": "failed",
-                "error": error_text,
-                "queued": 0,
-                "items": [],
-            }
-        queued_ids = set(result["approval_ids"])
-        queued = [item for item in await _approval_queue(request).get_all() if item.approval_id in queued_ids]
-        logger.info(
-            "Suggestion returned to frontend task_id=%s project_id=%s product_id=%s queued=%s stage=completed",
+        background_tasks.add_task(
+            process_project_seo_suggestion_job,
+            request.app,
             job.job_id,
             project_id,
             product_id,
-            len(queued),
+            action=action,
         )
         if _is_hx(request):
             return HTMLResponse(
-                '<div class="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">'
-                f"Поставлено в согласование: {len(queued)}. Job: {job.job_id}"
+                '<div class="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">'
+                f"Задача поставлена в очередь. Результат появится в разделе «Предложения AI». Job: {job.job_id}"
                 "</div>"
             )
         return {
             "success": True,
             "task_id": job.job_id,
-            "status": result["status"],
-            "model_used": result.get("model_used"),
-            "queued": len(queued),
-            "items": [_approval_to_dict(item) for item in queued],
+            "status": "queued",
         }
     except Exception as exc:
         raise _editor_error(exc) from exc

@@ -1170,7 +1170,8 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("approval_id", item)
 
     async def test_seo_suggestions_post_queues_pending_approvals(self):
-        """POST seo-suggestions создаёт реальные pending-записи approval workflow."""
+        """POST seo-suggestions ставит AI-задачу в фон и сразу подтверждает queued;
+        реальные pending-записи approval workflow появляются после выполнения задачи."""
         project_id = await self._create_project("SEO Queue")
         await self._import_csv(project_id, "лучший кабель USB-C для зарядки 1 м")
         product_id = await self._product_id(project_id)
@@ -1178,15 +1179,16 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         resp = await self.client.post(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertGreater(data["queued"], 0)
-        self.assertEqual(data["queued"], len(data["items"]))
-        self.assertTrue(all(item["status"] == "pending" for item in data["items"]))
-        self.assertTrue(all(item["approval_id"] for item in data["items"]))
+        self.assertTrue(data["success"])
+        self.assertEqual(data["status"], "queued")
+        self.assertTrue(data["task_id"])
 
         queued = await self.client.get("/api/suggestions?status=pending")
         self.assertEqual(queued.status_code, 200)
-        approval_ids = {item["approval_id"] for item in queued.json()}
-        self.assertTrue({item["approval_id"] for item in data["items"]}.issubset(approval_ids))
+        items = [item for item in queued.json() if item["product_id"] == str(product_id)]
+        self.assertGreater(len(items), 0)
+        self.assertTrue(all(item["status"] == "pending" for item in items))
+        self.assertTrue(all(item["approval_id"] for item in items))
 
     async def test_seo_suggestions_page_shows_jobs_and_approvals(self):
         """Страница Предложения AI показывает job lifecycle и сохранённые approvals."""
@@ -1198,7 +1200,7 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(queued.status_code, 200)
         data = queued.json()
         self.assertTrue(data["success"])
-        self.assertEqual(data["status"], "succeeded")
+        self.assertEqual(data["status"], "queued")
         self.assertTrue(data["task_id"])
 
         page = await self.client.get("/suggestions")
@@ -1221,7 +1223,7 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text/html", resp.headers["content-type"])
-        self.assertIn("Поставлено в согласование", resp.text)
+        self.assertIn("поставлена в очередь", resp.text)
         queued = await self.client.get("/api/suggestions?status=pending")
         self.assertGreater(len(queued.json()), 0)
 
@@ -1245,7 +1247,11 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
         queued = await self.client.post(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
         self.assertEqual(queued.status_code, 200)
-        title_item = next(item for item in queued.json()["items"] if item["field"] == "title")
+        pending = await self.client.get("/api/suggestions?status=pending")
+        title_item = next(
+            item for item in pending.json()
+            if item["product_id"] == str(product_id) and item["field"] == "title"
+        )
 
         approved = await self.client.post(f"/suggestions/{title_item['approval_id']}/approve")
         self.assertEqual(approved.status_code, 200)
@@ -1268,11 +1274,22 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         product_id = await self._product_id(project_id)
 
         first_queue = await self.client.post(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
-        second_queue = await self.client.post(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
         self.assertEqual(first_queue.status_code, 200)
+        pending_after_first = await self.client.get("/api/suggestions?status=pending")
+        first_title = next(
+            item for item in pending_after_first.json()
+            if item["product_id"] == str(product_id) and item["field"] == "title"
+        )
+
+        second_queue = await self.client.post(f"/api/projects/{project_id}/products/{product_id}/seo-suggestions")
         self.assertEqual(second_queue.status_code, 200)
-        first_title = next(item for item in first_queue.json()["items"] if item["field"] == "title")
-        second_title = next(item for item in second_queue.json()["items"] if item["field"] == "title")
+        pending_after_second = await self.client.get("/api/suggestions?status=pending")
+        second_title = next(
+            item for item in pending_after_second.json()
+            if item["product_id"] == str(product_id)
+            and item["field"] == "title"
+            and item["approval_id"] != first_title["approval_id"]
+        )
 
         first = await self.client.post(f"/suggestions/{first_title['approval_id']}/approve")
         second = await self.client.post(f"/suggestions/{second_title['approval_id']}/approve")
