@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -195,6 +196,44 @@ class TestFactory(unittest.TestCase):
     def test_create_configured_provider_uses_model_env(self):
         p = create_configured_provider()
         self.assertEqual(p._model, "mistral")
+
+    @patch.dict("os.environ", {"AI_PROVIDER": "claude", "ANTHROPIC_API_KEY": "sk-ant-test"})
+    def test_create_configured_provider_claude_is_available(self):
+        """Regression test: ProviderType.claude previously had no base_url in
+        _PROVIDER_BASE_URLS, so is_available() was always False even with a
+        valid ANTHROPIC_API_KEY."""
+        p = create_configured_provider()
+        self.assertIsInstance(p, OpenAICompatibleProvider)
+        self.assertEqual(p.name(), "claude")
+        self.assertTrue(p.is_available(), "claude provider must be available with a valid API key")
+        self.assertTrue(p.base_url, "claude provider must resolve a non-empty base_url")
+
+    def test_create_configured_provider_default_matches_config_ai_provider_default(self):
+        """When AI_PROVIDER is unset, the factory's hardcoded default must
+        match app.config.AI_PROVIDER's hardcoded default ("grok"), not
+        silently diverge to "ollama". (app.config.AI_PROVIDER itself is read
+        from the environment/.env at import time and may not equal its own
+        source default in a configured deployment, so this asserts against
+        the literal both modules are meant to agree on, not the live value.)"""
+        import inspect
+
+        import app.config as config_module
+
+        source = inspect.getsource(config_module)
+        self.assertIn(
+            'os.getenv("AI_PROVIDER", "grok")', source,
+            "app.config.AI_PROVIDER's own default changed -- update this test "
+            "and factory.py's default together",
+        )
+
+        original = os.environ.pop("AI_PROVIDER", None)
+        try:
+            with patch.dict("os.environ", {"GROK_API_KEY": "xai-test"}):
+                p = create_configured_provider()
+            self.assertEqual(p.name(), "grok")
+        finally:
+            if original is not None:
+                os.environ["AI_PROVIDER"] = original
 
 
 def _build_fallback_mock(responses: list[tuple[int, dict]]):

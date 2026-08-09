@@ -49,6 +49,8 @@ _PROVIDER_BASE_URLS: dict[ProviderType, str] = {
     ProviderType.grok: "https://api.x.ai/v1",
     ProviderType.gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
     ProviderType.groq: "https://api.groq.com/openai/v1",
+    # Anthropic's OpenAI-compatible endpoint (POST {base_url}/chat/completions).
+    ProviderType.claude: "https://api.anthropic.com/v1",
 }
 
 
@@ -78,7 +80,10 @@ def create_provider(provider_type: ProviderType, **kwargs) -> BaseAIProvider:
 
 def create_configured_provider() -> BaseAIProvider:
     """Create the provider specified by AI_PROVIDER env var."""
-    raw = os.getenv("AI_PROVIDER", "ollama").strip().lower()
+    # Default must match app.config.AI_PROVIDER's default ("grok") -- this
+    # reads os.environ directly (rather than importing app.config.AI_PROVIDER)
+    # so it stays responsive to env vars set after app.config was imported.
+    raw = os.getenv("AI_PROVIDER", "grok").strip().lower()
     try:
         ptype = ProviderType(raw)
     except ValueError:
