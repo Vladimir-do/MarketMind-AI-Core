@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import sqlite3
 from datetime import UTC, datetime
@@ -72,7 +73,14 @@ def restore_database_backup(backup_name: str, *, confirmation: str, db_path: Pat
         raise BackupError("Резервная копия не найдена")
     protective = create_database_backup(reason="pre_restore", db_path=target_db, backups_dir=source_dir)
     target_db.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(backup_path, target_db)
+    # Copy into a temp file first, then atomically swap it into place.
+    # A concurrent connection that already has target_db open keeps seeing a
+    # fully-consistent file (old or new) at every instant this way -- an
+    # in-place shutil.copy2() straight onto the live path could expose a
+    # partially-overwritten file to any reader active during the copy.
+    tmp_path = target_db.with_name(f"{target_db.name}.restore_tmp")
+    shutil.copy2(backup_path, tmp_path)
+    os.replace(tmp_path, target_db)
     for suffix in ("-wal", "-shm"):
         sidecar = Path(f"{target_db}{suffix}")
         sidecar.unlink(missing_ok=True)

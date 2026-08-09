@@ -132,6 +132,58 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
             self.db = database.Database()
             await self.db.init()
 
+    async def test_restore_database_backup_swaps_file_atomically(self):
+        """A reader with the old file already open must keep seeing a fully
+        consistent version (old or new), never a partially-overwritten one --
+        proving the restore uses a temp-file + os.replace() swap rather than
+        an in-place copy onto the live path."""
+        import sqlite3
+
+        from app.backups.service import restore_database_backup
+
+        backups_dir = self.root / "atomic_backups"
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        target_db = self.root / "atomic_target.db"
+
+        def _make_sqlite_file(path: Path, marker: str) -> None:
+            conn = sqlite3.connect(path)
+            conn.execute(f"CREATE TABLE {marker}(x)")
+            conn.commit()
+            conn.close()
+
+        _make_sqlite_file(target_db, "old_marker")
+        backup_file = backups_dir / "backup_new.db"
+        _make_sqlite_file(backup_file, "new_marker")
+
+        # Open a raw handle on the live file BEFORE restoring, mimicking a
+        # concurrent reader that already has the old inode open.
+        old_fd = os.open(target_db, os.O_RDONLY)
+        try:
+            restore_database_backup(
+                "backup_new.db",
+                confirmation="ВОССТАНОВИТЬ",
+                db_path=target_db,
+                backups_dir=backups_dir,
+            )
+
+            # The pre-existing handle must still resolve to the OLD content --
+            # proof the file was swapped via rename, not truncated in place.
+            old_content = os.pread(old_fd, 1_000_000, 0)
+            self.assertIn(b"old_marker", old_content)
+            self.assertNotIn(b"new_marker", old_content)
+        finally:
+            os.close(old_fd)
+
+        # A fresh open must see the NEW content.
+        new_conn = sqlite3.connect(target_db)
+        tables = {row[0] for row in new_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        new_conn.close()
+        self.assertIn("new_marker", tables)
+        self.assertNotIn("old_marker", tables)
+
+        # No leftover temp file.
+        self.assertFalse((self.root / "atomic_target.db.restore_tmp").exists())
+
     async def test_project_archive_contains_only_selected_project_and_no_secrets(self):
         project_a = await self._create_project("Archive A")
         project_b = await self._create_project("Archive B")
