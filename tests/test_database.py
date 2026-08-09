@@ -467,6 +467,69 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         finally:
             self.db._session_factory = original_session_factory
 
+    async def test_record_blocked_pattern_db_failure_logs_warning_not_silent(self):
+        """A failed BlockedPattern write must stay best-effort (no raise) but
+        must be visible at WARNING, not swallowed at DEBUG where it's invisible
+        in default production logging."""
+        import contextlib
+
+        original_session_factory = self.db._session_factory
+        real_cm_factory = original_session_factory
+
+        class _FailingAddSession:
+            def __init__(self, real_session):
+                self._real = real_session
+
+            def add(self, obj):
+                raise RuntimeError("simulated BlockedPattern insert failure")
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        @contextlib.asynccontextmanager
+        async def _patched_factory():
+            async with real_cm_factory() as real_s:
+                yield _FailingAddSession(real_s)
+
+        self.db._session_factory = _patched_factory
+        try:
+            with self.assertLogs("parser", level="WARNING") as logs:
+                await self.db.record_blocked_pattern(
+                    url="https://www.ozon.ru/product/warn-test",
+                    marketplace="ozon",
+                    source="api",
+                    status="blocked",
+                    trigger="http_403",
+                )
+        finally:
+            self.db._session_factory = original_session_factory
+
+        self.assertTrue(
+            any("blocked pattern write failed" in msg for msg in logs.output),
+            f"expected a WARNING about the failed write, got: {logs.output}",
+        )
+
+    async def test_append_blocked_pattern_jsonl_failure_logs_warning_not_silent(self):
+        """A failed JSONL audit-trail write must also be visible at WARNING."""
+        # Point the JSONL path at a directory so open("a") raises IsADirectoryError.
+        os.environ["BLOCK_PATTERNS_JSONL"] = str(Path(self.tmp.name))
+        try:
+            with self.assertLogs("parser", level="WARNING") as logs:
+                await self.db.record_blocked_pattern(
+                    url="https://www.ozon.ru/product/jsonl-warn-test",
+                    marketplace="ozon",
+                    source="api",
+                    status="blocked",
+                    trigger="http_403",
+                )
+        finally:
+            os.environ["BLOCK_PATTERNS_JSONL"] = str(self.block_jsonl_path)
+
+        self.assertTrue(
+            any("blocked pattern jsonl write failed" in msg for msg in logs.output),
+            f"expected a WARNING about the failed jsonl write, got: {logs.output}",
+        )
+
 
 class ProxyMaskingTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

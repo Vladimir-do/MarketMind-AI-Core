@@ -990,8 +990,12 @@ class Database:
             async with self.session() as s:
                 s.add(BlockedPattern(**payload))
                 await s.commit()
-        except Exception as e:
-            logger.debug(f"blocked pattern write failed: {e}")
+        except Exception:
+            logger.warning(
+                "blocked pattern write failed (marketplace=%s trigger=%s): "
+                "adaptive cooldown/circuit-breaker data may be incomplete",
+                marketplace, trigger, exc_info=True,
+            )
             return
         json_payload = {**payload, "recorded_at": now.isoformat()}
         self._append_blocked_pattern_jsonl(json_payload)
@@ -1004,8 +1008,8 @@ class Database:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
-        except Exception as e:
-            logger.debug(f"blocked pattern jsonl write failed: {e}")
+        except Exception:
+            logger.warning("blocked pattern jsonl write failed (path=%s)", path, exc_info=True)
 
     def _append_scrape_attempt_jsonl(self, payload: dict) -> None:
         path = _scrape_attempts_jsonl_path()
@@ -1015,8 +1019,8 @@ class Database:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
-        except Exception as e:
-            logger.debug(f"scrape_attempts jsonl write failed: {e}")
+        except Exception:
+            logger.warning("scrape_attempts jsonl write failed (path=%s)", path, exc_info=True)
 
     async def get_recent_scrape_attempts(
         self,
