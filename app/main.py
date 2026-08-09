@@ -183,7 +183,8 @@ def main():
             from playwright.async_api import async_playwright
 
             from app.config import OZON_PROFILE_DIR
-            from app.updater import BROWSER_INIT_SCRIPT, USER_AGENTS
+            from app.parsers.system_proxy import bypass_system_proxy
+            from app.updater import BROWSER_INIT_SCRIPT
 
             profile_dir = os.getenv("OZON_PROFILE_DIR", "").strip()
             if not profile_dir:
@@ -197,32 +198,33 @@ def main():
             print("Cookies will be saved into the persistent profile for next parser runs.")
             print("After successful login/check, return here and press Enter.")
 
-            pw = await async_playwright().start()
-            context = await pw.chromium.launch_persistent_context(
-                user_data_dir=profile_dir,
-                headless=False,
-                locale="ru-RU",
-                timezone_id="Europe/Moscow",
-                user_agent=USER_AGENTS[0],
-                no_viewport=True,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-infobars",
-                    "--start-maximized",
-                    "--lang=ru-RU",
-                ],
-                extra_http_headers={
-                    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-                },
-            )
-            try:
-                await context.add_init_script(BROWSER_INIT_SCRIPT)
-                page = context.pages[0] if context.pages else await context.new_page()
-                await page.goto(args.ozon_url, wait_until="domcontentloaded", timeout=60_000)
-                await asyncio.to_thread(input, "Press Enter here after Ozon opens normally...")
-            finally:
-                await context.close()
-                await pw.stop()
+            async with bypass_system_proxy():
+                pw = await async_playwright().start()
+                context = await pw.chromium.launch_persistent_context(
+                    user_data_dir=profile_dir,
+                    headless=False,
+                    locale="ru-RU",
+                    timezone_id="Europe/Moscow",
+                    no_viewport=True,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-infobars",
+                        "--start-maximized",
+                        "--lang=ru-RU",
+                    ],
+                    ignore_default_args=["--enable-automation"],
+                    extra_http_headers={
+                        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+                    },
+                )
+                try:
+                    await context.add_init_script(BROWSER_INIT_SCRIPT)
+                    page = context.pages[0] if context.pages else await context.new_page()
+                    await page.goto(args.ozon_url, wait_until="domcontentloaded", timeout=60_000)
+                    await asyncio.to_thread(input, "Press Enter here after Ozon opens normally...")
+                finally:
+                    await context.close()
+                    await pw.stop()
 
         asyncio.run(_ozon_login())
 

@@ -20,6 +20,7 @@ from app.updater import (
     _is_ozon_blocked_text,
 )
 from app.parsers.alt_sources import fetch_from_alt_sources
+from app.parsers.system_proxy import bypass_system_proxy
 from app.utils.error_research import research_parse_failure
 
 
@@ -127,55 +128,55 @@ class OzonParser(BaseParser):
     async def _fetch_html(self, url: str) -> str | None:
         if not self._browser:
             await self.start()
-        ctx = await self._browser.new_context(
-            user_agent=random.choice(USER_AGENTS),
-            viewport=random.choice(VIEWPORTS),
-            locale="ru-RU",
-            timezone_id="Europe/Moscow",
-            extra_http_headers={"Accept-Language": "ru-RU,ru;q=0.9"},
-        )
-        await ctx.add_init_script(BROWSER_INIT_SCRIPT)
-        page = await ctx.new_page()
-        try:
-            for attempt in range(RETRY_ATTEMPTS):
-                try:
-                    if attempt == 0:
-                        await page.goto("https://www.ozon.ru/", wait_until="domcontentloaded", timeout=20_000)
+        async with bypass_system_proxy():
+            ctx = await self._browser.new_context(
+                viewport=random.choice(VIEWPORTS),
+                locale="ru-RU",
+                timezone_id="Europe/Moscow",
+                extra_http_headers={"Accept-Language": "ru-RU,ru;q=0.9"},
+            )
+            await ctx.add_init_script(BROWSER_INIT_SCRIPT)
+            page = await ctx.new_page()
+            try:
+                for attempt in range(RETRY_ATTEMPTS):
+                    try:
+                        if attempt == 0:
+                            await page.goto("https://www.ozon.ru/", wait_until="domcontentloaded", timeout=20_000)
+                            await asyncio.sleep(random.uniform(2, 3))
+                        await page.goto(url, wait_until="load", timeout=60_000)
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=30_000)
+                        except Exception:
+                            pass
+                        await page.wait_for_selector("h1", timeout=12_000)
                         await asyncio.sleep(random.uniform(2, 3))
-                    await page.goto(url, wait_until="load", timeout=60_000)
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=30_000)
-                    except Exception:
-                        pass
-                    await page.wait_for_selector("h1", timeout=12_000)
-                    await asyncio.sleep(random.uniform(2, 3))
-                    # Скролл
-                    for _ in range(random.randint(5, 7)):
-                        await page.mouse.wheel(0, random.randint(600, 900))
-                        await asyncio.sleep(random.uniform(0.6, 1.0))
-                    for _ in range(2):
-                        await page.mouse.wheel(0, -random.randint(400, 700))
-                        await asyncio.sleep(random.uniform(0.4, 0.8))
-                    try:
-                        await page.wait_for_function(
-                            """() => Array.from(document.images)
-                                .some((img) => img.complete && img.naturalWidth > 0)""",
-                            timeout=10_000,
-                        )
-                    except Exception:
-                        logger.debug("Ozon images did not finish loading before HTML capture")
-                    html = await page.content()
-                    if "доступ ограничен" in html.lower():
-                        await asyncio.sleep(random.uniform(10, 20))
-                        continue
-                    return html
-                except Exception as e:
-                    logger.warning(f"Ozon попытка {attempt+1}: {e}")
-                    base_delay = 5 * (2 ** attempt)
-                    await asyncio.sleep(random.uniform(base_delay, base_delay * 2))
-            return None
-        finally:
-            await ctx.close()
+                        # Скролл
+                        for _ in range(random.randint(5, 7)):
+                            await page.mouse.wheel(0, random.randint(600, 900))
+                            await asyncio.sleep(random.uniform(0.6, 1.0))
+                        for _ in range(2):
+                            await page.mouse.wheel(0, -random.randint(400, 700))
+                            await asyncio.sleep(random.uniform(0.4, 0.8))
+                        try:
+                            await page.wait_for_function(
+                                """() => Array.from(document.images)
+                                    .some((img) => img.complete && img.naturalWidth > 0)""",
+                                timeout=10_000,
+                            )
+                        except Exception:
+                            logger.debug("Ozon images did not finish loading before HTML capture")
+                        html = await page.content()
+                        if "доступ ограничен" in html.lower():
+                            await asyncio.sleep(random.uniform(10, 20))
+                            continue
+                        return html
+                    except Exception as e:
+                        logger.warning(f"Ozon попытка {attempt+1}: {e}")
+                        base_delay = 5 * (2 ** attempt)
+                        await asyncio.sleep(random.uniform(base_delay, base_delay * 2))
+                return None
+            finally:
+                await ctx.close()
 
     async def fetch_product(self, url: str) -> ProductData | None:
         api_data = await self._fetch_api_data(url)
