@@ -1,17 +1,14 @@
-import hashlib
 import importlib
 import json
-import os
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.compat.aiosqlite_patch import apply_aiosqlite_future_poll_patch
-from app.config import BLOCK_PATTERNS_JSONL, DATABASE_URL, SCRAPE_ATTEMPTS_JSONL, logger
+from app.config import DATABASE_URL, logger
 from app.utils.proxy import mask_proxy_url
 
 apply_aiosqlite_future_poll_patch()
@@ -23,7 +20,12 @@ apply_aiosqlite_future_poll_patch()
 # Base/models/Database are rebuilt together on every reload, exactly as when
 # this was a single file. Order matters: base before models (models redefine
 # their classes against whichever Base object is current at that moment).
-for _submodule in ("app.database.base", "app.database.models", "app.database.resilience"):
+for _submodule in (
+    "app.database.base",
+    "app.database.models",
+    "app.database.resilience",
+    "app.database.utils",
+):
     if _submodule in sys.modules:
         importlib.reload(sys.modules[_submodule])
 
@@ -36,6 +38,13 @@ from app.database.resilience import (  # noqa: E402, I001
     _next_best_strategy_for,
     _score_source,
     _success_rate,
+)
+from app.database.utils import (  # noqa: E402, I001
+    _block_patterns_jsonl_path,
+    _scrape_attempts_jsonl_path,
+    _site_from_url,
+    _text_payload,
+    url_to_hash,
 )
 from app.database.models import (  # noqa: E402, I001
     ApprovalRecord,
@@ -81,47 +90,10 @@ __all__ = [
     "ProjectReport",
     "ScrapeAttempt",
     "Subscriber",
+    "url_to_hash",
 ]
 
 
-# ── Вспомогательные функции ───────────────────────────────────────────────────
-
-def url_to_hash(url: str) -> str:
-    return hashlib.md5(url.encode()).hexdigest()
-
-
-def _scrape_attempts_jsonl_path() -> Path | None:
-    raw = os.getenv("SCRAPE_ATTEMPTS_JSONL", "").strip()
-    if not raw:
-        return SCRAPE_ATTEMPTS_JSONL
-    return Path(raw)
-
-
-def _block_patterns_jsonl_path() -> Path | None:
-    raw = os.getenv("BLOCK_PATTERNS_JSONL", "").strip()
-    if not raw:
-        return BLOCK_PATTERNS_JSONL
-    return Path(raw)
-
-
-def _site_from_url(url: str | None) -> str | None:
-    if not url:
-        return None
-    from urllib.parse import urlparse
-
-    return (urlparse(url).netloc or "").lower() or None
-
-
-def _text_payload(value: str | list[str] | tuple[str, ...] | None) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        value = value.strip()
-        return value[:1000] if value else None
-    items = [str(item).strip() for item in value if str(item).strip()]
-    if not items:
-        return None
-    return json.dumps(items, ensure_ascii=False)[:1000]
 
 
 
