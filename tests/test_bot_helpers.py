@@ -1134,3 +1134,105 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
         subs_mock = asyncio.run(run())
 
         subs_mock.assert_not_awaited()
+
+    def test_cmd_update_empty_db_uses_read_service_and_does_not_start_update(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_product_count",
+                new=AsyncMock(return_value=0),
+            ) as mocked, patch.object(
+                bot_module, "worker_update_all", new=AsyncMock()
+            ) as worker_mock:
+                await bot_module.cmd_update(message)
+            return message, mocked, worker_mock
+
+        message, mocked, worker_mock = asyncio.run(run())
+
+        mocked.assert_awaited_once_with()
+        worker_mock.assert_not_awaited()
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("товар", message.answers[0].lower())
+
+    def test_cmd_update_denies_access_without_touching_service(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
+                bot_module.telegram_read_service,
+                "get_product_count",
+                new=AsyncMock(),
+            ) as mocked:
+                await bot_module.cmd_update(message)
+            return message, mocked
+
+        message, mocked = asyncio.run(run())
+
+        mocked.assert_not_awaited()
+        self.assertEqual(len(message.answers), 1)
+
+    def test_cmd_reviews_uses_read_service_and_lists_wb_products(self):
+        import app.bot as bot_module
+
+        fake_product = type("P", (), {"id": 7, "name": "WB Кабель USB-C"})()
+
+        async def run():
+            message = self.FakeMessage()
+            state = AsyncMock()
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_wildberries_products",
+                new=AsyncMock(return_value=[fake_product]),
+            ) as mocked:
+                await bot_module.cmd_reviews(message, state)
+            return message, mocked, state
+
+        message, mocked, state = asyncio.run(run())
+
+        mocked.assert_awaited_once_with(limit=5)
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("WB Кабель USB-C", message.answers[0])
+        state.update_data.assert_awaited_once_with(review_product_ids=[7])
+
+    def test_cmd_reviews_empty_service_result_shows_no_wb_products_message(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            state = AsyncMock()
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_wildberries_products",
+                new=AsyncMock(return_value=[]),
+            ):
+                await bot_module.cmd_reviews(message, state)
+            return message, state
+
+        message, state = asyncio.run(run())
+
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("Wildberries", message.answers[0])
+        state.set_state.assert_not_awaited()
+
+    def test_cmd_reviews_denies_access_without_touching_service(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            state = AsyncMock()
+            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_wildberries_products",
+                new=AsyncMock(),
+            ) as mocked:
+                await bot_module.cmd_reviews(message, state)
+            return message, mocked
+
+        message, mocked = asyncio.run(run())
+
+        mocked.assert_not_awaited()
+        self.assertEqual(len(message.answers), 1)

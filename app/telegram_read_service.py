@@ -1,10 +1,11 @@
 """Read-only service for Telegram bot commands that need product/price data.
 
 Owns the queries app/bot.py's read-only commands (cmd_list, cmd_status,
-_broadcast_changes) need, so those handlers depend on this service instead
-of touching app.database directly. No Telegram imports here -- this module
-knows nothing about aiogram, messages, or HTML formatting; it returns plain
-ORM objects/dicts/tuples for the handler to format and send.
+_broadcast_changes, cmd_update, cmd_reviews) need, so those handlers depend
+on this service instead of touching app.database directly. No Telegram
+imports here -- this module knows nothing about aiogram, messages, or HTML
+formatting; it returns plain ORM objects/dicts/tuples for the handler to
+format and send.
 """
 
 from __future__ import annotations
@@ -83,3 +84,18 @@ class TelegramReadService:
                 .limit(limit)
             )).all()
         return list(rows)
+
+    async def get_product_count(self) -> int:
+        async with self._db.session() as s:
+            return await s.scalar(select(func.count(Product.id)))
+
+    async def get_recent_wildberries_products(self, limit: int = 5) -> list[Product]:
+        """Most recently checked products whose URL is a Wildberries listing."""
+        async with self._db.session() as s:
+            products = (await s.execute(
+                select(Product)
+                .where(Product.url.contains("wildberries"))
+                .order_by(Product.last_check.desc())
+                .limit(limit)
+            )).scalars().all()
+        return list(products)

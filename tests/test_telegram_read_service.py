@@ -116,6 +116,50 @@ class TelegramReadServiceTests(unittest.IsolatedAsyncioTestCase):
         rows = await self.service.get_recent_price_changes(datetime.now(UTC) - timedelta(hours=2), limit=20)
         self.assertEqual(rows, [])
 
+    async def test_get_product_count_empty_db_returns_zero(self):
+        count = await self.service.get_product_count()
+        self.assertEqual(count, 0)
+
+    async def test_get_product_count_reflects_saved_products(self):
+        await self.db.save_product("https://example.com/a", {"name": "A", "price": 100, "availability": "in_stock"})
+        await self.db.save_product("https://example.com/b", {"name": "B", "price": 200, "availability": "in_stock"})
+
+        count = await self.service.get_product_count()
+
+        self.assertEqual(count, 2)
+
+    async def test_get_recent_wildberries_products_empty_db_returns_empty(self):
+        products = await self.service.get_recent_wildberries_products(limit=5)
+        self.assertEqual(products, [])
+
+    async def test_get_recent_wildberries_products_filters_by_url_and_limits(self):
+        await self.db.save_product(
+            "https://www.wildberries.ru/catalog/1/detail.aspx",
+            {"name": "WB Item 1", "price": 100, "availability": "in_stock"},
+        )
+        await self.db.save_product(
+            "https://www.ozon.ru/product/2", {"name": "Ozon Item", "price": 200, "availability": "in_stock"}
+        )
+        await self.db.save_product(
+            "https://www.wildberries.ru/catalog/3/detail.aspx",
+            {"name": "WB Item 3", "price": 300, "availability": "in_stock"},
+        )
+
+        products = await self.service.get_recent_wildberries_products(limit=5)
+
+        self.assertEqual({p.name for p in products}, {"WB Item 1", "WB Item 3"})
+
+    async def test_get_recent_wildberries_products_respects_limit(self):
+        for i in range(3):
+            await self.db.save_product(
+                f"https://www.wildberries.ru/catalog/{i}/detail.aspx",
+                {"name": f"WB Item {i}", "price": 10, "availability": "in_stock"},
+            )
+
+        products = await self.service.get_recent_wildberries_products(limit=2)
+
+        self.assertEqual(len(products), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

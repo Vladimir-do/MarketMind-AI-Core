@@ -11,7 +11,6 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from sqlalchemy import func, select
 
 from app.config import ADMIN_IDS, PROXY, TELEGRAM_PROXY, logger
 from app.database import Database, Product, url_to_hash
@@ -671,8 +670,7 @@ async def cmd_update(message: types.Message):
     if parser_lock.locked():
         return await message.answer(_h_busy())
 
-    async with db.session() as s:
-        total = await s.scalar(select(func.count(Product.id)))
+    total = await telegram_read_service.get_product_count()
     if not total:
         return await message.answer(_h_empty_db())
 
@@ -1295,14 +1293,7 @@ async def cmd_reviews(message: types.Message, state: FSMContext):
     """Анализирует отзывы последнего добавленного WB-товара."""
     if not allowed(message.from_user.id):
         return await message.answer("⛔ Доступ запрещён.")
-    async with db.session() as s:
-        from sqlalchemy import select
-        products = (await s.execute(
-            select(Product)
-            .where(Product.url.contains("wildberries"))
-            .order_by(Product.last_check.desc())
-            .limit(5)
-        )).scalars().all()
+    products = await telegram_read_service.get_recent_wildberries_products(limit=5)
 
     if not products:
         return await message.answer(

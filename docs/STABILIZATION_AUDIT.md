@@ -30,9 +30,15 @@
 > - **D13 (частично) — RESOLVED** (2026-08-10, см. запись ниже в §4). Убрана прямая зависимость
 >   `cmd_list`/`cmd_status`/`_broadcast_changes` от `Database`/сырого SQLAlchemy → новый
 >   `app/telegram_read_service.py` (`TelegramReadService`, 4 метода). Цепочка стала
->   `handler → Service → Database`. Остальные команды бота (`cmd_update`, `cmd_reviews` и др.),
->   которые тоже делают прямой `db.session()`/`select(...)`, **не тронуты** — D13 остаётся
->   PARTIALLY RESOLVED в масштабе всего `bot.py`, полностью решён только для трёх заявленных команд.
+>   `handler → Service → Database`.
+> - **D13, продолжение (частично) — RESOLVED** (2026-08-10, см. запись ниже в §4). Убрана прямая
+>   зависимость `cmd_update`/`cmd_reviews` от `Database`/сырого SQLAlchemy → `TelegramReadService`
+>   расширен методами `get_product_count()`/`get_recent_wildberries_products()` (6 методов всего).
+>   `handle_reviews_choice` — **отдельный** обработчик (FSM-продолжение `/reviews`, не сама команда
+>   `cmd_reviews`), тоже делает прямой `db.session()`/`s.get(Product, ...)` — **не тронут**, вне
+>   заявленного scope этой итерации. D13 остаётся PARTIALLY RESOLVED в масштабе всего `bot.py`:
+>   полностью решён для `cmd_list`/`cmd_status`/`_broadcast_changes`/`cmd_update`/`cmd_reviews`,
+>   открыт для `handle_reviews_choice` и любых иных необследованных команд бота.
 > - **`image_urls` в `_unified_from_snapshot` — NOT REPRODUCIBLE** (2026-08-10, расследование по
 >   находке из D12; см. новую запись §9/D12'). Полный трейс данных (`_snapshot_from_unified` →
 >   импорт CSV → `ProjectProduct.source_snapshot_json` → `normalize_card_payload` для черновиков →
@@ -200,7 +206,7 @@ X») должна быть внедрена в оба конвейера отд�
 
 | # | Нарушение | Файлы | Серьёзность |
 |---|---|---|---|
-| D13 | ~~Telegram-бот вообще не имеет service-слоя для чтения: прямой `SQLAlchemy`/`app.database` импорт и inline-запросы в обработчиках команд~~ **PARTIALLY RESOLVED 2026-08-10**: для `cmd_list`/`cmd_status`/`_broadcast_changes` (`bot.py:1055-1104,1118-1148` на момент фикса) введён `TelegramReadService` (`app/telegram_read_service.py`) — 0 прямых обращений к `Database`/сырому SQLAlchemy в этих трёх функциях, подтверждено. `cmd_update` (`bot.py:673`) и `cmd_reviews` (`bot.py:1336-1338,1378`) **по-прежнему** делают прямой `db.session()`/`select(Product)` — сознательно не тронуты (вне заявленного scope задачи), остаются нарушением D13 | `app/bot.py` (`cmd_update`, `cmd_reviews` — открыто); `app/telegram_read_service.py` (новое, закрыто для `cmd_list`/`cmd_status`/`_broadcast_changes`) | **P2** |
+| D13 | ~~Telegram-бот вообще не имеет service-слоя для чтения: прямой `SQLAlchemy`/`app.database` импорт и inline-запросы в обработчиках команд~~ **PARTIALLY RESOLVED 2026-08-10**: для `cmd_list`/`cmd_status`/`_broadcast_changes` введён `TelegramReadService` (`app/telegram_read_service.py`) — 0 прямых обращений к `Database`/сырому SQLAlchemy в этих трёх функциях, подтверждено. **Продолжение (тот же день)**: `cmd_update` и `cmd_reviews` тоже переведены на `TelegramReadService` — добавлены `get_product_count()` (замена `select(func.count(Product.id))`) и `get_recent_wildberries_products(limit)` (замена `select(Product).where(url.contains("wildberries"))...`). Статически подтверждено: 0 `db.session()`/`select(...)` в телах `cmd_update`/`cmd_reviews`. `worker_update_all(db, ...)`, вызываемый из `cmd_update`, — это write-путь (скрейпинг+запись), уже инкапсулированный в отдельном worker-модуле, а не inline-запрос в обработчике — вне буквального scope D13 (который про голые `db.session()`/`select()` в хендлере). **Остаётся нерешённым**: `handle_reviews_choice` (`bot.py`, отдельная функция — FSM-продолжение после `/reviews`, срабатывает по вводу номера, а не сама команда) по-прежнему делает `async with db.session() as s: product = await s.get(Product, ...)` — сознательно не тронут, вне заявленного scope этой итерации. Другие Telegram-команды `bot.py` на прямой доступ к БД не проверялись | `app/bot.py` (`handle_reviews_choice` — открыто; остальные команды не проверялись); `app/telegram_read_service.py` (закрыто для `cmd_list`/`cmd_status`/`_broadcast_changes`/`cmd_update`/`cmd_reviews`, 6 методов) | **P2** |
 | D14 | API→DB в обход service-слоя: `product_detail.py` — почти все хелперы открывают сессию напрямую; 4 места в `projects.py` (экспорт/отчёт по одному id) в обход уже существующих `ProjectExportService`/`ClientDeliveryReportService`; `reports.py` — прямой `select(ApprovalRecord.status)`; ~~дублирующийся inline `session.get(JobRecord, ...)` в `content_pipeline/routes.py` и `competitor_analysis/routes.py`~~ **RESOLVED 2026-08-10**: заменено на общий `Database.get_job()`, оба роут-файла больше не импортируют `app.database` вообще. Остальная часть (`product_detail.py`, `projects.py`, `reports.py`) — открыта | см. список выше | **P2** |
 | D25 | `app/domain/events/builders.py` импортирует `app.database.Product` не под `TYPE_CHECKING` и делает `isinstance(source, Product)` — минорная утечка infrastructure в domain-модуль, который в остальном чист | `app/domain/events/builders.py:7,92` | **P3** |
 | D11 | Repository-паттерн применён непоследовательно: реален для editor/domain-events/timeline, но `ProjectService`, `CompetitorSnapshotStore`, `DatabaseApprovalQueue`, `job_queue.py` обращаются к SQLAlchemy напрямую и одновременно исполняют роль repository | `app/projects/service.py`, `app/competitor_analysis/store.py`, `app/ai_recommendation/db_approval.py` | **P2** |
