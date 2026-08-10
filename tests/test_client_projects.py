@@ -535,6 +535,21 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(card_b["effective_snapshot"]["title"], "Исходное B")
         self.assertNotEqual(legacy["name"], "Ручное название A")
 
+    async def test_project_draft_quality_preview_with_string_image_urls_splits_into_real_urls(self):
+        """D30: draft_quality_preview also merges an unvalidated `payload`
+        through normalize_card_payload(); a comma-separated image_urls
+        string must not be exploded into one-character 'URLs'."""
+        project_id = await self._create_project("Quality Preview")
+        await self._import_csv(project_id, "Товар")
+        product_id = await self._product_id(project_id)
+
+        response = await self.client.post(
+            f"/api/projects/{project_id}/products/{product_id}/drafts/preview/quality-preview",
+            json={"payload": {"image_urls": "https://img.test/a.jpg,https://img.test/b.jpg"}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
     async def test_project_effective_card_seo_is_project_scoped(self):
         project_a = await self._create_project("SEO A")
         project_b = await self._create_project("SEO B")

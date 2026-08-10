@@ -64,9 +64,12 @@ def normalize_card_payload(payload: dict[str, Any]) -> dict[str, Any]:
         if isinstance(result.get(key), str):
             result[key] = " ".join(result[key].strip().split()) if key != "description" else result[key].strip()
     if "image_urls" in result:
+        raw_urls = result.get("image_urls") or []
+        if isinstance(raw_urls, str):
+            raw_urls = raw_urls.split(",")
         seen: set[str] = set()
         urls = []
-        for item in result.get("image_urls") or []:
+        for item in raw_urls:
             text = str(item).strip()
             if text and text not in seen:
                 seen.add(text)

@@ -211,3 +211,38 @@ class CardEditorTests(unittest.IsolatedAsyncioTestCase):
                         payload={"token": "secret"},
                     )
                 )
+
+    async def test_create_draft_via_api_with_string_image_urls_splits_into_real_urls(self):
+        """D30: a direct API call (no Pydantic schema guards `payload`) that
+        sends image_urls as a comma-separated string must not have it
+        exploded into one-character 'URLs' by normalize_card_payload()."""
+        draft = await self._draft(
+            {"image_urls": "https://img.test/a.jpg,https://img.test/b.jpg"}
+        )
+
+        self.assertEqual(
+            draft["payload"]["image_urls"],
+            ["https://img.test/a.jpg", "https://img.test/b.jpg"],
+        )
+
+    async def test_create_draft_via_api_with_single_string_image_url(self):
+        draft = await self._draft({"image_urls": "https://img.test/a.jpg"})
+
+        self.assertEqual(draft["payload"]["image_urls"], ["https://img.test/a.jpg"])
+
+    async def test_update_draft_via_api_with_string_image_urls_splits_into_real_urls(self):
+        draft = await self._draft({"title": "Товар"})
+
+        response = await self.client.patch(
+            f"/api/products/{self.product_id}/drafts/{draft['draft_id']}",
+            json={
+                "revision": draft["revision"],
+                "payload": {"image_urls": "https://img.test/a.jpg,https://img.test/b.jpg"},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["payload"]["image_urls"],
+            ["https://img.test/a.jpg", "https://img.test/b.jpg"],
+        )
