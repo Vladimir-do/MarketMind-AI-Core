@@ -72,11 +72,7 @@ async def run_content_pipeline_page(
 
 @router.get("/api/content-pipeline/jobs/{job_id}")
 async def get_content_pipeline_job(job_id: str, request: Request):
-    from app.database import JobRecord
-
-    db = request.app.state.db
-    async with db.session() as session:
-        record = await session.get(JobRecord, job_id)
+    record = await request.app.state.db.get_job(job_id)
     if record is None or record.job_type != JOB_TYPE:
         raise HTTPException(status_code=404, detail="Job not found")
 

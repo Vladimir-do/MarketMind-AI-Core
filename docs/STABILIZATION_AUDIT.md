@@ -14,6 +14,19 @@
 > - D7 (синхронный AI-вызов в HTTP-запросе) — исправлено, `22c60a3`.
 >
 > Все P0/P1 закрыты. Остаётся P2 (архитектурный рефакторинг) и P3 (косметика) — см. §7.
+>
+> **Журнал P2 (начат 2026-08-10):**
+> - **D9 — RESOLVED** (`ef7b016`, `2459afe`, `1f81570`, `5b46161`, 2026-08-09/10). `app/database.py`
+>   декомпозирован в пакет `app/database/{base,models,resilience,utils,core}.py`. Модели/чистая
+>   resilience-логика/утилиты вынесены из класса `Database`. Публичный контракт сохранён полностью
+>   (`app/database/__init__.py` — фасад с reload-каскадом). Класс `Database` (core.py, 887 строк)
+>   намеренно не дробился дальше на repository-классы — это отдельная, более рискованная задача
+>   (см. D11). Полный test suite (833) + `verify_control_build.sh` + smoke test — зелёные на момент
+>   коммита.
+> - **D14 (частично) — RESOLVED** (см. запись ниже в §4). Устранён дублированный
+>   `session.get(JobRecord, job_id)` в `content_pipeline/routes.py` и `competitor_analysis/routes.py`
+>   → общий `Database.get_job()`. Остальная часть D14 (`product_detail.py`, `projects.py`,
+>   `reports.py`) — **не тронута**, остаётся открытой.
 > Метод: прочитаны 4 предыдущих аудита (2026-07-12 — 2026-07-17, см. §0), затем текущее состояние
 > кода перепроверено напрямую (чтение файлов + `graphify query/explain`), так как с последнего
 > аудита прошло ~3 недели активной разработки (P3.6–P3.9, P4, P5, P6, domain events, timeline,
@@ -170,7 +183,7 @@ X») должна быть внедрена в оба конвейера отд�
 | # | Нарушение | Файлы | Серьёзность |
 |---|---|---|---|
 | D13 | Telegram-бот вообще не имеет service-слоя для чтения: прямой `SQLAlchemy`/`app.database` импорт и inline-запросы в обработчиках команд | `app/bot.py:14,17,1055-1104,1146-1154,1333-1338,1377` (`cmd_list`, `cmd_status`, `_broadcast_changes`) | **P2** |
-| D14 | API→DB в обход service-слоя: `product_detail.py` — почти все хелперы открывают сессию напрямую; 4 места в `projects.py` (экспорт/отчёт по одному id) в обход уже существующих `ProjectExportService`/`ClientDeliveryReportService`; `reports.py` — прямой `select(ApprovalRecord.status)`; дублирующийся inline `session.get(JobRecord, ...)` в `content_pipeline/routes.py` и `competitor_analysis/routes.py` | см. список выше | **P2** |
+| D14 | API→DB в обход service-слоя: `product_detail.py` — почти все хелперы открывают сессию напрямую; 4 места в `projects.py` (экспорт/отчёт по одному id) в обход уже существующих `ProjectExportService`/`ClientDeliveryReportService`; `reports.py` — прямой `select(ApprovalRecord.status)`; ~~дублирующийся inline `session.get(JobRecord, ...)` в `content_pipeline/routes.py` и `competitor_analysis/routes.py`~~ **RESOLVED 2026-08-10**: заменено на общий `Database.get_job()`, оба роут-файла больше не импортируют `app.database` вообще. Остальная часть (`product_detail.py`, `projects.py`, `reports.py`) — открыта | см. список выше | **P2** |
 | D25 | `app/domain/events/builders.py` импортирует `app.database.Product` не под `TYPE_CHECKING` и делает `isinstance(source, Product)` — минорная утечка infrastructure в domain-модуль, который в остальном чист | `app/domain/events/builders.py:7,92` | **P3** |
 | D11 | Repository-паттерн применён непоследовательно: реален для editor/domain-events/timeline, но `ProjectService`, `CompetitorSnapshotStore`, `DatabaseApprovalQueue`, `job_queue.py` обращаются к SQLAlchemy напрямую и одновременно исполняют роль repository | `app/projects/service.py`, `app/competitor_analysis/store.py`, `app/ai_recommendation/db_approval.py` | **P2** |
 
@@ -283,10 +296,10 @@ snapshot между `apply_approved()` (`str(current_value)`, `db_approval.py:20
 
 | # | Проблема | Файлы | Серьёзность |
 |---|---|---|---|
-| D9 | `app/database.py` — god object: 15 ORM-моделей + connection lifecycle + generic CRUD + JSONL-логирование + полноценный adaptive cooldown/circuit-breaker engine (~280 строк scraper-бизнес-логики) в одном файле/классе | `app/database.py` | **P2** |
+| D9 | ~~`app/database.py` — god object: 15 ORM-моделей + connection lifecycle + generic CRUD + JSONL-логирование + полноценный adaptive cooldown/circuit-breaker engine (~280 строк scraper-бизнес-логики) в одном файле/классе~~ **RESOLVED 2026-08-09/10**: декомпозирован в `app/database/{base,models,resilience,utils,core}.py`. `Database`-класс (core.py) остаётся одной большой сущностью (887 строк) — намеренно не дробился дальше, см. D11 | `app/database/` | **P2** |
 | D10 | Два параллельных механизма миграции: Alembic (чистый, линейный) vs. `_migrate_scrape_attempts` — ad-hoc ALTER-TABLE шим, до сих пор выполняющийся при каждом `Database.init()`. Ничто не гарантирует их синхронность | `app/database.py:621-682` | **P2** |
 | D11 | Repository-паттерн непоследователен (см. §4/D11) | — | **P2** |
-| D12 | Дублирование бизнес-логики: конвертация snapshot→`UnifiedProduct` независимо реализована дважды | `app/effective_card/service.py:200-225`, `app/ai_recommendation/job_queue.py:91-122` | **P2** |
+| D12 | Дублирование бизнес-логики: конвертация snapshot→`UnifiedProduct` независимо реализована дважды. **Уточнено 2026-08-10 при попытке выбрать этот P2**: функции **не идентичны** — `_build_project_unified` (job_queue.py) вычисляет `thumbnail_url` и защищён от случая, когда `image_urls` приходит строкой (иначе `_unified_from_snapshot` даст `list(str)` → список символов вместо URL — потенциальный скрытый баг); `_unified_from_snapshot` (effective_card/service.py) передаёт `discount_pct`, которого нет в другой версии; `attributes`/`tags` по-разному приводятся к типам (`str()`-принудительно vs нет). Честное объединение требует либо принять поведенческие изменения, либо параметризовать — не тривиальный минимальный фикс, отложено | `app/effective_card/service.py:200-225`, `app/ai_recommendation/job_queue.py:91-122` | **P2** |
 | D15 | `app/bot.py` (1872 строк) и `app/web/routes/projects.py` (1470 строк/51 endpoint) — god-модули. `bot.py` вырос обратно после разделения в P1.1. `handle_unhandled_message` смешивает разбор намерения + разбиение задач + диспетчеризацию + форматирование ответа в одной функции | `app/bot.py`, `app/web/routes/projects.py` | **P2** |
 | D16 | Две независимые LLM-абстракции (`app/ai_client.py` и `app/ai_recommendation/providers/*`) обслуживают разные сценарии по назначению, но дублируют одинаковую логику выбора провайдера/HTTP-вызова для одних и тех же вендоров (Grok/Gemini/Claude/Groq) | `app/ai_client.py`, `app/ai_recommendation/providers/*` | **P2** |
 | D17 | `app/ai_client.py` сигнализирует об ошибке магической строкой `"AI error: ..."` вместо исключения/структурированного результата — вызывающий код должен знать про этот префикс | `app/ai_client.py` | **P2** |
@@ -427,11 +440,11 @@ snapshot между `apply_approved()` (`str(current_value)`, `db_approval.py:20
 | Уровень | Количество | Список |
 |---|---|---|
 | **P0** | 0 | — |
-| **P1** | 7 | D2, D3, D4, D5, D6, D7, D8 |
-| **P2** | 14 | D9, D10, D11, D12, D13, D14, D15, D16, D17, D18, D19, D20, D21, D24 |
+| **P1** | 7 (все закрыты) | D2, D3, D4, D5, D6, D7, D8 |
+| **P2** | 14 (2 закрыты: D9 полностью, D14 частично) | D9 ✅, D10, D11, D12, D13, D14 (частично ✅), D15, D16, D17, D18, D19, D20, D21, D24 |
 | **P3** | 8 | D1 (пересмотрен), D22, D23, D25, D26, D27, D28, D29 |
 
-Итого 0+7+14+8 = 29.
+Итого 0+7+14+8 = 29. Записи не удаляются при решении — история сохраняется через ~~зачёркивание~~ + RESOLVED-пометку.
 
 ### 5 наиболее опасных проблем (обновлено)
 

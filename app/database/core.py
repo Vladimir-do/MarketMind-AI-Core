@@ -225,6 +225,10 @@ class Database:
             result = await s.execute(stmt)
             return result.scalars().all()
 
+    async def get_job(self, job_id: str) -> JobRecord | None:
+        async with self.session() as s:
+            return await s.get(JobRecord, job_id)
+
     async def get_product_by_hash(self, url_hash: str) -> Product | None:
         from sqlalchemy import select
         async with self.session() as s:
