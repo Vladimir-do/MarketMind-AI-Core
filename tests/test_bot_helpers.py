@@ -982,3 +982,155 @@ class AllowedAccessTests(unittest.TestCase):
             self.assertTrue(result)
             # The return value is a plain bool — no secrets embedded
             self.assertIsInstance(result, bool)
+
+
+class TelegramReadServiceHandlerTests(unittest.TestCase):
+    """cmd_list / cmd_status / _broadcast_changes with a mocked
+    TelegramReadService -- verifies the handlers delegate reads to the
+    service (D13) and still produce the same Telegram-facing behavior."""
+
+    ADMIN_ID = 42
+
+    class FakeUser:
+        id = 42
+
+    class FakeMessage:
+        from_user = None
+
+        def __init__(self):
+            self.from_user = TelegramReadServiceHandlerTests.FakeUser()
+            self.answers = []
+
+        async def answer(self, text, **kwargs):
+            self.answers.append(text)
+
+    def test_cmd_list_uses_read_service_and_formats_products(self):
+        import app.bot as bot_module
+
+        fake_product = type("P", (), {"id": 1, "url": "https://example.com/a", "name": "Test Product"})()
+        fake_price = type("PH", (), {"price": 150, "availability_status": "in_stock"})()
+
+        async def run():
+            message = self.FakeMessage()
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_products_with_prices",
+                new=AsyncMock(return_value=([fake_product], {1: fake_price})),
+            ) as mocked:
+                await bot_module.cmd_list(message)
+            return message, mocked
+
+        message, mocked = asyncio.run(run())
+
+        mocked.assert_awaited_once_with(limit=20)
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("Test Product", message.answers[0])
+        self.assertIn("150", message.answers[0])
+
+    def test_cmd_list_empty_service_result_shows_empty_db_message(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_products_with_prices",
+                new=AsyncMock(return_value=([], {})),
+            ):
+                await bot_module.cmd_list(message)
+            return message
+
+        message = asyncio.run(run())
+
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("товар", message.answers[0].lower())
+
+    def test_cmd_list_denies_access_without_touching_service(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_products_with_prices",
+                new=AsyncMock(),
+            ) as mocked:
+                await bot_module.cmd_list(message)
+            return message, mocked
+
+        message, mocked = asyncio.run(run())
+
+        mocked.assert_not_awaited()
+        self.assertEqual(len(message.answers), 1)
+
+    def test_cmd_status_uses_read_service_and_formats_counts(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_status_counts",
+                new=AsyncMock(return_value=(5, 12, 3)),
+            ) as mocked, patch.object(bot_module.agent, "_is_available", return_value=True):
+                await bot_module.cmd_status(message)
+            return message, mocked
+
+        message, mocked = asyncio.run(run())
+
+        mocked.assert_awaited_once_with()
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("5", message.answers[0])
+        self.assertIn("12", message.answers[0])
+        self.assertIn("3", message.answers[0])
+
+    def test_broadcast_changes_sends_formatted_message_to_each_subscriber(self):
+        import app.bot as bot_module
+
+        fake_product = type("P", (), {"id": 1, "name": "Broadcast Product"})()
+        fake_price = type("PH", (), {"price": 99, "availability_status": "in_stock"})()
+
+        sent = []
+
+        class FakeBot:
+            async def send_message(self, uid, text, **kwargs):
+                sent.append((uid, text))
+
+        async def run():
+            with patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_price_changes",
+                new=AsyncMock(return_value=[(fake_price, fake_product)]),
+            ), patch.object(
+                bot_module.telegram_read_service,
+                "get_subscriber_ids",
+                new=AsyncMock(return_value=[111, 222]),
+            ), patch.object(bot_module, "bot", FakeBot()):
+                await bot_module._broadcast_changes()
+
+        asyncio.run(run())
+
+        self.assertEqual(len(sent), 2)
+        self.assertEqual({uid for uid, _ in sent}, {111, 222})
+        self.assertIn("Broadcast Product", sent[0][1])
+        self.assertIn("99", sent[0][1])
+
+    def test_broadcast_changes_no_changes_does_not_query_subscribers_or_send(self):
+        import app.bot as bot_module
+
+        async def run():
+            with patch.object(
+                bot_module.telegram_read_service,
+                "get_recent_price_changes",
+                new=AsyncMock(return_value=[]),
+            ), patch.object(
+                bot_module.telegram_read_service,
+                "get_subscriber_ids",
+                new=AsyncMock(),
+            ) as subs_mock:
+                await bot_module._broadcast_changes()
+            return subs_mock
+
+        subs_mock = asyncio.run(run())
+
+        subs_mock.assert_not_awaited()

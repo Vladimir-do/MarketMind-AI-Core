@@ -11,10 +11,11 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from sqlalchemy import and_, func, select, desc
+from sqlalchemy import func, select
 
 from app.config import ADMIN_IDS, PROXY, TELEGRAM_PROXY, logger
-from app.database import Database, Product, PriceHistory, url_to_hash
+from app.database import Database, Product, url_to_hash
+from app.telegram_read_service import TelegramReadService
 from app.utils.urls import is_yandex_market_url
 from app.parsers.wildberries import WildberriesParser
 from app.telegram_url_utils import (
@@ -138,6 +139,7 @@ dp = Dispatcher(storage=MemoryStorage())
 
 db = Database()
 agent = PriceAgent(db)
+telegram_read_service = TelegramReadService(db)
 parser_lock = asyncio.Lock()
 MAX_NATURAL_TASKS = 300
 MAX_BATCH_CARD_SOURCES = 300
@@ -1056,36 +1058,9 @@ async def cmd_anomalies(message: types.Message):
 async def cmd_list(message: types.Message):
     if not await ensure_allowed(message):
         return
-    async with db.session() as s:
-        products = (await s.execute(
-            select(Product).order_by(Product.last_check.desc()).limit(20)
-        )).scalars().all()
-
+    products, latest_by_product = await telegram_read_service.get_recent_products_with_prices(limit=20)
     if not products:
         return await message.answer(_h_empty_db())
-
-    product_ids = [p.id for p in products]
-    latest_at = (
-        select(
-            PriceHistory.product_id.label("product_id"),
-            func.max(PriceHistory.recorded_at).label("recorded_at"),
-        )
-        .where(PriceHistory.product_id.in_(product_ids))
-        .group_by(PriceHistory.product_id)
-        .subquery()
-    )
-    async with db.session() as s:
-        latest_rows = (await s.execute(
-            select(PriceHistory)
-            .join(
-                latest_at,
-                and_(
-                    PriceHistory.product_id == latest_at.c.product_id,
-                    PriceHistory.recorded_at == latest_at.c.recorded_at,
-                ),
-            )
-        )).scalars().all()
-    latest_by_product = {row.product_id: row for row in latest_rows}
 
     await message.answer(format_product_list(products, latest_by_product), parse_mode="HTML", disable_web_page_preview=True)
 
@@ -1094,12 +1069,9 @@ async def cmd_list(message: types.Message):
 async def cmd_status(message: types.Message):
     if not await ensure_allowed(message):
         return
-    async with db.session() as s:
-        n_products = await s.scalar(select(func.count(Product.id)))
-        n_history  = await s.scalar(select(func.count(PriceHistory.id)))
-    subscribers = await db.get_subscribers()
+    n_products, n_history, n_subscribers = await telegram_read_service.get_status_counts()
     await message.answer(
-        format_status_message(n_products, n_history, len(subscribers), agent._is_available()),
+        format_status_message(n_products, n_history, n_subscribers, agent._is_available()),
         parse_mode="HTML",
     )
 
@@ -1146,14 +1118,7 @@ async def cmd_unsubscribe(message: types.Message):
 async def _broadcast_changes():
     try:
         two_h_ago = datetime.now(timezone.utc) - timedelta(hours=2)
-        async with db.session() as s:
-            rows = (await s.execute(
-                select(PriceHistory, Product)
-                .join(Product)
-                .where(PriceHistory.recorded_at >= two_h_ago)
-                .order_by(desc(PriceHistory.recorded_at))
-                .limit(20)
-            )).all()
+        rows = await telegram_read_service.get_recent_price_changes(two_h_ago, limit=20)
 
         if not rows:
             return
@@ -1164,7 +1129,7 @@ async def _broadcast_changes():
             lines.append(f"{icon} {p.name[:40]}: {ph.price} ₽")
 
         text = "\n".join(lines)
-        subscribers = await db.get_subscribers()
+        subscribers = await telegram_read_service.get_subscriber_ids()
         for uid in subscribers:
             try:
                 if bot is None:

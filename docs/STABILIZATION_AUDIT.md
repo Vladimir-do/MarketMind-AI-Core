@@ -27,6 +27,12 @@
 >   `session.get(JobRecord, job_id)` в `content_pipeline/routes.py` и `competitor_analysis/routes.py`
 >   → общий `Database.get_job()`. Остальная часть D14 (`product_detail.py`, `projects.py`,
 >   `reports.py`) — **не тронута**, остаётся открытой.
+> - **D13 (частично) — RESOLVED** (2026-08-10, см. запись ниже в §4). Убрана прямая зависимость
+>   `cmd_list`/`cmd_status`/`_broadcast_changes` от `Database`/сырого SQLAlchemy → новый
+>   `app/telegram_read_service.py` (`TelegramReadService`, 4 метода). Цепочка стала
+>   `handler → Service → Database`. Остальные команды бота (`cmd_update`, `cmd_reviews` и др.),
+>   которые тоже делают прямой `db.session()`/`select(...)`, **не тронуты** — D13 остаётся
+>   PARTIALLY RESOLVED в масштабе всего `bot.py`, полностью решён только для трёх заявленных команд.
 > - **`image_urls` в `_unified_from_snapshot` — NOT REPRODUCIBLE** (2026-08-10, расследование по
 >   находке из D12; см. новую запись §9/D12'). Полный трейс данных (`_snapshot_from_unified` →
 >   импорт CSV → `ProjectProduct.source_snapshot_json` → `normalize_card_payload` для черновиков →
@@ -194,7 +200,7 @@ X») должна быть внедрена в оба конвейера отд�
 
 | # | Нарушение | Файлы | Серьёзность |
 |---|---|---|---|
-| D13 | Telegram-бот вообще не имеет service-слоя для чтения: прямой `SQLAlchemy`/`app.database` импорт и inline-запросы в обработчиках команд | `app/bot.py:14,17,1055-1104,1146-1154,1333-1338,1377` (`cmd_list`, `cmd_status`, `_broadcast_changes`) | **P2** |
+| D13 | ~~Telegram-бот вообще не имеет service-слоя для чтения: прямой `SQLAlchemy`/`app.database` импорт и inline-запросы в обработчиках команд~~ **PARTIALLY RESOLVED 2026-08-10**: для `cmd_list`/`cmd_status`/`_broadcast_changes` (`bot.py:1055-1104,1118-1148` на момент фикса) введён `TelegramReadService` (`app/telegram_read_service.py`) — 0 прямых обращений к `Database`/сырому SQLAlchemy в этих трёх функциях, подтверждено. `cmd_update` (`bot.py:673`) и `cmd_reviews` (`bot.py:1336-1338,1378`) **по-прежнему** делают прямой `db.session()`/`select(Product)` — сознательно не тронуты (вне заявленного scope задачи), остаются нарушением D13 | `app/bot.py` (`cmd_update`, `cmd_reviews` — открыто); `app/telegram_read_service.py` (новое, закрыто для `cmd_list`/`cmd_status`/`_broadcast_changes`) | **P2** |
 | D14 | API→DB в обход service-слоя: `product_detail.py` — почти все хелперы открывают сессию напрямую; 4 места в `projects.py` (экспорт/отчёт по одному id) в обход уже существующих `ProjectExportService`/`ClientDeliveryReportService`; `reports.py` — прямой `select(ApprovalRecord.status)`; ~~дублирующийся inline `session.get(JobRecord, ...)` в `content_pipeline/routes.py` и `competitor_analysis/routes.py`~~ **RESOLVED 2026-08-10**: заменено на общий `Database.get_job()`, оба роут-файла больше не импортируют `app.database` вообще. Остальная часть (`product_detail.py`, `projects.py`, `reports.py`) — открыта | см. список выше | **P2** |
 | D25 | `app/domain/events/builders.py` импортирует `app.database.Product` не под `TYPE_CHECKING` и делает `isinstance(source, Product)` — минорная утечка infrastructure в domain-модуль, который в остальном чист | `app/domain/events/builders.py:7,92` | **P3** |
 | D11 | Repository-паттерн применён непоследовательно: реален для editor/domain-events/timeline, но `ProjectService`, `CompetitorSnapshotStore`, `DatabaseApprovalQueue`, `job_queue.py` обращаются к SQLAlchemy напрямую и одновременно исполняют роль repository | `app/projects/service.py`, `app/competitor_analysis/store.py`, `app/ai_recommendation/db_approval.py` | **P2** |
@@ -454,7 +460,7 @@ snapshot между `apply_approved()` (`str(current_value)`, `db_approval.py:20
 |---|---|---|
 | **P0** | 0 | — |
 | **P1** | 7 (все закрыты) | D2, D3, D4, D5, D6, D7, D8 |
-| **P2** | 15 (2 закрыты: D9 полностью, D14 частично) | D9 ✅, D10, D11, D12 (уточнён, `image_urls`-подозрение — NOT REPRODUCIBLE), D13, D14 (частично ✅), D15, D16, D17, D18, D19, D20, D21, D24, D30 (новый) |
+| **P2** | 15 (1 закрыт полностью, 2 частично: D9 ✅, D14 частично ✅, D13 частично ✅) | D9 ✅, D10, D11, D12 (уточнён, `image_urls`-подозрение — NOT REPRODUCIBLE), D13 (частично ✅), D14 (частично ✅), D15, D16, D17, D18, D19, D20, D21, D24, D30 (новый) |
 | **P3** | 8 | D1 (пересмотрен), D22, D23, D25, D26, D27, D28, D29 |
 
 Итого 0+7+15+8 = 30. Записи не удаляются при решении — история сохраняется через ~~зачёркивание~~ + RESOLVED-пометку.
