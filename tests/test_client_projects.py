@@ -654,6 +654,54 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         resp = await self.client.get(f"/api/projects/{project_id}/products/99999/seo")
         self.assertEqual(resp.status_code, 404)
 
+    async def test_import_with_comma_separated_image_cell_produces_real_url_list_not_characters(self):
+        """Regression test for the suspected image_urls bug in
+        _unified_from_snapshot (see docs/STABILIZATION_AUDIT.md). A user
+        plausibly puts several image URLs in one spreadsheet cell,
+        comma-separated -- the import pipeline (app/projects/imports.py)
+        must split that into a real list BEFORE it ever reaches the
+        snapshot/effective-card layer, not leave it as a raw string."""
+        project_id = await self._create_project("Image URLs CSV")
+        csv_text = (
+            "название,цена,ссылка,маркетплейс,фото\n"
+            "Тестовый товар с несколькими фото,777,"
+            "https://example.test/multi-image-product,ozon,"
+            '"https://img.test/1.jpg, https://img.test/2.jpg, https://img.test/3.jpg"\n'
+        )
+        response = await self.client.post(
+            f"/api/projects/{project_id}/imports",
+            files={"file": ("multi_image.csv", csv_text.encode("utf-8"), "text/csv")},
+        )
+        self.assertEqual(response.status_code, 200)
+        product_id = await self._product_id(project_id)
+
+        # 1) The raw project-product listing (source of _unified_from_snapshot's
+        #    input) must already hold a clean list of 3 URLs -- not a string.
+        products = await self.client.get(f"/api/projects/{project_id}/products")
+        item = products.json()["items"][0]
+        image_urls = item["effective_snapshot"]["image_urls"]
+        self.assertIsInstance(image_urls, list)
+        self.assertEqual(
+            image_urls,
+            ["https://img.test/1.jpg", "https://img.test/2.jpg", "https://img.test/3.jpg"],
+        )
+
+        # 2) The SEO endpoint (which internally calls _unified_from_snapshot)
+        #    must respond normally on this snapshot.
+        seo = await self.client.get(f"/api/projects/{project_id}/products/{product_id}/seo")
+        self.assertEqual(seo.status_code, 200)
+        self.assertIn("recommendations", seo.json()["effective"])
+
+        # 3) Feed the ACTUAL snapshot the API returned straight into
+        #    _unified_from_snapshot (the function under investigation) and
+        #    compare image_urls before/after -- this is the direct
+        #    before/after comparison the investigation asked for.
+        from app.effective_card.service import _unified_from_snapshot
+
+        unified = _unified_from_snapshot(item["effective_snapshot"], product_id)
+        self.assertEqual(unified.image_urls, image_urls, "must be unchanged: already a clean list going in")
+        self.assertEqual(len(unified.image_urls), 3, "must be 3 real URLs, not ~60 individual characters")
+
     async def test_project_seo_независимость_между_проектами(self):
         project_a = await self._create_project("Независимость A")
         project_b = await self._create_project("Независимость B")

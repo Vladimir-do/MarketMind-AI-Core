@@ -27,6 +27,18 @@
 >   `session.get(JobRecord, job_id)` в `content_pipeline/routes.py` и `competitor_analysis/routes.py`
 >   → общий `Database.get_job()`. Остальная часть D14 (`product_detail.py`, `projects.py`,
 >   `reports.py`) — **не тронута**, остаётся открытой.
+> - **`image_urls` в `_unified_from_snapshot` — NOT REPRODUCIBLE** (2026-08-10, расследование по
+>   находке из D12; см. новую запись §9/D12'). Полный трейс данных (`_snapshot_from_unified` →
+>   импорт CSV → `ProjectProduct.source_snapshot_json` → `normalize_card_payload` для черновиков →
+>   `_unified_from_snapshot`) показал: **все** реальные писатели snapshot'а приводят `image_urls`
+>   к `list[str]` до того, как строка могла бы достичь этой функции. Прямой unit-тест подтверждает,
+>   что САМА функция не защищена (если вызвать её напрямую со строкой — испортит данные посимвольно),
+>   но ни одного реального пути вызова с сырой строкой не найдено. **Production-код не менялся**
+>   (по инструкции задачи). Найдена смежная, реально достижимая версия того же класса дефекта в
+>   `normalize_card_payload()` (`app/editor/schemas.py:66-74`, через `payload` параметр
+>   `create_draft`/`update_draft`/`draft_quality_preview` — потенциальный внешний API-вызов, не
+>   через UI) — зафиксирована как отдельная Deferred finding, не исправлена (другая функция, вне
+>   заявленного скоупа).
 > Метод: прочитаны 4 предыдущих аудита (2026-07-12 — 2026-07-17, см. §0), затем текущее состояние
 > кода перепроверено напрямую (чтение файлов + `graphify query/explain`), так как с последнего
 > аудита прошло ~3 недели активной разработки (P3.6–P3.9, P4, P5, P6, domain events, timeline,
@@ -299,7 +311,7 @@ snapshot между `apply_approved()` (`str(current_value)`, `db_approval.py:20
 | D9 | ~~`app/database.py` — god object: 15 ORM-моделей + connection lifecycle + generic CRUD + JSONL-логирование + полноценный adaptive cooldown/circuit-breaker engine (~280 строк scraper-бизнес-логики) в одном файле/классе~~ **RESOLVED 2026-08-09/10**: декомпозирован в `app/database/{base,models,resilience,utils,core}.py`. `Database`-класс (core.py) остаётся одной большой сущностью (887 строк) — намеренно не дробился дальше, см. D11 | `app/database/` | **P2** |
 | D10 | Два параллельных механизма миграции: Alembic (чистый, линейный) vs. `_migrate_scrape_attempts` — ad-hoc ALTER-TABLE шим, до сих пор выполняющийся при каждом `Database.init()`. Ничто не гарантирует их синхронность | `app/database.py:621-682` | **P2** |
 | D11 | Repository-паттерн непоследователен (см. §4/D11) | — | **P2** |
-| D12 | Дублирование бизнес-логики: конвертация snapshot→`UnifiedProduct` независимо реализована дважды. **Уточнено 2026-08-10 при попытке выбрать этот P2**: функции **не идентичны** — `_build_project_unified` (job_queue.py) вычисляет `thumbnail_url` и защищён от случая, когда `image_urls` приходит строкой (иначе `_unified_from_snapshot` даст `list(str)` → список символов вместо URL — потенциальный скрытый баг); `_unified_from_snapshot` (effective_card/service.py) передаёт `discount_pct`, которого нет в другой версии; `attributes`/`tags` по-разному приводятся к типам (`str()`-принудительно vs нет). Честное объединение требует либо принять поведенческие изменения, либо параметризовать — не тривиальный минимальный фикс, отложено | `app/effective_card/service.py:200-225`, `app/ai_recommendation/job_queue.py:91-122` | **P2** |
+| D12 | Дублирование бизнес-логики: конвертация snapshot→`UnifiedProduct` независимо реализована дважды. **Уточнено 2026-08-10 при попытке выбрать этот P2**: функции **не идентичны** — `_build_project_unified` (job_queue.py) вычисляет `thumbnail_url` и защищён от случая, когда `image_urls` приходит строкой (иначе `_unified_from_snapshot` даст `list(str)` → список символов вместо URL — потенциальный скрытый баг); `_unified_from_snapshot` (effective_card/service.py) передаёт `discount_pct`, которого нет в другой версии; `attributes`/`tags` по-разному приводятся к типам (`str()`-принудительно vs нет). Честное объединение требует либо принять поведенческие изменения, либо параметризовать — не тривиальный минимальный фикс, отложено. **Расследование `image_urls`-подозрения (2026-08-10) — NOT REPRODUCIBLE**: полный трейс данных (`_snapshot_from_unified` → импорт → `normalize_card_payload` → `_unified_from_snapshot`) показал, что каждый реальный писатель snapshot'а уже приводит `image_urls` к `list[str]` — строка никогда не достигает `_unified_from_snapshot` через существующий код. Функция сама по себе не защищена (подтверждено unit-тестом при прямом вызове), но нерабочий сценарий недостижим — production-код не менялся (`tests/test_unified_from_snapshot.py`, `tests/test_client_projects.py::test_import_with_comma_separated_image_cell_produces_real_url_list_not_characters`). Найдена смежная, **реально достижимая** версия того же класса дефекта в `normalize_card_payload()` (`app/editor/schemas.py:66-74`) — не исправлена, другая функция, отдельная задача | `app/effective_card/service.py:200-225`, `app/ai_recommendation/job_queue.py:91-122` | **P2** |
 | D15 | `app/bot.py` (1872 строк) и `app/web/routes/projects.py` (1470 строк/51 endpoint) — god-модули. `bot.py` вырос обратно после разделения в P1.1. `handle_unhandled_message` смешивает разбор намерения + разбиение задач + диспетчеризацию + форматирование ответа в одной функции | `app/bot.py`, `app/web/routes/projects.py` | **P2** |
 | D16 | Две независимые LLM-абстракции (`app/ai_client.py` и `app/ai_recommendation/providers/*`) обслуживают разные сценарии по назначению, но дублируют одинаковую логику выбора провайдера/HTTP-вызова для одних и тех же вендоров (Grok/Gemini/Claude/Groq) | `app/ai_client.py`, `app/ai_recommendation/providers/*` | **P2** |
 | D17 | `app/ai_client.py` сигнализирует об ошибке магической строкой `"AI error: ..."` вместо исключения/структурированного результата — вызывающий код должен знать про этот префикс | `app/ai_client.py` | **P2** |
@@ -307,6 +319,7 @@ snapshot между `apply_approved()` (`str(current_value)`, `db_approval.py:20
 | D19 | Несогласованная retry-стратегия: `wildberries.py` — каскадный fallback, `ozon.py` — ручной exponential backoff, `yandex_market.py` — **вообще без retry/fallback**. `tenacity` заявлен в зависимостях, но нигде не используется (см. D22) | `app/parsers/{wildberries,ozon,yandex_market}.py` | **P2** |
 | D20 | Скрытый side effect: `generate_ozon_batch_card_files` (сборка пачки карточек в Telegram) незаметно скрейпит URL и пишет новые товары в БД через `worker_add_urls` с no-op `quiet_notify` — пользователь видит только итоговый файл, не подозревая о записи в БД мониторинга | `app/telegram_card_handlers.py:141-251` | **P2** |
 | D21 | Bot-обработчики экспорта проглатывают ошибки совсем без логирования (`except Exception as e: await message.answer(...)`, ни одного `logger` вызова) — в отличие от всех остальных обработчиков файла | `app/bot.py:1413-1415,1424-1425` | **P2** |
+| D30 | **Новая находка 2026-08-10** (обнаружена при расследовании D12/`image_urls`): `normalize_card_payload()` не защищена от `image_urls`, приходящего строкой — `for item in result.get("image_urls") or []:` посимвольно разберёт строку вместо того, чтобы принять её как один URL или разделить по запятой. Реально достижимо через `payload: dict[str, Any]` параметр `ProductCardEditorService.create_draft`/`update_draft`/`EffectiveProductCardService.draft_quality_preview` — то есть напрямую через API-запрос (`POST .../drafts`), в обход UI (ни один HTML-шаблон сейчас не отправляет `image_urls` в теле запроса — проверено). Не исправлено — вне скоупа задачи (другая функция, `_unified_from_snapshot` не затронута) | `app/editor/schemas.py:66-74` | **P2** |
 
 ---
 
@@ -435,16 +448,16 @@ snapshot между `apply_approved()` (`str(current_value)`, `db_approval.py:20
 > **Обновлено 2026-08-09 после начала работы над P0 #1** — D1 пересмотрен с P0 на P3
 > (см. разбор в конце §5). Актуальные счётчики ниже.
 
-**Найдено дефектов: 29**
+**Найдено дефектов: 30** (D30 добавлен 2026-08-10 при расследовании D12/`image_urls`)
 
 | Уровень | Количество | Список |
 |---|---|---|
 | **P0** | 0 | — |
 | **P1** | 7 (все закрыты) | D2, D3, D4, D5, D6, D7, D8 |
-| **P2** | 14 (2 закрыты: D9 полностью, D14 частично) | D9 ✅, D10, D11, D12, D13, D14 (частично ✅), D15, D16, D17, D18, D19, D20, D21, D24 |
+| **P2** | 15 (2 закрыты: D9 полностью, D14 частично) | D9 ✅, D10, D11, D12 (уточнён, `image_urls`-подозрение — NOT REPRODUCIBLE), D13, D14 (частично ✅), D15, D16, D17, D18, D19, D20, D21, D24, D30 (новый) |
 | **P3** | 8 | D1 (пересмотрен), D22, D23, D25, D26, D27, D28, D29 |
 
-Итого 0+7+14+8 = 29. Записи не удаляются при решении — история сохраняется через ~~зачёркивание~~ + RESOLVED-пометку.
+Итого 0+7+15+8 = 30. Записи не удаляются при решении — история сохраняется через ~~зачёркивание~~ + RESOLVED-пометку.
 
 ### 5 наиболее опасных проблем (обновлено)
 
