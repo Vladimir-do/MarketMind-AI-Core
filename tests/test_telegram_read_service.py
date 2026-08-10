@@ -160,6 +160,21 @@ class TelegramReadServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(products), 2)
 
+    async def test_get_product_by_id_returns_matching_product(self):
+        product, _ = await self.db.save_product(
+            "https://example.com/a", {"name": "A", "price": 100, "availability": "in_stock"}
+        )
+
+        found = await self.service.get_product_by_id(product.id)
+
+        self.assertIsNotNone(found)
+        self.assertEqual(found.id, product.id)
+        self.assertEqual(found.name, "A")
+
+    async def test_get_product_by_id_missing_returns_none(self):
+        found = await self.service.get_product_by_id(999999)
+        self.assertIsNone(found)
+
 
 if __name__ == "__main__":
     unittest.main()

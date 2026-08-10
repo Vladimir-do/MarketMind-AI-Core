@@ -13,7 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.config import ADMIN_IDS, PROXY, TELEGRAM_PROXY, logger
-from app.database import Database, Product, url_to_hash
+from app.database import Database, url_to_hash
 from app.telegram_read_service import TelegramReadService
 from app.utils.urls import is_yandex_market_url
 from app.parsers.wildberries import WildberriesParser
@@ -1330,8 +1330,7 @@ async def handle_reviews_choice(message: types.Message, state: FSMContext):
     if not (1 <= choice <= len(product_ids)):
         return await message.answer("❌ Нет такого номера в списке.")
 
-    async with db.session() as s:
-        product = await s.get(Product, product_ids[choice - 1])
+    product = await telegram_read_service.get_product_by_id(product_ids[choice - 1])
     if not product:
         return await message.answer("❌ Товар не найден.")
 

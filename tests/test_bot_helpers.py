@@ -1236,3 +1236,101 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
 
         mocked.assert_not_awaited()
         self.assertEqual(len(message.answers), 1)
+
+    def test_handle_reviews_choice_uses_read_service_for_valid_choice(self):
+        import app.bot as bot_module
+
+        fake_product = type(
+            "P", (), {"id": 7, "name": "WB Кабель USB-C", "url": "https://www.wildberries.ru/catalog/7"}
+        )()
+
+        async def run():
+            message = self.FakeMessage()
+            message.text = "1"
+            state = AsyncMock()
+            state.get_data = AsyncMock(return_value={"review_product_ids": [7]})
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_product_by_id",
+                new=AsyncMock(return_value=fake_product),
+            ) as mocked, patch(
+                "app.parsers.wildberries.WildberriesParser"
+            ) as parser_cls, patch(
+                "app.parsers.wildberries._extract_wb_id", return_value="7"
+            ), patch.object(
+                bot_module.agent, "analyze_reviews", new=AsyncMock(return_value="разбор отзывов")
+            ):
+                parser_instance = parser_cls.return_value
+                parser_instance._fetch_reviews = AsyncMock(return_value=[])
+                await bot_module.handle_reviews_choice(message, state)
+            return message, mocked, state
+
+        message, mocked, state = asyncio.run(run())
+
+        mocked.assert_awaited_once_with(7)
+        state.clear.assert_awaited_once()
+        self.assertIn("WB Кабель USB-C", message.answers[0])
+
+    def test_handle_reviews_choice_missing_product_shows_not_found(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            message.text = "1"
+            state = AsyncMock()
+            state.get_data = AsyncMock(return_value={"review_product_ids": [999]})
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_product_by_id",
+                new=AsyncMock(return_value=None),
+            ) as mocked:
+                await bot_module.handle_reviews_choice(message, state)
+            return message, mocked
+
+        message, mocked = asyncio.run(run())
+
+        mocked.assert_awaited_once_with(999)
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("не найден", message.answers[0].lower())
+
+    def test_handle_reviews_choice_out_of_range_choice_does_not_touch_service(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            message.text = "5"
+            state = AsyncMock()
+            state.get_data = AsyncMock(return_value={"review_product_ids": [7]})
+            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
+                bot_module.telegram_read_service,
+                "get_product_by_id",
+                new=AsyncMock(),
+            ) as mocked:
+                await bot_module.handle_reviews_choice(message, state)
+            return message, mocked
+
+        message, mocked = asyncio.run(run())
+
+        mocked.assert_not_awaited()
+        self.assertEqual(len(message.answers), 1)
+        self.assertIn("нет такого номера", message.answers[0].lower())
+
+    def test_handle_reviews_choice_denies_access_without_touching_service(self):
+        import app.bot as bot_module
+
+        async def run():
+            message = self.FakeMessage()
+            message.text = "1"
+            state = AsyncMock()
+            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
+                bot_module.telegram_read_service,
+                "get_product_by_id",
+                new=AsyncMock(),
+            ) as mocked:
+                await bot_module.handle_reviews_choice(message, state)
+            return message, mocked, state
+
+        message, mocked, state = asyncio.run(run())
+
+        mocked.assert_not_awaited()
+        state.clear.assert_awaited_once()
