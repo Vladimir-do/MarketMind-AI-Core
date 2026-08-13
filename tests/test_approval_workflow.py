@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import unittest
+from datetime import UTC
 
 from tests.helpers import reload_app_modules
 
@@ -14,9 +15,9 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
         os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
         reload_app_modules(database_url="sqlite+aiosqlite://")
 
-        from app.database import Database
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
-        from app.ai_recommendation.suggestions import AISuggestion, AIRecommendationResult
+        from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
+        from app.database import Database
 
         self.db = Database()
         await self.db.init()
@@ -94,8 +95,9 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
         await self.queue.approve(aid)
 
         # Simulate apply with snapshot
+        from datetime import datetime
+
         from app.database import ApprovalRecord
-        from datetime import datetime, timezone
         async with self.db.session() as s:
             record = (await s.execute(
                 select(ApprovalRecord).where(ApprovalRecord.approval_id == aid)
@@ -103,10 +105,10 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
             snapshot = json.dumps({
                 "field": "title",
                 "value": "Original title",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
             record.snapshot_before = snapshot
-            record.applied_at = datetime.now(timezone.utc)
+            record.applied_at = datetime.now(UTC)
             await s.commit()
 
         # Create a mock product with the field set to the AI value
@@ -140,8 +142,9 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
         await self.queue.approve(aid)
 
+        from datetime import datetime
+
         from app.database import ApprovalRecord
-        from datetime import datetime, timezone
         async with self.db.session() as s:
             record = (await s.execute(
                 select(ApprovalRecord).where(ApprovalRecord.approval_id == aid)
@@ -149,10 +152,10 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
             snapshot = json.dumps({
                 "field": "title",
                 "value": "Original title",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
             record.snapshot_before = snapshot
-            record.applied_at = datetime.now(timezone.utc)
+            record.applied_at = datetime.now(UTC)
             await s.commit()
 
         # Rollback without product
@@ -265,10 +268,29 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
         result = await self.queue.approve("nonexistent-id")
         self.assertIsNone(result)
 
+    async def test_get_status_counts_empty_queue_returns_all_zero(self):
+        counts = await self.queue.get_status_counts()
+        self.assertEqual(counts, {"total": 0, "pending": 0, "approved": 0, "rejected": 0, "rolled_back": 0})
+
+    async def test_get_status_counts_reflects_mixed_statuses(self):
+        await self.queue.add(self._make_result("p1"))
+        approved = (await self.queue.add(self._make_result("p2")))[0]
+        rejected = (await self.queue.add(self._make_result("p3")))[0]
+
+        await self.queue.approve(approved.approval_id)
+        await self.queue.reject(rejected.approval_id, reason="test")
+
+        counts = await self.queue.get_status_counts()
+
+        self.assertEqual(counts["total"], 3)
+        self.assertEqual(counts["pending"], 1)
+        self.assertEqual(counts["approved"], 1)
+        self.assertEqual(counts["rejected"], 1)
+        self.assertEqual(counts["rolled_back"], 0)
+
 
 # Need select for inline queries
 from sqlalchemy import select  # noqa: E402
-
 
 if __name__ == "__main__":
     unittest.main()

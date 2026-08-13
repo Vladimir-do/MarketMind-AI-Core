@@ -77,6 +77,71 @@ class ReportsUITests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Рекомендуемые действия", resp.text)
         self.assertIn("Товары, требующие внимания", resp.text)
 
+    async def _seed_approval_records(self):
+        """Seed ApprovalRecord rows covering every status the DB can hold:
+        pending, approved, rejected, rolled_back (see app/database/models.py
+        ApprovalRecord.status and app/ai_recommendation/db_approval.py's
+        approve()/reject()/rollback())."""
+        from app.ai_recommendation.db_approval import DatabaseApprovalQueue
+        from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
+
+        queue = DatabaseApprovalQueue(self.db)
+
+        def make_result(product_id, **kwargs):
+            defaults = dict(
+                field="title", suggestion_type="improve", before="Old",
+                after="New", reason="Better SEO", confidence=0.9,
+            )
+            defaults.update(kwargs)
+            return AIRecommendationResult(product_id=product_id, suggestions=[AISuggestion(**defaults)])
+
+        pending = (await queue.add(make_result("p1")))[0]
+        approved = (await queue.add(make_result("p2")))[0]
+        rejected = (await queue.add(make_result("p3")))[0]
+        rolled_back = (await queue.add(make_result("p4")))[0]
+
+        await queue.approve(approved.approval_id)
+        await queue.reject(rejected.approval_id, reason="test")
+
+        # queue.rollback() requires a populated snapshot_before (set by
+        # apply_approved(), not by add()) -- set the status directly here,
+        # this is fixture seeding, not a claim about the rollback() flow.
+        from sqlalchemy import select
+
+        from app.database import ApprovalRecord
+
+        async with self.db.session() as s:
+            record = (await s.execute(
+                select(ApprovalRecord).where(ApprovalRecord.approval_id == rolled_back.approval_id)
+            )).scalar_one()
+            record.status = "rolled_back"
+            await s.commit()
+
+        return pending, approved, rejected, rolled_back
+
+    async def test_client_summary_api_suggestion_counts_reflect_approval_record_statuses(self):
+        await self._seed_approval_records()
+
+        resp = await self.client.get("/api/reports/client-summary")
+
+        self.assertEqual(resp.status_code, 200)
+        suggestions = resp.json()["suggestions"]
+        self.assertEqual(suggestions["total"], 4)
+        self.assertEqual(suggestions["pending"], 1)
+        self.assertEqual(suggestions["approved"], 1)
+        self.assertEqual(suggestions["rejected"], 1)
+        self.assertEqual(suggestions["rolled_back"], 1)
+
+    async def test_client_summary_api_pending_suggestions_trigger_recommended_action(self):
+        await self._seed_approval_records()
+
+        resp = await self.client.get("/api/reports/client-summary")
+
+        self.assertIn(
+            "Проверить ожидающие AI-предложения и принять или отклонить каждое вручную.",
+            resp.json()["recommended_actions"],
+        )
+
     async def test_base_menu_contains_reports_link(self):
         resp = await self.client.get("/")
         self.assertEqual(resp.status_code, 200)

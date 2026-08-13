@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from collections import Counter
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -44,7 +45,7 @@ class DatabaseApprovalQueue:
                     source_finding=suggestion.source_finding or None,
                     metadata_json=metadata_json,
                     status="pending",
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 s.add(record)
                 added.append(PendingApproval(
@@ -57,7 +58,7 @@ class DatabaseApprovalQueue:
 
     async def approve(self, approval_id: str) -> PendingApproval | None:
         """Mark a suggestion as approved."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as s:
             result = await s.execute(
                 select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
@@ -72,7 +73,7 @@ class DatabaseApprovalQueue:
 
     async def reject(self, approval_id: str, reason: str = "") -> PendingApproval | None:
         """Mark a suggestion as rejected."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as s:
             result = await s.execute(
                 select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
@@ -128,7 +129,7 @@ class DatabaseApprovalQueue:
         after_value,
     ) -> bool:
         """Save apply snapshots for an already approved suggestion."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as s:
             result = await s.execute(
                 select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
@@ -168,6 +169,20 @@ class DatabaseApprovalQueue:
             )
             return [self._record_to_approval(r) for r in result.scalars().all()]
 
+    async def get_status_counts(self) -> dict[str, int]:
+        """Breakdown of all ApprovalRecord rows by status, plus a total."""
+        async with self._db.session() as s:
+            result = await s.execute(select(ApprovalRecord.status))
+            statuses = [row[0] for row in result.all()]
+        counter = Counter(statuses)
+        return {
+            "total": len(statuses),
+            "pending": counter.get("pending", 0),
+            "approved": counter.get("approved", 0),
+            "rejected": counter.get("rejected", 0),
+            "rolled_back": counter.get("rolled_back", 0),
+        }
+
     async def _get_by_status(self, status: str) -> list[PendingApproval]:
         async with self._db.session() as s:
             result = await s.execute(
@@ -199,7 +214,7 @@ class DatabaseApprovalQueue:
                     snapshot_before = json.dumps({
                         "field": field_name,
                         "value": str(current_value) if current_value is not None else None,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }, ensure_ascii=False)
                     # Apply
                     setattr(product, field_name, record.after_value)
@@ -207,11 +222,11 @@ class DatabaseApprovalQueue:
                     snapshot_after = json.dumps({
                         "field": field_name,
                         "value": record.after_value,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }, ensure_ascii=False)
                     record.snapshot_before = snapshot_before
                     record.snapshot_after = snapshot_after
-                    record.applied_at = datetime.now(timezone.utc)
+                    record.applied_at = datetime.now(UTC)
                     applied_fields.append(field_name)
             await s.commit()
         return applied_fields
@@ -235,7 +250,7 @@ class DatabaseApprovalQueue:
             except (json.JSONDecodeError, KeyError):
                 logger.warning("Invalid snapshot_before for %s", approval_id)
                 return False
-            record.rolled_back_at = datetime.now(timezone.utc)
+            record.rolled_back_at = datetime.now(UTC)
             record.status = "rolled_back"
             if product is not None and hasattr(product, record.field):
                 setattr(product, record.field, original_value)

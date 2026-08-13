@@ -1,32 +1,19 @@
 from __future__ import annotations
 
-from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select
 
+from app.ai_recommendation.db_approval import DatabaseApprovalQueue
 from app.analytics.store_analyzer import StoreAnalyzer
-from app.database import ApprovalRecord
 from app.web.app import templates
 
 router = APIRouter()
 
 
 async def _suggestion_stats(request: Request) -> dict:
-    db = request.app.state.db
-    async with db.session() as s:
-        result = await s.execute(select(ApprovalRecord.status))
-        statuses = [row[0] for row in result.all()]
-    counter = Counter(statuses)
-    return {
-        "total": len(statuses),
-        "pending": counter.get("pending", 0),
-        "approved": counter.get("approved", 0),
-        "rejected": counter.get("rejected", 0),
-        "rolled_back": counter.get("rolled_back", 0),
-    }
+    return await DatabaseApprovalQueue(request.app.state.db).get_status_counts()
 
 
 async def build_client_report(request: Request) -> dict:
@@ -41,7 +28,7 @@ async def build_client_report(request: Request) -> dict:
     report_status = "needs_attention" if summary.products_below_threshold else "good"
 
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "status": report_status,
         "summary": summary.model_dump(),
         "top_issues": [item.model_dump() for item in top_issues],
