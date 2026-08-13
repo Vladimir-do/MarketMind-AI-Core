@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-from app.products.schema import UnifiedProduct
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.products.schema import UnifiedProduct
 
 
 @dataclass

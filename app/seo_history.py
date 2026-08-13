@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from app.semantic_core import SemanticCore
-from app.seo_intelligence import SEOAuditResult
+
+if TYPE_CHECKING:
+    from app.semantic_core import SemanticCore
+    from app.seo_intelligence import SEOAuditResult
 
 _MAX_SNAPSHOTS_PER_PRODUCT = 1000
 

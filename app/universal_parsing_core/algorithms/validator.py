@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from app.universal_parsing_core.schemas.normalized_entity import NormalizedEntity
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.universal_parsing_core.schemas.normalized_entity import NormalizedEntity
 
 
 def validate_entities(entities: list[NormalizedEntity]) -> tuple[list[NormalizedEntity], list[str]]:

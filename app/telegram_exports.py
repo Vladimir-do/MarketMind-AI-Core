@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, TYPE_CHECKING
 
 from aiogram import Bot, types
 
-from app.database import Database
+
+if TYPE_CHECKING:
+    from app.database import Database
 
 ExportKind = Literal["csv", "excel"]
 

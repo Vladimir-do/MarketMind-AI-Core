@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from app.ai_recommendation.approval import PendingApproval
 from app.ai_recommendation.db_approval import DatabaseApprovalQueue
 from app.editor.service import EditorError, ProductCardEditorService
 from app.effective_card.service import EffectiveProductCardService
 from app.web.app import templates
 from app.web.schemas import SuggestionItem, SuggestionStats
+
+if TYPE_CHECKING:
+    from app.ai_recommendation.approval import PendingApproval
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

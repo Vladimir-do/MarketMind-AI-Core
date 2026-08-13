@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime  # noqa: TC003 -- pydantic BaseModel field, needs real type at runtime
 from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl

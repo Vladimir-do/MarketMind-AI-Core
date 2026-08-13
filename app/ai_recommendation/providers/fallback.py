@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from app.ai_recommendation.provider import AIResponse
 from app.ai_recommendation.providers.base import BaseAIProvider
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.ai_recommendation.provider import AIResponse
 
 logger = logging.getLogger(__name__)
 

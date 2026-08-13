@@ -6,9 +6,12 @@ import enum
 import logging
 import os
 
-from app.ai_recommendation.providers.base import BaseAIProvider
 from app.ai_recommendation.providers.ollama_provider import OllamaProvider
 from app.ai_recommendation.providers.openai_compatible import OpenAICompatibleProvider
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.ai_recommendation.providers.base import BaseAIProvider
 
 logger = logging.getLogger(__name__)
 

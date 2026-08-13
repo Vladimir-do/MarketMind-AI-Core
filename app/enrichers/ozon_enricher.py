@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from app.card_filler import OzonCardDraft, build_ozon_card_draft, build_ozon_card_quality_report
 from app.enrichers import EnrichmentResult
-from app.products.schema import UnifiedProduct
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.products.schema import UnifiedProduct
 
 
 class OzonEnrichmentStrategy:

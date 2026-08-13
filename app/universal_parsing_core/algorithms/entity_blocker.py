@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.universal_parsing_core.algorithms.price_extractor import PriceCandidate
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.universal_parsing_core.algorithms.price_extractor import PriceCandidate
 
 
 @dataclass(frozen=True)

@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from app.enrichers import EnrichmentStrategy
 from app.enrichers.ozon_enricher import OzonEnrichmentStrategy
-from app.importers.base import ImportResult, ImportRowError
 from app.importers.registry import import_file, import_string
 from app.products.analyzer import ProductAnalyzer
-from app.products.findings import AnalysisResult, BatchAnalysisResult
-from app.products.schema import UnifiedProduct
 from app.products.validator import ProductValidator, ValidationError
+
+if TYPE_CHECKING:
+    from app.enrichers import EnrichmentStrategy
+    from app.products.schema import UnifiedProduct
+    from app.products.findings import AnalysisResult, BatchAnalysisResult
+    from app.importers.base import ImportResult, ImportRowError
+    from pathlib import Path
 
 
 @dataclass

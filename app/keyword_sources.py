@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
 
-from app.products.schema import UnifiedProduct
 from app.seo_intelligence import extract_competitor_terms
+
+if TYPE_CHECKING:
+    from app.products.schema import UnifiedProduct
 
 
 class KeywordSource(Protocol):

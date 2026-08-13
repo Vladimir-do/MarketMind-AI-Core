@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from pathlib import Path
 from urllib.parse import quote_plus
 
 import aiohttp
 from bs4 import BeautifulSoup
 
 from app.config import PARSER_DEBUG_DIR, RESEARCH_ON_PARSE_FAILURE, logger
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 DDG_HTML = "https://html.duckduckgo.com/html/"
 

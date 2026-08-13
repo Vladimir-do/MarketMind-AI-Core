@@ -7,10 +7,13 @@ import re
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
-from app.parsers.base import ProductData
 from app.parsers.router import search_all_marketplaces
 from app.parsers.wildberries import WildberriesParser
 from app.searcher import ozon_search_blocked_message
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.parsers.base import ProductData
 
 SUPPORTED_MARKET_ANALYSIS_MARKETPLACES = {"wildberries", "ozon", "yandex_market", "all"}
 TOO_BROAD_MARKET_ANALYSIS_QUERIES = {

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
 
-from app.products.schema import UnifiedProduct
+
+if TYPE_CHECKING:
+    from app.products.schema import UnifiedProduct
 
 
 class EnrichmentResult:

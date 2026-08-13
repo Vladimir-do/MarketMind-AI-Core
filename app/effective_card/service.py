@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from sqlalchemy import desc, select
 
@@ -14,13 +14,15 @@ from app.editor.schemas import normalize_card_payload
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
 from app.projects.service import ProjectNotFoundError
-from app.seo_history import SEOHistoryService
 from app.seo_intelligence import (
     FORBIDDEN_MARKETING_WORDS,
     GENERIC_PRODUCT_TYPES,
     SEOFinding,
     audit_unified_product_seo,
 )
+
+if TYPE_CHECKING:
+    from app.seo_history import SEOHistoryService
 
 
 @dataclass(frozen=True)

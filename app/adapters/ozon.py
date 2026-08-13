@@ -5,7 +5,10 @@ from time import perf_counter
 
 from app.core.enums import AvailabilityStatus, FetchStatus, Marketplace
 from app.core.models import ProductSnapshot
-from app.updater import OzonUpdater
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.updater import OzonUpdater
 
 
 async def fetch_ozon_snapshot(updater: OzonUpdater, url: str) -> tuple[ProductSnapshot, int | None, int]:

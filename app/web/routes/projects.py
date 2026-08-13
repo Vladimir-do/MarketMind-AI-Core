@@ -8,14 +8,13 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy import select
 
 from app.ai_recommendation.job_queue import process_project_seo_suggestion_job
-from app.ai_recommendation.suggestions import AISuggestion
 from app.config import IMPORT_SCHEMA_VERSION
 from app.database import ProjectExport, ProjectReport
 from app.editor.service import (
@@ -39,6 +38,9 @@ from app.projects.service import (
 from app.reports.service import ClientDeliveryReportService
 from app.web.app import templates
 from app.workspace.files import WorkspaceError, project_root, store_source_file, stored_source_file
+
+if TYPE_CHECKING:
+    from app.ai_recommendation.suggestions import AISuggestion
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

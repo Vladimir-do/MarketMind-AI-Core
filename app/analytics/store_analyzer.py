@@ -6,9 +6,7 @@ import statistics
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 
-from app.database import Database, PriceHistory, Product
 from app.products.analyzer import ProductAnalyzer
-from app.products.findings import AnalysisResult
 from app.products.schema import UnifiedProduct
 
 from .schemas import (
@@ -20,6 +18,11 @@ from .schemas import (
     ScoreDistribution,
     StoreSummary,
 )
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.products.findings import AnalysisResult
+    from app.database import Database, PriceHistory, Product
 
 
 def _detect_marketplace(url: str) -> str:

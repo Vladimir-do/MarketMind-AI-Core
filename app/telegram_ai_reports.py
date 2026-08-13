@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import html
 
-from app.database import Database
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.database import Database
 
 
 async def build_market_overview_message(db: Database) -> str:

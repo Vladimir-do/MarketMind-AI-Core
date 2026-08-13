@@ -5,7 +5,6 @@ import csv
 import io
 import logging
 import re
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
@@ -13,8 +12,12 @@ from urllib.parse import urljoin, urlparse
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
-from app.task_intents import StructuredTask
 from app.universal_parsing_core.parsers.universal_html import UniversalHtmlParser
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.task_intents import StructuredTask
+    from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 

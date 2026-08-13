@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from app.parsers.base import ProductData
-from app.products.schema import UnifiedProduct
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.products.schema import UnifiedProduct
 
 
 def unified_to_product_data(product: UnifiedProduct) -> ProductData:

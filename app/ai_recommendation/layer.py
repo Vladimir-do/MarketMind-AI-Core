@@ -5,13 +5,15 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from app.ai_recommendation.approval import ApprovalQueue
 from app.ai_recommendation.engine import AIRecommendationEngine
-from app.ai_recommendation.provider import AIProvider
 from app.ai_recommendation.suggestions import AIBatchRecommendationResult
-from app.pipeline import PipelineResult
+
+if TYPE_CHECKING:
+    from app.pipeline import PipelineResult
+    from app.ai_recommendation.provider import AIProvider
 
 logger = logging.getLogger(__name__)
 

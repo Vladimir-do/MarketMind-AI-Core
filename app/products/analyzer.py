@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Sequence
 
 from app.products.findings import AnalysisResult, BatchAnalysisResult, Finding, Recommendation
-from app.products.schema import UnifiedProduct
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.products.schema import UnifiedProduct
+    from collections.abc import Sequence
 
 # ── Thresholds ──────────────────────────────────────────────────────────
 

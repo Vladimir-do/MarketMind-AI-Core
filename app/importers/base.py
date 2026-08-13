@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from app.importers.image_fetcher import resolve_image_url_from_source
 from app.products.schema import UnifiedProduct
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 DEFAULT_FIELD_MAPPING: dict[str, str] = {
     # Russian names
