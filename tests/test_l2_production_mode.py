@@ -210,6 +210,19 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(".env", payload)
         self.assertNotIn("redacted-value", payload)
 
+    async def test_full_archive_missing_project_returns_404(self):
+        """D11-F regression: missing project must be 404, matching every other project endpoint."""
+        from httpx import ASGITransport, AsyncClient
+
+        from app.web.app import create_app
+
+        app = create_app()
+        app.state.db = self.db
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.post("/projects/does-not-exist/full-archive")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Проект не найден")
+
     async def test_low_space_warning_is_reported(self):
         from collections import namedtuple
 

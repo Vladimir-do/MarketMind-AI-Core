@@ -21,6 +21,7 @@ from app.database import (
     ProjectReport,
 )
 from app.exports.service import ProjectExportService
+from app.projects.service import ProjectNotFoundError
 from app.workspace.files import project_artifact_path, project_root
 
 
@@ -37,7 +38,7 @@ class ProjectArchiveService:
         async with self._db.session() as session:
             project = await session.get(ClientProject, project_id)
             if project is None:
-                raise ProjectArchiveError("Проект не найден")
+                raise ProjectNotFoundError("Проект не найден")
         export_service = ProjectExportService(self._db)
         await export_service.create_export(project_id, file_format="csv")
         await export_service.create_export(project_id, file_format="xlsx")
@@ -92,7 +93,7 @@ class ProjectArchiveService:
                 )
             ).scalars().all()
         if project is None:
-            raise ProjectArchiveError("Проект не найден")
+            raise ProjectNotFoundError("Проект не найден")
         return {
             "project": _project_dict(project),
             "generated_at": datetime.now(UTC).isoformat(),
