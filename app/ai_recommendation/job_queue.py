@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.ai_recommendation.db_approval import DatabaseApprovalQueue
 from app.ai_recommendation.engine import AIRecommendationEngine
 from app.ai_recommendation.providers.factory import create_configured_provider
 from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
-from app.database import Database, PriceHistory, Product
 from app.effective_card.service import EffectiveProductCardService
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
 from app.seo_intelligence import audit_unified_product_seo
+
+if TYPE_CHECKING:
+    from app.database import Database, PriceHistory, Product
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +55,6 @@ def _detect_marketplace(url: str | None) -> str:
     if "market.yandex" in low or "yandex.ru/market" in low:
         return "yandex_market"
     return "unknown"
-
-
-async def _get_product(db: Database, product_id: int) -> Product | None:
-    async with db.session() as session:
-        return await session.get(Product, product_id)
 
 
 def _build_unified(product: Product, last_price: PriceHistory | None) -> UnifiedProduct:
@@ -309,7 +306,7 @@ async def process_product_ai_suggestion_job(app, job_id: str, product_id: int) -
     await db.start_job(job_id)
 
     try:
-        product = await _get_product(db, product_id)
+        product = await db.get_product_by_id(product_id)
         if product is None:
             raise ValueError("Product not found")
 

@@ -101,5 +101,4 @@ class TelegramReadService:
         return list(products)
 
     async def get_product_by_id(self, product_id: int) -> Product | None:
-        async with self._db.session() as s:
-            return await s.get(Product, product_id)
+        return await self._db.get_product_by_id(product_id)

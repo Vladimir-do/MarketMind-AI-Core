@@ -229,6 +229,10 @@ class Database:
         async with self.session() as s:
             return await s.get(JobRecord, job_id)
 
+    async def get_product_by_id(self, product_id: int) -> Product | None:
+        async with self.session() as s:
+            return await s.get(Product, product_id)
+
     async def get_product_by_hash(self, url_hash: str) -> Product | None:
         from sqlalchemy import select
         async with self.session() as s:
