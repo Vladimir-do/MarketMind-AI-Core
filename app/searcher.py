@@ -3,6 +3,7 @@ searcher.py — поиск товаров на Озоне по названию 
 Возвращает список найденных товаров с ценами.
 """
 import asyncio
+import contextlib
 import os
 import random
 import re
@@ -83,10 +84,8 @@ async def search_ozon(query: str, max_results: int = 5) -> list[dict]:
 
             # Поисковая страница
             await page.goto(search_url, wait_until="load", timeout=60_000)
-            try:
+            with contextlib.suppress(Exception):
                 await page.wait_for_load_state("networkidle", timeout=30_000)
-            except Exception:
-                pass
             try:
                 await page.wait_for_selector("div[data-widget='searchResultsV2']", timeout=12_000)
             except Exception:

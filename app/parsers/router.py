@@ -143,7 +143,7 @@ async def search_all_marketplaces(
 
     if tasks:
         gathered = await asyncio.gather(*tasks, return_exceptions=True)
-        for name, result in zip(names, gathered):
+        for name, result in zip(names, gathered, strict=True):
             if isinstance(result, Exception):
                 logger.warning(f"Search failed for {name}: {type(result).__name__}: {result}")
                 results[name] = []

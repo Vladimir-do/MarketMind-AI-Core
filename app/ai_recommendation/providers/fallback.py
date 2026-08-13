@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from app.ai_recommendation.providers.base import BaseAIProvider
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.ai_recommendation.provider import AIResponse

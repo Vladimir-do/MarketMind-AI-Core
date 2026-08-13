@@ -3,6 +3,7 @@
 ozon.py — парсер Озон через Playwright (ninja-режим).
 """
 import asyncio
+import contextlib
 import json
 import os
 import random
@@ -144,10 +145,8 @@ class OzonParser(BaseParser):
                             await page.goto("https://www.ozon.ru/", wait_until="domcontentloaded", timeout=20_000)
                             await asyncio.sleep(random.uniform(2, 3))
                         await page.goto(url, wait_until="load", timeout=60_000)
-                        try:
+                        with contextlib.suppress(Exception):
                             await page.wait_for_load_state("networkidle", timeout=30_000)
-                        except Exception:
-                            pass
                         await page.wait_for_selector("h1", timeout=12_000)
                         await asyncio.sleep(random.uniform(2, 3))
                         # Скролл
@@ -220,27 +219,23 @@ class OzonParser(BaseParser):
             if started_here:
                 await self.stop()
         if not html:
-            try:
+            with contextlib.suppress(Exception):
                 await research_parse_failure(
                     source="ozon_parser_no_html",
                     url=url,
                     detail="OzonParser: _fetch_html вернул None",
                     marketplace="ozon",
                 )
-            except Exception:
-                pass
             return None
         data = parse_ozon_html(html, url)
         if not data:
-            try:
+            with contextlib.suppress(Exception):
                 await research_parse_failure(
                     source="ozon_parser_parse_failed",
                     url=url,
                     detail="OzonParser: parse_ozon_html вернул None",
                     marketplace="ozon",
                 )
-            except Exception:
-                pass
             return None
         return ProductData(
             name=data["name"],

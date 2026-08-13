@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-
-from app.products.findings import AnalysisResult, BatchAnalysisResult, Finding, Recommendation
 from typing import TYPE_CHECKING
 
+from app.products.findings import AnalysisResult, BatchAnalysisResult, Finding, Recommendation
+
 if TYPE_CHECKING:
-    from app.products.schema import UnifiedProduct
     from collections.abc import Sequence
+
+    from app.products.schema import UnifiedProduct
 
 # ── Thresholds ──────────────────────────────────────────────────────────
 
@@ -161,27 +162,30 @@ def _check_consistency(product: UnifiedProduct) -> list[Finding]:
             category="consistency",
         ))
 
-    if product.old_price is not None and product.price is not None:
-        if product.old_price <= product.price:
+    if product.old_price is not None and product.price is not None and product.old_price <= product.price:
+        findings.append(Finding(
+            rule="consistency_old_price_gt_current",
+            field="old_price",
+            message="Old price should be greater than current price",
+            severity="warning",
+            category="consistency",
+        ))
+
+    if (
+        product.discount_pct is not None
+        and product.old_price is not None
+        and product.price is not None
+        and product.old_price > product.price
+    ):
+        expected = round((1 - product.price / product.old_price) * 100)
+        if abs(product.discount_pct - expected) > 1:
             findings.append(Finding(
-                rule="consistency_old_price_gt_current",
-                field="old_price",
-                message="Old price should be greater than current price",
-                severity="warning",
+                rule="consistency_discount_pct",
+                field="discount_pct",
+                message=f"Discount {product.discount_pct}% doesn't match calculated {expected}%",
+                severity="info",
                 category="consistency",
             ))
-
-    if product.discount_pct is not None and product.old_price is not None and product.price is not None:
-        if product.old_price > product.price:
-            expected = round((1 - product.price / product.old_price) * 100)
-            if abs(product.discount_pct - expected) > 1:
-                findings.append(Finding(
-                    rule="consistency_discount_pct",
-                    field="discount_pct",
-                    message=f"Discount {product.discount_pct}% doesn't match calculated {expected}%",
-                    severity="info",
-                    category="consistency",
-                ))
 
     if len(product.name) > 200:
         findings.append(Finding(

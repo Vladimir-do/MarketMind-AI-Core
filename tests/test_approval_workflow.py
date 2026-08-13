@@ -29,14 +29,14 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
         await self.db._engine.dispose()
 
     def _make_result(self, product_id="prod-001", **kwargs):
-        defaults = dict(
-            field="title",
-            suggestion_type="improve",
-            before="Old title",
-            after="New improved title",
-            reason="Better SEO",
-            confidence=0.9,
-        )
+        defaults = {
+            "field": "title",
+            "suggestion_type": "improve",
+            "before": "Old title",
+            "after": "New improved title",
+            "reason": "Better SEO",
+            "confidence": 0.9,
+        }
         defaults.update(kwargs)
         return self.AIRecommendationResult(
             product_id=product_id,

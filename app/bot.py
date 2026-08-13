@@ -1470,7 +1470,7 @@ async def handle_natural_card_urls(message: types.Message, urls: list[str]):
         return await message.answer("⚠️ Парсер занят. Подождите.")
 
     await parser_lock.acquire()
-    await message.answer(f"🚀 Нашёл ссылку для карточки, сначала получаю данные товара...")
+    await message.answer("🚀 Нашёл ссылку для карточки, сначала получаю данные товара...")
     proxy = PROXY if PROXY else None
     try:
         await worker_add_urls(db, urls[:1], lambda t: notify_chat(message.chat.id, t), proxy=proxy)

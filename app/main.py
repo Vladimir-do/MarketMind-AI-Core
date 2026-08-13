@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import contextlib
 import os
 import signal
 import sys
@@ -81,10 +82,8 @@ def main():
                 return
         finally:
             if _db_ref is not None:
-                try:
+                with contextlib.suppress(Exception):
                     _loop.run_until_complete(_db_ref._engine.dispose())
-                except Exception:
-                    pass
             _loop.close()
             _loop = None
 

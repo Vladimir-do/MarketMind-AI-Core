@@ -88,10 +88,10 @@ class ReportsUITests(unittest.IsolatedAsyncioTestCase):
         queue = DatabaseApprovalQueue(self.db)
 
         def make_result(product_id, **kwargs):
-            defaults = dict(
-                field="title", suggestion_type="improve", before="Old",
-                after="New", reason="Better SEO", confidence=0.9,
-            )
+            defaults = {
+                "field": "title", "suggestion_type": "improve", "before": "Old",
+                "after": "New", "reason": "Better SEO", "confidence": 0.9,
+            }
             defaults.update(kwargs)
             return AIRecommendationResult(product_id=product_id, suggestions=[AISuggestion(**defaults)])
 

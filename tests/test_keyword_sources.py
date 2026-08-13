@@ -12,7 +12,7 @@ from app.seo_intelligence import extract_competitor_terms
 
 
 def _пустой_товар(**kwargs):
-    defaults = dict(name="", source_id="t1", source_type="test")
+    defaults = {"name": "", "source_id": "t1", "source_type": "test"}
     defaults.update(kwargs)
     return UnifiedProduct(**defaults)
 

@@ -38,13 +38,15 @@ async def fetch_via_google_cache(url: str, timeout: float = 10.0) -> str | None:
     """Получает страницу из кэша Google."""
     cache_url = f"https://webcache.googleusercontent.com/search?q=cache:{quote(url)}"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(cache_url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                if resp.status == 200:
-                    html = await resp.text()
-                    if len(html) > 1000:
-                        logger.info(f"Google cache hit: {url[:80]}")
-                        return html
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(cache_url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp,
+        ):
+            if resp.status == 200:
+                html = await resp.text()
+                if len(html) > 1000:
+                    logger.info(f"Google cache hit: {url[:80]}")
+                    return html
     except Exception as e:
         logger.debug(f"Google cache failed: {e}")
     return None
@@ -56,13 +58,15 @@ async def fetch_via_yandex_cache(url: str, timeout: float = 10.0) -> str | None:
     """Получает страницу из кэша Яндекса."""
     cache_url = f"https://yandexwebcache.net/yandbtm?fmode=inject&tm=1700000000&tld=ru&lang=ru&la=1700000000&text={quote(url)}&url={quote(url)}"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(cache_url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                if resp.status == 200:
-                    html = await resp.text()
-                    if len(html) > 1000:
-                        logger.info(f"Yandex cache hit: {url[:80]}")
-                        return html
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(cache_url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp,
+        ):
+            if resp.status == 200:
+                html = await resp.text()
+                if len(html) > 1000:
+                    logger.info(f"Yandex cache hit: {url[:80]}")
+                    return html
     except Exception as e:
         logger.debug(f"Yandex cache failed: {e}")
     return None
@@ -74,11 +78,13 @@ async def fetch_ozon_suggestions(query: str, timeout: float = 5.0) -> list[dict]
     """Получает подсказки поиска Ozon — быстрый способ найти товар."""
     url = f"https://www.ozon.ru/api/serpbox/v2/search/suggest?text={quote(query)}&lang=ru"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("suggestions", [])
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp,
+        ):
+            if resp.status == 200:
+                data = await resp.json()
+                return data.get("suggestions", [])
     except Exception as e:
         logger.debug(f"Ozon suggestions failed: {e}")
     return []
@@ -101,64 +107,66 @@ async def fetch_ozon_search_api(query: str, timeout: float = 10.0) -> list[dict]
         "Accept": "application/json",
     }
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                if resp.status != 200:
-                    logger.debug(f"Ozon mobile API status {resp.status} for query={query!r}")
-                    return []
-                data = await resp.json()
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)) as resp,
+        ):
+            if resp.status != 200:
+                logger.debug(f"Ozon mobile API status {resp.status} for query={query!r}")
+                return []
+            data = await resp.json()
 
-                widgets = data.get("widgetStates", {})
-                for key, value in widgets.items():
-                    if "tile" not in key.lower() or not isinstance(value, str):
-                        continue
-                    try:
-                        tile_data = _json.loads(value)
-                    except Exception:
-                        continue
-                    items = tile_data.get("items", [])
-                    if not items:
-                        continue
+            widgets = data.get("widgetStates", {})
+            for key, value in widgets.items():
+                if "tile" not in key.lower() or not isinstance(value, str):
+                    continue
+                try:
+                    tile_data = _json.loads(value)
+                except Exception:
+                    continue
+                items = tile_data.get("items", [])
+                if not items:
+                    continue
 
-                    results = []
-                    for item in items:
-                        product_id = item.get("id", "")
-                        link = item.get("action", {}).get("link", "")
-                        title = ""
-                        price_text = ""
-                        image_url = None
+                results = []
+                for item in items:
+                    product_id = item.get("id", "")
+                    link = item.get("action", {}).get("link", "")
+                    title = ""
+                    price_text = ""
+                    image_url = None
 
-                        for state in item.get("mainState", []):
-                            state_type = state.get("type", "")
-                            if state_type == "title":
-                                title = state.get("title", {}).get("text", "")
-                            elif state_type == "priceV2":
-                                prices = state.get("priceV2", {}).get("price", [])
-                                if prices:
-                                    price_text = prices[0].get("text", "")
-                            elif state_type == "image":
-                                img = state.get("image", {})
-                                image_url = img.get("url") or img.get("imageUrl")
+                    for state in item.get("mainState", []):
+                        state_type = state.get("type", "")
+                        if state_type == "title":
+                            title = state.get("title", {}).get("text", "")
+                        elif state_type == "priceV2":
+                            prices = state.get("priceV2", {}).get("price", [])
+                            if prices:
+                                price_text = prices[0].get("text", "")
+                        elif state_type == "image":
+                            img = state.get("image", {})
+                            image_url = img.get("url") or img.get("imageUrl")
 
-                        price = None
-                        if price_text:
-                            digits = re.sub(r"[^\d]", "", price_text)
+                    price = None
+                    if price_text:
+                        digits = re.sub(r"[^\d]", "", price_text)
                         price = int(digits) if digits else None
 
-                        full_url = f"https://www.ozon.ru{link}" if link.startswith("/") else link
-                        if _looks_like_service_page_title(title) and not price and not image_url:
-                            continue
+                    full_url = f"https://www.ozon.ru{link}" if link.startswith("/") else link
+                    if _looks_like_service_page_title(title) and not price and not image_url:
+                        continue
 
-                        results.append({
-                            "id": product_id,
-                            "name": title or f"Товар Ozon {product_id}",
-                            "price": price,
-                            "url": full_url,
-                            "image_url": image_url,
-                        })
+                    results.append({
+                        "id": product_id,
+                        "name": title or f"Товар Ozon {product_id}",
+                        "price": price,
+                        "url": full_url,
+                        "image_url": image_url,
+                    })
 
-                    logger.info(f"Ozon mobile API: {len(results)} results for query={query!r}")
-                    return results
+                logger.info(f"Ozon mobile API: {len(results)} results for query={query!r}")
+                return results
 
     except Exception as e:
         logger.debug(f"Ozon mobile API failed: {e}")
@@ -171,11 +179,13 @@ async def fetch_wb_suggestions(query: str, timeout: float = 5.0) -> list[dict]:
     """Получает подсказки поиска Wildberries."""
     url = f"https://search.wb.ru/exactmatch/ru/common/v5/suggest?ab_testing=false&appType=1&curr=rub&dest=-1257786&query={quote(query)}&spp=30"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("data", {}).get("products", [])
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp,
+        ):
+            if resp.status == 200:
+                data = await resp.json()
+                return data.get("data", {}).get("products", [])
     except Exception as e:
         logger.debug(f"WB suggestions failed: {e}")
     return []
@@ -187,12 +197,14 @@ async def fetch_yandex_market_search(query: str, timeout: float = 10.0) -> str |
     """Ищет товар через Yandex Market (менее защищён чем Ozon)."""
     url = f"https://market.yandex.ru/search?text={quote(query)}"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                if resp.status == 200:
-                    html = await resp.text()
-                    if len(html) > 5000:
-                        return html
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp,
+        ):
+            if resp.status == 200:
+                html = await resp.text()
+                if len(html) > 5000:
+                    return html
     except Exception as e:
         logger.debug(f"Yandex Market search failed: {e}")
     return None

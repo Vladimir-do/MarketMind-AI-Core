@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from app.parsers.base import ProductData
 from typing import TYPE_CHECKING
+
+from app.parsers.base import ProductData
 
 if TYPE_CHECKING:
     from app.products.schema import UnifiedProduct

@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from urllib.parse import quote_plus
 
 import aiohttp
 from bs4 import BeautifulSoup
 
 from app.config import PARSER_DEBUG_DIR, RESEARCH_ON_PARSE_FAILURE, logger
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -78,15 +78,14 @@ async def _fetch_ddg_snippets(query: str, max_results: int = 8) -> list[tuple[st
     body = f"q={quote_plus(query)}&b="
     out: list[tuple[str, str]] = []
     try:
-        async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.post(
-                DDG_HTML,
-                data=body.encode("utf-8"),
-                timeout=aiohttp.ClientTimeout(total=15),
-            ) as resp:
-                if resp.status != 200:
-                    return out
-                html = await resp.text()
+        async with aiohttp.ClientSession(headers=headers) as session, session.post(
+            DDG_HTML,
+            data=body.encode("utf-8"),
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as resp:
+            if resp.status != 200:
+                return out
+            html = await resp.text()
     except Exception as e:
         logger.debug(f"research: DDG request failed: {e}")
         return out

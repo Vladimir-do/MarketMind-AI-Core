@@ -1,5 +1,6 @@
 """Integration test: HTTP 429 from Gemini → ask_ai → job_records.error_text."""
 
+import contextlib
 import unittest
 import uuid
 from types import SimpleNamespace
@@ -40,9 +41,9 @@ class _FakeGeminiSession:
             outer = self._exc
 
             class _Raising:
-                async def __aenter__(self_):
+                async def __aenter__(self):
                     raise outer
-                async def __aexit__(self_, *a):
+                async def __aexit__(self, *a):
                     return False
             return _Raising()
         return self._response
@@ -218,12 +219,10 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             await db.create_job("seo_suggestion", {"action": "test"}, job_id=job_id)
             await db.start_job(job_id)
 
-            try:
+            with contextlib.suppress(RuntimeError):
                 await process_project_seo_suggestion_job(
                     mock_app, job_id, "project-x", 99003, action="test"
                 )
-            except RuntimeError:
-                pass
 
         from sqlalchemy import select
         async with db.session() as s:

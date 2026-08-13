@@ -226,9 +226,7 @@ class ContextSession:
     def should_continue_page_classification(self, urls: list[str], raw_text: str | None = None) -> bool:
         if not self.waiting_for_page_classification_url() or not urls:
             return False
-        if raw_text and _has_explicit_scraping_command(raw_text.lower()):
-            return False
-        return True
+        return not (raw_text and _has_explicit_scraping_command(raw_text.lower()))
 
 
 @dataclass(frozen=True, slots=True)
@@ -702,12 +700,11 @@ def _classify_scraping_domain_task(raw: str, urls: list[str], fields: list[str])
         parameters["next_strategy"] = "api"
         return parameters
 
-    if host.endswith("fl.ru") or ".fl.ru" in host:
-        if "/projects/" in path or "project" in path:
-            parameters["task_type"] = "freelance_project"
-            parameters["entity_type"] = "project"
-            parameters["page_structure"] = "article_or_project"
-            return parameters
+    if (host.endswith("fl.ru") or ".fl.ru" in host) and ("/projects/" in path or "project" in path):
+        parameters["task_type"] = "freelance_project"
+        parameters["entity_type"] = "project"
+        parameters["page_structure"] = "article_or_project"
+        return parameters
 
     if any(marker in path for marker in ("/blog", "/news", "/article", "/articles", "/posts")) or any(
         marker in low for marker in ("\u0441\u0442\u0430\u0442\u044c", "article", "blog post", "news")
@@ -906,8 +903,6 @@ def _is_requirement_candidate(normalized: str) -> bool:
         "result",
         "вывод",
         "результат",
-        "вывод",
-        "результат",
         "csv",
         "xlsx",
         "json",
@@ -915,32 +910,21 @@ def _is_requirement_candidate(normalized: str) -> bool:
         "logging",
         "логирование",
         "добавить_логирование",
-        "логирование",
         "retry",
-        "ретрай",
-        "повтор",
         "ретрай",
         "повтор",
         "error_handling",
         "обработка_ошибок",
         "обработку_ошибок",
         "добавить_обработку_ошибок",
-        "обработка_ошибок",
         "delay",
         "delay_between_requests",
-        "задержка",
-        "задержка_между_запросами",
         "задержка",
         "задержка_между_запросами",
         "pagination",
         "пагинация",
         "задача",
-        "пагинация",
-        "логирование",
-        "обработку_ошибок",
-        "обработка_ошибок",
         "задержку_между_запросами",
-        "задержка_между_запросами",
         "нормальную_структуру_функций",
     }
 
@@ -991,13 +975,7 @@ def _is_scope_command_candidate(normalized: str) -> bool:
             "получи_все",
             "получи_все_товары",
             "все_товары",
-            "собери_все",
-            "собери_все_книги",
             "собери_с_первой_страницы",
-            "спарси_все",
-            "получи_все",
-            "получи_все_товары",
-            "все_товары",
             "первая_страница",
             "first_page",
             "all_pages",

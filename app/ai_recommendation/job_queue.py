@@ -20,7 +20,7 @@ from app.seo_intelligence import audit_unified_product_seo
 
 logger = logging.getLogger(__name__)
 
-class AIJobFailure(RuntimeError):
+class AIJobFailureError(RuntimeError):
     """AI job error carrying structured diagnostics for persistence and UI."""
 
     def __init__(self, message: str, *, details: dict[str, Any] | None = None) -> None:
@@ -228,7 +228,7 @@ async def process_project_seo_suggestion_job(
             details = _response_failure_details(
                 provider, response, job_id=job_id, product_id=product_id, project_id=project_id
             )
-            raise AIJobFailure(
+            raise AIJobFailureError(
                 f"AI request failed: {details['error_type']}: {details['error_message']}",
                 details=details,
             )

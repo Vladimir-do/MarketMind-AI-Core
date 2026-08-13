@@ -59,19 +59,21 @@ class OllamaProvider(BaseAIProvider):
         start = time.monotonic()
         try:
             timeout_obj = aiohttp.ClientTimeout(total=self._timeout)
-            async with aiohttp.ClientSession(timeout=timeout_obj) as session:
-                async with session.post(url, json=payload) as resp:
-                    body = await resp.json()
-                    if resp.status != 200:
-                        error_msg = body.get("error", str(body))
-                        raise RuntimeError(f"Ollama HTTP {resp.status}: {error_msg}")
-                    content = body.get("message", {}).get("content", "")
-                    return AIResponse(
-                        text=content,
-                        model=body.get("model", self._model),
-                        input_tokens=body.get("prompt_eval_count", 0),
-                        output_tokens=body.get("eval_count", 0),
-                        latency_ms=self._elapsed_ms(start),
-                    )
+            async with (
+                aiohttp.ClientSession(timeout=timeout_obj) as session,
+                session.post(url, json=payload) as resp,
+            ):
+                body = await resp.json()
+                if resp.status != 200:
+                    error_msg = body.get("error", str(body))
+                    raise RuntimeError(f"Ollama HTTP {resp.status}: {error_msg}")
+                content = body.get("message", {}).get("content", "")
+                return AIResponse(
+                    text=content,
+                    model=body.get("model", self._model),
+                    input_tokens=body.get("prompt_eval_count", 0),
+                    output_tokens=body.get("eval_count", 0),
+                    latency_ms=self._elapsed_ms(start),
+                )
         except Exception as exc:
             return self._create_error_response(exc, prompt)

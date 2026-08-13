@@ -131,8 +131,8 @@ Expensive Product,789,60000000,70000000,Very expensive product
             self.assertEqual(len(result.enriched), 2)
 
             # Should have price_range warning
-            from app.products.validator import ValidationError as VE
-            validation_errors = [e for e in result.errors if isinstance(e, VE)]
+            from app.products.validator import ValidationError
+            validation_errors = [e for e in result.errors if isinstance(e, ValidationError)]
             error_rules = {e.rule for e in validation_errors}
             self.assertIn("price_range", error_rules)
 
@@ -160,8 +160,8 @@ Expensive Product,789,60000000,70000000,Very expensive product
         self.assertEqual(result.enriched[0].product.name, "Valid")
         self.assertEqual(result.enriched[1].product.name, "High Price")
 
-        from app.products.validator import ValidationError as VE
-        validation_errors = [e for e in result.errors if isinstance(e, VE)]
+        from app.products.validator import ValidationError
+        validation_errors = [e for e in result.errors if isinstance(e, ValidationError)]
         error_rules = {e.rule for e in validation_errors}
         self.assertIn("required_name", error_rules)
         self.assertIn("required_source_id", error_rules)

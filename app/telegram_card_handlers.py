@@ -71,10 +71,7 @@ async def _read_text_document(document: types.Document, *, bot: Bot | None) -> s
     downloaded = await bot.download_file(telegram_file.file_path)
     if downloaded is None:
         return ""
-    if hasattr(downloaded, "getvalue"):
-        raw = downloaded.getvalue()
-    else:
-        raw = downloaded.read()
+    raw = downloaded.getvalue() if hasattr(downloaded, "getvalue") else downloaded.read()
     return raw.decode("utf-8", errors="ignore")
 
 
@@ -187,7 +184,7 @@ async def generate_ozon_batch_card_files(
 
             await worker_add_urls(db, url_sources, quiet_notify, proxy=PROXY if PROXY else None)
 
-        for idx, source in enumerate(sources, 1):
+        for source in sources:
             try:
                 task = source
                 fallback_message = ""

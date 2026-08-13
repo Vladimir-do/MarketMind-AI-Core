@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import uuid
@@ -268,10 +269,8 @@ class DatabaseApprovalQueue:
                 return None
             snapshot_before = None
             if record.snapshot_before:
-                try:
+                with contextlib.suppress(json.JSONDecodeError, KeyError):
                     snapshot_before = json.loads(record.snapshot_before)
-                except (json.JSONDecodeError, KeyError):
-                    pass
             return {
                 "approval_id": record.approval_id,
                 "product_id": record.product_id,
@@ -304,10 +303,8 @@ class DatabaseApprovalQueue:
         status_map = {"pending": None, "approved": True, "rejected": False}
         metadata = {}
         if record.metadata_json:
-            try:
+            with contextlib.suppress(json.JSONDecodeError, KeyError):
                 metadata = json.loads(record.metadata_json)
-            except (json.JSONDecodeError, KeyError):
-                pass
         return PendingApproval(
             suggestion=AISuggestion(
                 field=record.field,

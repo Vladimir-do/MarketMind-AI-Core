@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from app.universal_parsing_core.schemas.page_structure import PageStructure
 from typing import TYPE_CHECKING
+
+from app.universal_parsing_core.schemas.page_structure import PageStructure
 
 if TYPE_CHECKING:
     from app.universal_parsing_core.schemas.normalized_entity import NormalizedEntity

@@ -67,10 +67,12 @@ async def fetch_funpay_offer(url: str, timeout: int = 20) -> FunPayOffer:
         ),
         "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
     }
-    async with aiohttp.ClientSession(headers=headers) as session:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
-            response.raise_for_status()
-            html = await response.text()
+    async with (
+        aiohttp.ClientSession(headers=headers) as session,
+        session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as response,
+    ):
+        response.raise_for_status()
+        html = await response.text()
     return parse_funpay_offer_html(html, url)
 
 

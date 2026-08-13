@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from urllib.parse import urlparse
-
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from app.products.schema import UnifiedProduct
@@ -86,15 +85,14 @@ class ProductValidator:
             ))
 
         # old_price_gt_price
-        if product.old_price is not None and product.price is not None:
-            if product.old_price <= product.price:
-                errors.append(ValidationError(
-                    product_index=idx,
-                    rule="old_price_gt_price",
-                    field="old_price",
-                    message=f"Old price ({product.old_price}) must be greater than current price ({product.price})",
-                    severity="warning",
-                ))
+        if product.old_price is not None and product.price is not None and product.old_price <= product.price:
+            errors.append(ValidationError(
+                product_index=idx,
+                rule="old_price_gt_price",
+                field="old_price",
+                message=f"Old price ({product.old_price}) must be greater than current price ({product.price})",
+                severity="warning",
+            ))
 
         # url_valid
         if product.source_url:
@@ -113,15 +111,14 @@ class ProductValidator:
 
         # dimensions_complete
         dimensions = [product.width_mm, product.height_mm, product.depth_mm]
-        if any(d is not None for d in dimensions):
-            if not all(d is not None for d in dimensions):
-                errors.append(ValidationError(
-                    product_index=idx,
-                    rule="dimensions_complete",
-                    field="dimensions",
-                    message="All three dimensions (width, height, depth) must be specified together",
-                    severity="error",
-                ))
+        if any(d is not None for d in dimensions) and not all(d is not None for d in dimensions):
+            errors.append(ValidationError(
+                product_index=idx,
+                rule="dimensions_complete",
+                field="dimensions",
+                message="All three dimensions (width, height, depth) must be specified together",
+                severity="error",
+            ))
 
         # weight_positive
         if product.weight_g is not None and product.weight_g <= 0:

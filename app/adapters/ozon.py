@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from time import perf_counter
+from typing import TYPE_CHECKING
 
 from app.core.enums import AvailabilityStatus, FetchStatus, Marketplace
 from app.core.models import ProductSnapshot
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.updater import OzonUpdater

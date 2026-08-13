@@ -12,6 +12,7 @@ safe to import before SQLAlchemy creates the SQLite async engine.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from functools import partial
 from typing import Any
 
@@ -64,10 +65,8 @@ def apply_aiosqlite_future_poll_patch() -> None:
                 self._tx.put_nowait((future, self._connector))
                 self._connection = await _await_future_poll(future)
             except AttributeError as exc:
-                try:
+                with contextlib.suppress(Exception):
                     self.stop()
-                except Exception:
-                    pass
                 self._connection = None
                 raise _patch_incompatible(exc, installed_version) from exc
             except BaseException:

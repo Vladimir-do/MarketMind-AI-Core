@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.universal_parsing_core.schemas.page_structure import PageStructure
 
 if TYPE_CHECKING:
-    from app.universal_parsing_core.schemas.task_type import TaskType
     from app.universal_parsing_core.schemas.normalized_entity import NormalizedEntity
+    from app.universal_parsing_core.schemas.task_type import TaskType
 
 
 @dataclass

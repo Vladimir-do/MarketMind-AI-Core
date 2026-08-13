@@ -1,3 +1,4 @@
+import contextlib
 import json
 import re
 from collections.abc import Awaitable, Callable
@@ -76,7 +77,7 @@ class YandexMarketParser(BaseParser):
     ) -> None:
         if not self._attempt_recorder:
             return
-        try:
+        with contextlib.suppress(Exception):
             await self._attempt_recorder(
                 url=url,
                 marketplace="yandex_market",
@@ -87,17 +88,17 @@ class YandexMarketParser(BaseParser):
                 error_class=type(error).__name__ if error else None,
                 error_text=str(error) if error else None,
             )
-        except Exception:
-            pass
 
     async def fetch_product(self, url: str) -> ProductData | None:
         started = perf_counter()
         status_code = None
         try:
-            async with aiohttp.ClientSession(headers=_headers(url)) as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    status_code = response.status
-                    html = await response.text(errors="replace")
+            async with (
+                aiohttp.ClientSession(headers=_headers(url)) as session,
+                session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response,
+            ):
+                status_code = response.status
+                html = await response.text(errors="replace")
             latency_ms = int((perf_counter() - started) * 1000)
             if status_code in {403, 429}:
                 logger.warning(f"Yandex Market blocked: status={status_code} url={url}")

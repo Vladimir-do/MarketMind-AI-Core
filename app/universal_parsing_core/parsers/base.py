@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.universal_parsing_core.schemas.parse_result import ParseResult
     from app.universal_parsing_core.schemas.parse_context import ParseContext
+    from app.universal_parsing_core.schemas.parse_result import ParseResult
 
 
 class BaseParser(ABC):

@@ -28,15 +28,15 @@ def _run(coro):
 
 
 def _make_product(**overrides) -> UnifiedProduct:
-    defaults = dict(
-        name="Тестовый товар",
-        source_id="12345",
-        source_type="ozon",
-        description="Описание товара",
-        brand="Brand",
-        category="Электроника",
-        price=1500,
-    )
+    defaults = {
+        "name": "Тестовый товар",
+        "source_id": "12345",
+        "source_type": "ozon",
+        "description": "Описание товара",
+        "brand": "Brand",
+        "category": "Электроника",
+        "price": 1500,
+    }
     defaults.update(overrides)
     return UnifiedProduct(**defaults)
 

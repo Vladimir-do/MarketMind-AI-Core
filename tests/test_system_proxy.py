@@ -62,10 +62,9 @@ class BypassSystemProxyTests(unittest.IsolatedAsyncioTestCase):
             return _completed()
 
         with patch("app.parsers.system_proxy.shutil.which", return_value="/usr/bin/gsettings"), \
-                patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run):
-            with self.assertRaises(ValueError):
-                async with bypass_system_proxy():
-                    raise ValueError("boom")
+                patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run), self.assertRaises(ValueError):
+            async with bypass_system_proxy():
+                raise ValueError("boom")
 
         set_calls = [c for c in calls if c[:2] == ["gsettings", "set"]]
         self.assertEqual(set_calls[-1][-1], "manual")

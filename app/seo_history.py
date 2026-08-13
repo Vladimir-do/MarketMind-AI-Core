@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import Any, TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.semantic_core import SemanticCore

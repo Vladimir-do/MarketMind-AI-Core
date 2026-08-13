@@ -15,6 +15,8 @@ try:
 except Exception:  # pragma: no cover
     ProxyConnector = None
 
+import contextlib
+
 from app.config import (
     WB_CLOUD_FALLBACK_LOCAL,
     WB_CLOUD_FIRST,
@@ -159,7 +161,7 @@ class WildberriesParser(BaseParser):
     ) -> None:
         if not self._attempt_recorder:
             return
-        try:
+        with contextlib.suppress(Exception):
             await self._attempt_recorder(
                 url=url,
                 marketplace="wildberries",
@@ -171,8 +173,6 @@ class WildberriesParser(BaseParser):
                 error_class=type(error).__name__ if error else None,
                 error_text=str(error) if error else None,
             )
-        except Exception:
-            pass
 
     @classmethod
     def can_handle(cls, url: str) -> bool:
@@ -183,15 +183,13 @@ class WildberriesParser(BaseParser):
         nm_id = _extract_wb_id(url)
         if not nm_id:
             logger.error(f"WB URL parse error: не удалось извлечь числовой nm_id из URL: {url}")
-            try:
+            with contextlib.suppress(Exception):
                 await research_parse_failure(
                     source="wildberries_invalid_url",
                     url=url,
                     detail="Не удалось извлечь nm_id из URL",
                     marketplace="wildberries",
                 )
-            except Exception:
-                pass
             return None
 
         if WB_CLOUD_FUNCTION_URL and WB_CLOUD_FIRST:
@@ -303,11 +301,10 @@ class WildberriesParser(BaseParser):
             # Если API не сработал — пробуем через страницу поиска
             logger.info(f"WB: API не сработал, пробуем поиск по ID {nm_id}")
             data = await self._fetch_via_search(session, nm_id, url, proxy=proxy)
-            if data:
-                # На WB поисковый API иногда возвращает карточку без цен.
-                # В этом случае пробуем wbbasket card.json.
-                if data.price is not None or data.old_price is not None:
-                    return data
+            # На WB поисковый API иногда возвращает карточку без цен.
+            # В этом случае пробуем wbbasket card.json.
+            if data and (data.price is not None or data.old_price is not None):
+                return data
 
             # Последний шанс: wbbasket card.json (часто работает когда card.wb.ru 403)
             data = await self._fetch_via_wbbasket_card_json(session, nm_id, url, proxy=proxy)
@@ -317,47 +314,44 @@ class WildberriesParser(BaseParser):
                     f"WB fetch failed for nm_id={nm_id}: {summary}. "
                     "Это не ошибка парсинга URL, артикул извлечен корректно."
                 )
-                try:
+                with contextlib.suppress(Exception):
                     await research_parse_failure(
                         source="wildberries_all_sources_empty",
                         url=url,
                         detail=f"nm_id={nm_id}: card API, поиск и wbbasket не вернули карточку; {summary}",
                         marketplace="wildberries",
                     )
-                except Exception:
-                    pass
             return data
 
     async def _fetch_via_cloud_function(self, url: str, nm_id: int) -> ProductData | None:
         t0 = perf_counter()
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    WB_CLOUD_FUNCTION_URL,
-                    json={"product_id": nm_id},
-                    timeout=aiohttp.ClientTimeout(total=20),
-                ) as resp:
-                    latency_ms = int((perf_counter() - t0) * 1000)
-                    if resp.status != 200:
-                        await self._record_attempt(
-                            url=url,
-                            source="cloud_function",
-                            status="blocked" if resp.status in {403, 429} else "http_error",
-                            http_status=resp.status,
-                            latency_ms=latency_ms,
-                        )
-                        return None
-
-                    payload = await resp.json(content_type=None)
-                    data = self._parse_cloud_payload(payload, url, nm_id)
+            async with aiohttp.ClientSession() as session, session.post(
+                WB_CLOUD_FUNCTION_URL,
+                json={"product_id": nm_id},
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as resp:
+                latency_ms = int((perf_counter() - t0) * 1000)
+                if resp.status != 200:
                     await self._record_attempt(
                         url=url,
                         source="cloud_function",
-                        status="ok" if data else "parse_error",
+                        status="blocked" if resp.status in {403, 429} else "http_error",
                         http_status=resp.status,
                         latency_ms=latency_ms,
                     )
-                    return data
+                    return None
+
+                payload = await resp.json(content_type=None)
+                data = self._parse_cloud_payload(payload, url, nm_id)
+                await self._record_attempt(
+                    url=url,
+                    source="cloud_function",
+                    status="ok" if data else "parse_error",
+                    http_status=resp.status,
+                    latency_ms=latency_ms,
+                )
+                return data
         except Exception as e:
             await self._record_attempt(
                 url=url,

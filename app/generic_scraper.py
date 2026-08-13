@@ -7,17 +7,18 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
 from app.universal_parsing_core.parsers.universal_html import UniversalHtmlParser
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.task_intents import StructuredTask
     from collections.abc import Awaitable, Callable
+
+    from app.task_intents import StructuredTask
 
 logger = logging.getLogger(__name__)
 
@@ -154,8 +155,8 @@ def _should_use_browser_fetch(task: StructuredTask) -> bool:
 def normalize_fields(fields: list[str] | tuple[str, ...] | None) -> list[str]:
     requested = list(fields or DEFAULT_FIELDS)
     normalized: list[str] = []
-    for field in requested:
-        key = (field or "").strip().lower().replace(" ", "_")
+    for field_name in requested:
+        key = (field_name or "").strip().lower().replace(" ", "_")
         if key == "url":
             key = "product_url"
         if key == "name":
@@ -176,10 +177,12 @@ async def fetch_html(url: str, timeout_seconds: float = 20.0) -> tuple[int, str]
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     }
     try:
-        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                return response.status, await response.text(errors="replace")
+        async with (
+            aiohttp.ClientSession(timeout=timeout, headers=headers) as session,
+            session.get(url) as response,
+        ):
+            response.raise_for_status()
+            return response.status, await response.text(errors="replace")
     except aiohttp.ClientError as exc:
         logger.warning("Generic scraper network error: url=%s error=%s", url, exc)
         raise ScrapingError(f"Could not fetch page: {exc}") from exc

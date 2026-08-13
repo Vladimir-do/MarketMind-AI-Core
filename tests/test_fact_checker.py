@@ -9,18 +9,18 @@ from app.content_pipeline.schemas import ProductPassport
 
 
 def _passport(**overrides) -> ProductPassport:
-    defaults = dict(
-        product_id=1,
-        project_id="proj-1",
-        project_product_id="pp-1",
-        title="Термокружка",
-        marketplace="ozon",
-        weight_g=450,
-        width_mm=80,
-        height_mm=200,
-        depth_mm=80,
-        attributes={"Материал": "Нержавеющая сталь", "Цвет": "Черный"},
-    )
+    defaults = {
+        "product_id": 1,
+        "project_id": "proj-1",
+        "project_product_id": "pp-1",
+        "title": "Термокружка",
+        "marketplace": "ozon",
+        "weight_g": 450,
+        "width_mm": 80,
+        "height_mm": 200,
+        "depth_mm": 80,
+        "attributes": {"Материал": "Нержавеющая сталь", "Цвет": "Черный"},
+    }
     defaults.update(overrides)
     return ProductPassport(**defaults)
 

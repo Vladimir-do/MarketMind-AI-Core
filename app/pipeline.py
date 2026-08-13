@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.enrichers.ozon_enricher import OzonEnrichmentStrategy
 from app.importers.registry import import_file, import_string
@@ -11,11 +11,12 @@ from app.products.analyzer import ProductAnalyzer
 from app.products.validator import ProductValidator, ValidationError
 
 if TYPE_CHECKING:
-    from app.enrichers import EnrichmentStrategy
-    from app.products.schema import UnifiedProduct
-    from app.products.findings import AnalysisResult, BatchAnalysisResult
-    from app.importers.base import ImportResult, ImportRowError
     from pathlib import Path
+
+    from app.enrichers import EnrichmentStrategy
+    from app.importers.base import ImportResult, ImportRowError
+    from app.products.findings import AnalysisResult, BatchAnalysisResult
+    from app.products.schema import UnifiedProduct
 
 
 @dataclass
@@ -168,9 +169,13 @@ class ImportPipeline:
 
     def _fill_missing_data(self, product: UnifiedProduct) -> UnifiedProduct:
         """Fill derived fields if source data is present."""
-        if product.discount_pct is None and product.price is not None and product.old_price is not None:
-            if product.old_price > product.price:
-                discount = round((1 - product.price / product.old_price) * 100)
-                product.discount_pct = discount
+        if (
+            product.discount_pct is None
+            and product.price is not None
+            and product.old_price is not None
+            and product.old_price > product.price
+        ):
+            discount = round((1 - product.price / product.old_price) * 100)
+            product.discount_pct = discount
         return product
 

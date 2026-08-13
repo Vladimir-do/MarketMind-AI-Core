@@ -21,10 +21,7 @@ _CONVERSATION_PATTERNS = [
 def _is_conversation(text: str) -> bool:
     """Определяет, является ли сообщение обычным разговором, а не задачей."""
     low = text.lower().strip()
-    for pattern in _CONVERSATION_PATTERNS:
-        if re.search(pattern, low):
-            return True
-    return False
+    return any(re.search(pattern, low) for pattern in _CONVERSATION_PATTERNS)
 
 
 def _conversation_response(text: str) -> str:

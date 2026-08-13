@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from app.seo_intelligence import extract_competitor_terms
 
@@ -24,10 +24,7 @@ class ManualCSVSource:
     """Импорт ключевых слов из CSV с колонками keyword, frequency, marketplace, category."""
 
     def __init__(self, data: str | bytes) -> None:
-        if isinstance(data, bytes):
-            text = data.decode("utf-8-sig")
-        else:
-            text = data
+        text = data.decode("utf-8-sig") if isinstance(data, bytes) else data
         self._rows = list(csv.DictReader(io.StringIO(text)))
 
     def get_keywords(self, product: UnifiedProduct) -> list[str]:  # noqa: ARG002

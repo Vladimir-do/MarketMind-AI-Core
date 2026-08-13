@@ -129,10 +129,7 @@ def _has_listing_structure(signals: PageStructureSignals) -> bool:
 def _has_matching_class(classes: object, pattern: re.Pattern[str]) -> bool:
     if not classes:
         return False
-    if isinstance(classes, str):
-        class_names = classes.split()
-    else:
-        class_names = [str(item) for item in classes]
+    class_names = classes.split() if isinstance(classes, str) else [str(item) for item in classes]
     return any(pattern.search(class_name) for class_name in class_names)
 
 

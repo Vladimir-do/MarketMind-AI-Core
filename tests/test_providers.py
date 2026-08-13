@@ -343,10 +343,12 @@ class TestFallbackProvider(unittest.TestCase):
             (200, _mock_ollama_response("second")),
         ])
 
-        with patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp):
-            with patch("app.ai_recommendation.providers.ollama_provider.aiohttp", mock_aiohttp):
-                fb = FallbackAIProvider([p1, p2])
-                result = _run(fb.complete("test"))
+        with (
+            patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp),
+            patch("app.ai_recommendation.providers.ollama_provider.aiohttp", mock_aiohttp),
+        ):
+            fb = FallbackAIProvider([p1, p2])
+            result = _run(fb.complete("test"))
 
         self.assertEqual(result.text, "second")
 

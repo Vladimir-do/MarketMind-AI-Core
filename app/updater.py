@@ -4,6 +4,7 @@ updater.py — Парсинг Озон через Playwright.
 скрытие webdriver, поддержка прокси.
 """
 import asyncio
+import contextlib
 import json
 import os
 import random
@@ -407,7 +408,7 @@ class OzonUpdater:
         self._pw = await async_playwright().start()
 
         headless_env = os.getenv("OZON_HEADLESS", "").strip()
-        headless = not (headless_env in {"0", "false", "False", "no", "NO"})
+        headless = headless_env not in {"0", "false", "False", "no", "NO"}
         profile_dir = os.getenv("OZON_PROFILE_DIR", "").strip()
 
         # В рамках одной сессии держим один UA/viewport (как “реальный пользователь”)
@@ -532,10 +533,7 @@ class OzonUpdater:
         try:
             scroll_count = random.randint(4, 8)
             for i in range(scroll_count):
-                if i < scroll_count // 2:
-                    amount = random.randint(300, 700)
-                else:
-                    amount = random.randint(100, 300)
+                amount = random.randint(300, 700) if i < scroll_count // 2 else random.randint(100, 300)
                 await page.mouse.wheel(0, amount)
                 await asyncio.sleep(random.uniform(0.4, 1.2))
 
@@ -760,10 +758,8 @@ class OzonUpdater:
                     await page.goto(url, wait_until="load", timeout=60_000)
 
                     # Даём странице догрузить XHR/скрипты (Ozon часто рендерит клиентом)
-                    try:
+                    with contextlib.suppress(Exception):
                         await page.wait_for_load_state("networkidle", timeout=20_000)
-                    except Exception:
-                        pass
 
                     # Ждём признаки того, что страница реально отрендерилась
                     try:

@@ -90,38 +90,40 @@ class OpenAICompatibleProvider(BaseAIProvider):
         )
         try:
             timeout_obj = aiohttp.ClientTimeout(total=self._timeout, connect=min(self._timeout, 20.0))
-            async with aiohttp.ClientSession(timeout=timeout_obj) as session:
-                async with session.post(url, json=payload, headers=headers) as resp:
-                    try:
-                        body = await resp.json(content_type=None)
-                        raw = json.dumps(body, ensure_ascii=False)
-                    except Exception:
-                        raw = await resp.text()
-                        body = _safe_json(raw)
-                    if resp.status < 200 or resp.status >= 300:
-                        raise ProviderHTTPError(resp.status, _extract_error(body, raw))
-                    if not isinstance(body, dict):
-                        raise ValueError(f"Unexpected response type: {type(body).__name__}")
-                    choices = body.get("choices")
-                    if not isinstance(choices, list) or not choices:
-                        raise ValueError("Response has no choices")
-                    message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-                    content = message.get("content", "") if isinstance(message, dict) else ""
-                    if not isinstance(content, str) or not content.strip():
-                        raise ValueError("Response content is empty")
-                    usage = body.get("usage", {}) if isinstance(body.get("usage", {}), dict) else {}
-                    result = AIResponse(
-                        text=content,
-                        model=str(body.get("model") or self._model),
-                        input_tokens=int(usage.get("prompt_tokens") or 0),
-                        output_tokens=int(usage.get("completion_tokens") or 0),
-                        latency_ms=self._elapsed_ms(start),
-                    )
-                    logger.info(
-                        "AI response provider=%s model=%s status=%s latency_ms=%s input_tokens=%s output_tokens=%s stage=response_received",
-                        self.name(), result.model, resp.status, result.latency_ms, result.input_tokens, result.output_tokens,
-                    )
-                    return result
+            async with (
+                aiohttp.ClientSession(timeout=timeout_obj) as session,
+                session.post(url, json=payload, headers=headers) as resp,
+            ):
+                try:
+                    body = await resp.json(content_type=None)
+                    raw = json.dumps(body, ensure_ascii=False)
+                except Exception:
+                    raw = await resp.text()
+                    body = _safe_json(raw)
+                if resp.status < 200 or resp.status >= 300:
+                    raise ProviderHTTPError(resp.status, _extract_error(body, raw))
+                if not isinstance(body, dict):
+                    raise ValueError(f"Unexpected response type: {type(body).__name__}")
+                choices = body.get("choices")
+                if not isinstance(choices, list) or not choices:
+                    raise ValueError("Response has no choices")
+                message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+                content = message.get("content", "") if isinstance(message, dict) else ""
+                if not isinstance(content, str) or not content.strip():
+                    raise ValueError("Response content is empty")
+                usage = body.get("usage", {}) if isinstance(body.get("usage", {}), dict) else {}
+                result = AIResponse(
+                    text=content,
+                    model=str(body.get("model") or self._model),
+                    input_tokens=int(usage.get("prompt_tokens") or 0),
+                    output_tokens=int(usage.get("completion_tokens") or 0),
+                    latency_ms=self._elapsed_ms(start),
+                )
+                logger.info(
+                    "AI response provider=%s model=%s status=%s latency_ms=%s input_tokens=%s output_tokens=%s stage=response_received",
+                    self.name(), result.model, resp.status, result.latency_ms, result.input_tokens, result.output_tokens,
+                )
+                return result
         except ProviderHTTPError as exc:
             return self._create_error_response(exc, prompt, started_at=start, status_code=exc.status, stage="http")
         except (TimeoutError, ServerTimeoutError) as exc:

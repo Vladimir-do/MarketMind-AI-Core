@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from app.parsers.router import search_all_marketplaces
 from app.parsers.wildberries import WildberriesParser
 from app.searcher import ozon_search_blocked_message
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.parsers.base import ProductData
@@ -201,7 +201,7 @@ async def generate_search_queries_with_ai(raw_query: str, marketplace: str) -> l
         cleaned = response.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines).strip()
         queries = json.loads(cleaned)
         if isinstance(queries, list) and all(isinstance(q, str) and q.strip() for q in queries):

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from aiogram import Bot, types
-
 
 if TYPE_CHECKING:
     from app.database import Database

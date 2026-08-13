@@ -5,10 +5,10 @@ from __future__ import annotations
 import enum
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from app.ai_recommendation.providers.ollama_provider import OllamaProvider
 from app.ai_recommendation.providers.openai_compatible import OpenAICompatibleProvider
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.ai_recommendation.providers.base import BaseAIProvider

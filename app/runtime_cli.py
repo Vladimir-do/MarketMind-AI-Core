@@ -24,10 +24,7 @@ def main() -> None:
         else:
             print(f"DB backup: skipped, no database at {runtime_layout().database_dir}")
         return
-    if args.command == "db-upgrade":
-        status = upgrade_database()
-    else:
-        status = migration_status()
+    status = upgrade_database() if args.command == "db-upgrade" else migration_status()
     print(
         "DB schema: "
         f"current={status.current_revision} "

@@ -95,7 +95,7 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
         jobs = await self.db.get_recent_jobs(job_type="ai_product_suggestions")
         self.assertTrue(jobs)
         self.assertEqual(jobs[0].job_type, "ai_product_suggestions")
-        self.assertIn('"product_id": %s' % pid, jobs[0].payload_json)
+        self.assertIn(f'"product_id": {pid}', jobs[0].payload_json)
 
     async def test_ai_suggestion_job_writes_pending_approval(self):
         from app.ai_recommendation.job_queue import process_product_ai_suggestion_job

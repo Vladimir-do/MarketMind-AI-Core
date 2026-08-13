@@ -4,7 +4,6 @@ import csv
 import io
 import json
 from dataclasses import asdict
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -106,7 +106,7 @@ class LocalizationTests(unittest.TestCase):
                         violations.append(f"{template_file.name}:{line_num}: {word} in: {stripped[:80]}")
 
         if violations:
-            self.fail(f"English text found in templates:\n" + "\n".join(violations[:20]))
+            self.fail("English text found in templates:\n" + "\n".join(violations[:20]))
 
     def test_locale_file_exists(self):
         """Verify Russian locale file exists and has keys."""
