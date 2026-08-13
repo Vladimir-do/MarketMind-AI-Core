@@ -6,8 +6,6 @@ import logging
 from dataclasses import replace
 from typing import Any
 
-from sqlalchemy import desc, select
-
 from app.ai_recommendation.db_approval import DatabaseApprovalQueue
 from app.ai_recommendation.engine import AIRecommendationEngine
 from app.ai_recommendation.providers.factory import create_configured_provider
@@ -60,17 +58,6 @@ def _detect_marketplace(url: str | None) -> str:
 async def _get_product(db: Database, product_id: int) -> Product | None:
     async with db.session() as session:
         return await session.get(Product, product_id)
-
-
-async def _get_last_price(db: Database, product_id: int) -> PriceHistory | None:
-    async with db.session() as session:
-        result = await session.execute(
-            select(PriceHistory)
-            .where(PriceHistory.product_id == product_id)
-            .order_by(desc(PriceHistory.recorded_at))
-            .limit(1)
-        )
-        return result.scalar_one_or_none()
 
 
 def _build_unified(product: Product, last_price: PriceHistory | None) -> UnifiedProduct:
@@ -326,7 +313,7 @@ async def process_product_ai_suggestion_job(app, job_id: str, product_id: int) -
         if product is None:
             raise ValueError("Product not found")
 
-        last_price = await _get_last_price(db, product_id)
+        last_price = await db.get_last_price(product_id)
         unified = _build_unified(product, last_price)
         analysis = ProductAnalyzer().analyze(unified)
         provider = create_configured_provider()
