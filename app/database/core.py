@@ -13,6 +13,7 @@ from app.config import DATABASE_URL, logger
 from app.database.base import Base
 from app.database.models import (
     BlockedPattern,
+    ClientProject,
     JobRecord,
     PriceHistory,
     Product,
@@ -809,6 +810,16 @@ class Database:
 
         async with self.session() as s:
             return await s.scalar(select(func.count(Subscriber.id))) or 0
+
+    async def get_project_counts(self) -> dict[str, int]:
+        from sqlalchemy import func, select
+
+        async with self.session() as s:
+            total = await s.scalar(select(func.count()).select_from(ClientProject))
+            active = await s.scalar(
+                select(func.count()).select_from(ClientProject).where(ClientProject.status != "archived")
+            )
+        return {"total": int(total or 0), "active": int(active or 0)}
 
     async def save_product(self, url: str, data: dict) -> tuple[Product, bool]:
         """

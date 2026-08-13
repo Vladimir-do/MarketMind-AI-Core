@@ -8,12 +8,13 @@ import sqlite3
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-
-from sqlalchemy import func, select
+from typing import TYPE_CHECKING
 
 from app.config import DATABASE_URL, MARKETMIND_WORKSPACE_DIR, PROJECT_ROOT, RUNTIME_DATA_DIR
-from app.database import ClientProject, Database
 from app.stack_status import database_backend, readiness_checks, runtime_stack
+
+if TYPE_CHECKING:
+    from app.database import Database
 
 LOW_SPACE_BYTES = 1024 * 1024 * 1024
 WORK_MODE_MESSAGE = "РАБОЧИЙ РЕЖИМ. ДАННЫЕ СОХРАНЯЮТСЯ"
@@ -99,11 +100,7 @@ async def system_status(db: Database) -> dict:
     db_path = sqlite_database_path()
     workspace_path = MARKETMIND_WORKSPACE_DIR
     disk = shutil.disk_usage(layout.home if layout.home.exists() else layout.home.parent)
-    async with db.session() as session:
-        total_projects = await session.scalar(select(func.count()).select_from(ClientProject))
-        active_projects = await session.scalar(
-            select(func.count()).select_from(ClientProject).where(ClientProject.status != "archived")
-        )
+    project_counts = await db.get_project_counts()
     backups = list_backups(layout.backups_dir)
     warnings = []
     if is_tmp_path(layout.home) or is_tmp_path(workspace_path) or (db_path is not None and is_tmp_path(db_path)):
@@ -120,8 +117,8 @@ async def system_status(db: Database) -> dict:
         "free_space_human": human_bytes(disk.free),
         "last_backup": backups[0] if backups else None,
         "schema_version": read_schema_version(db_path),
-        "project_count": int(total_projects or 0),
-        "active_project_count": int(active_projects or 0),
+        "project_count": project_counts["total"],
+        "active_project_count": project_counts["active"],
         "stack": runtime_stack(),
         "readiness": readiness_checks(schema_version=read_schema_version(db_path)),
         "warnings": warnings,
