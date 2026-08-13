@@ -16,9 +16,7 @@ from app.config import (
     logger,
     require_bot_token,
 )
-from app.utils.proxy import mask_proxy_url
-from app.utils.proxy import proxy_is_reachable
-
+from app.utils.proxy import mask_proxy_url, proxy_is_reachable
 
 TELEGRAM_RECONNECT_DELAYS_SEC = (1, 2, 5, 10, 30, 60)
 

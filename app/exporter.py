@@ -5,14 +5,14 @@ exporter.py — экспорт данных в CSV и Excel.
 import csv
 import io
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from sqlalchemy import and_, func, select
 
-from app.database import Database, Product, PriceHistory
+from app.database import Database, PriceHistory, Product
 
 MARKETPLACE_COLORS = {
     "ozon":        "FF0055FF",  # синий
@@ -23,7 +23,7 @@ MARKETPLACE_COLORS = {
 
 async def get_export_data(db: Database, days: int = 30) -> tuple[list[dict], dict[int, list[PriceHistory]]]:
     """Собирает все данные для экспорта."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
 
     async with db.session() as s:
         products = (await s.execute(select(Product).order_by(Product.last_check.desc()))).scalars().all()

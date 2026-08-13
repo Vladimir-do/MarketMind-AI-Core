@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import time
 import re
+import time
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup

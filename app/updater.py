@@ -8,9 +8,9 @@ import json
 import os
 import random
 import re
-from time import perf_counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from time import perf_counter
 from urllib.parse import quote, urlparse
 
 import aiohttp
@@ -18,10 +18,9 @@ from bs4 import BeautifulSoup
 
 from app.config import DELAY_MAX, DELAY_MIN, PARSER_DEBUG_DIR, RETRY_ATTEMPTS, logger
 from app.database import Database, PriceHistory
-from app.utils.proxy import mask_proxy_url
-from app.utils.proxy import proxy_is_reachable
-from app.utils.error_research import research_parse_failure
 from app.parsers.alt_sources import fetch_from_alt_sources
+from app.utils.error_research import research_parse_failure
+from app.utils.proxy import mask_proxy_url, proxy_is_reachable
 
 # ── Случайные User-Agent (реальные браузеры) ──────────────────────────────────
 USER_AGENTS = [
@@ -394,7 +393,7 @@ class OzonUpdater:
         Пишем скриншот + HTML при подозрении на антибот.
         """
         try:
-            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", prefix)[:80]
             base = self._debug_dir() / f"{ts}_{safe}"
             await page.screenshot(path=str(base) + ".png", full_page=True)

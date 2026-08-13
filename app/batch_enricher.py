@@ -7,7 +7,6 @@ import openpyxl
 
 from app.card_filler import build_ozon_card_draft, build_ozon_import_payload
 
-
 CHECKPOINT_SUFFIX = ".checkpoint.json"
 
 

@@ -4,11 +4,12 @@ wildberries.py — парсер Wildberries через API.
 """
 import asyncio
 import re
+from collections.abc import Awaitable, Callable
 from time import perf_counter
-from typing import Awaitable, Callable
 from urllib.parse import parse_qs, urlparse
 
 import aiohttp
+
 try:
     from aiohttp_socks import ProxyConnector  # type: ignore
 except Exception:  # pragma: no cover
@@ -21,9 +22,8 @@ from app.config import (
     logger,
 )
 from app.parsers.base import BaseParser, ProductData
-from app.utils.proxy import mask_proxy_url
 from app.utils.error_research import research_parse_failure
-from app.utils.proxy import proxy_is_reachable
+from app.utils.proxy import mask_proxy_url, proxy_is_reachable
 
 
 def _extract_wb_id(url: str) -> int | None:
@@ -651,7 +651,8 @@ class WildberriesParser(BaseParser):
 
     async def search(self, query: str, max_results: int = 5) -> list[ProductData]:
         try:
-            import urllib.parse, json
+            import json
+            import urllib.parse
             query_variants = self._search_query_variants(query)
             url_templates = [
                 "https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=1&curr=rub&dest=-1257786&lang=ru&locale=ru&query={query}&resultset=catalog&sort=popular&spp=30",

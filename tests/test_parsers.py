@@ -3,7 +3,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+from app.parsers.alt_sources import extract_product_from_cache_html, fetch_from_alt_sources
 from app.parsers.base import ProductData
+from app.parsers.mcp_sources import normalize_mcp_product_payload
 from app.parsers.ozon import OzonParser
 from app.parsers.router import detect_marketplace
 from app.parsers.wildberries import (
@@ -14,8 +16,6 @@ from app.parsers.wildberries import (
     _wbbasket_candidates,
 )
 from app.parsers.yandex_market import YandexMarketParser, parse_yandex_market_html
-from app.parsers.alt_sources import extract_product_from_cache_html, fetch_from_alt_sources
-from app.parsers.mcp_sources import normalize_mcp_product_payload
 from app.searcher import _parse_search_results
 from app.updater import (
     OzonUpdater,

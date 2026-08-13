@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 DISH_WORDS = {
     "бургер",
     "донер",

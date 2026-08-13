@@ -6,7 +6,6 @@ from urllib.parse import urlparse
 
 from app.task_intents import StructuredTask, TaskType
 
-
 DEFAULT_MIN_CONFIDENCE = 0.85
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import ssl
@@ -125,7 +124,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
                     return result
         except ProviderHTTPError as exc:
             return self._create_error_response(exc, prompt, started_at=start, status_code=exc.status, stage="http")
-        except (asyncio.TimeoutError, TimeoutError, ServerTimeoutError) as exc:
+        except (TimeoutError, ServerTimeoutError) as exc:
             return self._create_error_response(exc, prompt, started_at=start, stage=_timeout_stage(exc))
         except (ClientConnectorCertificateError, ClientSSLError, ssl.SSLError) as exc:
             return self._create_error_response(exc, prompt, started_at=start, stage="ssl")

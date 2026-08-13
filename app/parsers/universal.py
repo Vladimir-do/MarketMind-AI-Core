@@ -4,7 +4,6 @@ universal.py — Универсальный парсер для обработк
 а возвращать корректный ParseResult с предложением следующей стратегии.
 """
 import re
-from typing import Optional
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
@@ -16,7 +15,7 @@ from app.parsers.base import BaseParser, ProductData
 class ParseResult:
     """Результат парсинга, который может включать не только данные, но и мета-информацию."""
     success: bool
-    data: Optional[ProductData] = None
+    data: ProductData | None = None
     page_structure: str = "unknown"
     warnings: list[str] = None
     next_strategy: str = "none"

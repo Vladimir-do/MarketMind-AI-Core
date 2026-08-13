@@ -12,7 +12,6 @@ import aiohttp
 from app.config import logger
 from app.parsers.mcp_sources import fetch_product_via_mcp
 
-
 _SERVICE_PAGE_TITLES = {
     "google search",
     "yandex search",
@@ -205,7 +204,7 @@ def extract_product_from_cache_html(html: str, url: str) -> dict | None:
     """Извлекает данные товара из кэшированного HTML."""
     if not html:
         return None
-    
+
     result = {
         "url": url,
         "name": None,
@@ -215,7 +214,7 @@ def extract_product_from_cache_html(html: str, url: str) -> dict | None:
         "brand": None,
         "image_url": None,
     }
-    
+
     # Извлекаем название из title
     title_match = re.search(r"<title>([^<]+)</title>", html, re.I)
     if title_match:
@@ -225,22 +224,22 @@ def extract_product_from_cache_html(html: str, url: str) -> dict | None:
         if _looks_like_service_page_title(title):
             title = ""
         result["name"] = title[:200]
-    
+
     # Извлекаем цену из JSON-LD
     jsonld_match = re.search(r'"price"\s*:\s*"?(\d+)"?', html)
     if jsonld_match:
         result["price"] = int(jsonld_match.group(1))
-    
+
     # Извлекаем бренд
     brand_match = re.search(r'"brand"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"', html)
     if brand_match:
         result["brand"] = brand_match.group(1)
-    
+
     # Извлекаем картинку
     img_match = re.search(r'<meta[^>]*property="og:image"[^>]*content="([^"]+)"', html, re.I)
     if img_match:
         result["image_url"] = img_match.group(1)
-    
+
     # Проверяем что извлекли хоть что-то
     if result["name"] or result["price"]:
         return result
@@ -256,7 +255,7 @@ async def fetch_from_alt_sources(url: str, query: str = "") -> dict | None:
     """
     parsed = urlparse(url)
     host = parsed.netloc.lower()
-    
+
     # Для Ozon пробуем кэш и API
     if "ozon.ru" in host:
         # 1. Пробуем внешний MCP-источник, если он явно включен.
@@ -277,17 +276,17 @@ async def fetch_from_alt_sources(url: str, query: str = "") -> dict | None:
                     "brand": item.get("brand"),
                     "image_url": item.get("image"),
                 }
-        
+
         # 3. Пробуем Google Cache
         html = await fetch_via_google_cache(url)
         if html:
             return extract_product_from_cache_html(html, url)
-        
+
         # 4. Пробуем Yandex Cache
         html = await fetch_via_yandex_cache(url)
         if html:
             return extract_product_from_cache_html(html, url)
-    
+
     # Для WB — WB API уже надёжный, но пробуем suggestions
     elif "wildberries.ru" in host or "wb.ru" in host:
         if query:
@@ -302,5 +301,5 @@ async def fetch_from_alt_sources(url: str, query: str = "") -> dict | None:
                     "brand": item.get("brand"),
                     "image_url": None,
                 }
-    
+
     return None

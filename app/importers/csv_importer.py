@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from typing import Any
 
-from app.importers.base import BaseImporter, DEFAULT_FIELD_MAPPING
+from app.importers.base import DEFAULT_FIELD_MAPPING, BaseImporter
 
 
 class CsvImporter(BaseImporter):

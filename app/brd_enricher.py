@@ -7,12 +7,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
-from zipfile import ZipFile
 from xml.etree import ElementTree as ET
+from zipfile import ZipFile
 
 import openpyxl
 from bs4 import BeautifulSoup
-
 
 BRD_SHEET_NAME = "BRD ТбД"
 BRD_REQUIRED_COLUMNS = [

@@ -2,12 +2,12 @@
 ai_analyzer.py — глубокий AI анализ с прогнозом цен.
 Использует статистику + Claude для умных выводов.
 """
-from datetime import datetime, timezone, timedelta
-from sqlalchemy import select, desc
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import desc, select
 
 from app.ai_client import ai_is_available, ai_missing_message, ask_ai
-from app.database import Database, Product, PriceHistory
-
+from app.database import Database, PriceHistory, Product
 
 # ── Статистический анализ (без AI, мгновенно) ─────────────────────────────────
 
@@ -106,7 +106,7 @@ class DeepAnalyzer:
         )
 
     async def _get_prices(self, product_id: int, days: int = 30) -> list[int]:
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         async with self.db.session() as s:
             rows = (await s.execute(
                 select(PriceHistory)
@@ -250,7 +250,7 @@ class DeepAnalyzer:
         products = await self.db.get_all_products()
         alerts = []
 
-        since = datetime.now(timezone.utc) - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         for product in products:
             prices = await self._get_prices(product.id, days=30)
 

@@ -6,7 +6,6 @@ from typing import Any
 
 import yaml
 
-
 PROFILES_DIR = Path(__file__).resolve().parent.parent / "profiles"
 DEFAULT_PROFILE_NAME = "default"
 

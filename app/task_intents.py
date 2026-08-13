@@ -41,14 +41,14 @@ class LastFailureMemory:
     @classmethod
     def from_task(
         cls,
-        task: "StructuredTask",
+        task: StructuredTask,
         *,
         error_text: str,
         error_type: str = "unknown",
         metrics: dict[str, object] | None = None,
         created_files: list[str] | None = None,
         validation_warnings: list[str] | None = None,
-    ) -> "LastFailureMemory":
+    ) -> LastFailureMemory:
         return cls(
             task_type=task.type,
             error_text=error_text,
@@ -80,7 +80,7 @@ class StructuredTask:
     confidence: float = 0.0
     plan: list[str] = field(default_factory=list)
 
-    def with_context(self, context: "ContextSession | None") -> "StructuredTask":
+    def with_context(self, context: ContextSession | None) -> StructuredTask:
         if not context or not context.current_task:
             return self
         if self.type is TaskType.REPAIR:

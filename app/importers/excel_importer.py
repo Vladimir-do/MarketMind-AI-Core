@@ -7,7 +7,7 @@ from typing import Any
 
 import openpyxl
 
-from app.importers.base import BaseImporter, DEFAULT_FIELD_MAPPING
+from app.importers.base import DEFAULT_FIELD_MAPPING, BaseImporter
 
 
 class ExcelImporter(BaseImporter):

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -130,7 +130,7 @@ async def research_parse_failure(
 
     lines = [
         "# Parse failure research",
-        f"- time (UTC): {datetime.now(timezone.utc).isoformat()}",
+        f"- time (UTC): {datetime.now(UTC).isoformat()}",
         f"- marketplace: `{mp}`",
         f"- source: `{source}`",
         f"- url: `{url}`",
@@ -152,7 +152,7 @@ async def research_parse_failure(
     else:
         lines.append("_Выдача не получена (блок/таймаут/разметка изменилась)._")
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     safe = re.sub(r"[^\w.-]+", "_", source)[:40]
     path = _debug_dir() / f"{ts}_research_{safe}.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

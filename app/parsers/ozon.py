@@ -2,27 +2,27 @@
 """
 ozon.py — парсер Озон через Playwright (ninja-режим).
 """
-import aiohttp
 import asyncio
 import json
 import os
 import random
 from urllib.parse import quote, urlparse
 
-from app.config import logger, RETRY_ATTEMPTS, PROXY
+import aiohttp
+
+from app.config import PROXY, RETRY_ATTEMPTS, logger
+from app.parsers.alt_sources import fetch_from_alt_sources
 from app.parsers.base import BaseParser, ProductData
+from app.parsers.system_proxy import bypass_system_proxy
 from app.updater import (
+    BROWSER_INIT_SCRIPT,
     USER_AGENTS,
     VIEWPORTS,
-    BROWSER_INIT_SCRIPT,
+    _is_ozon_blocked_text,
     parse_ozon_api_json,
     parse_ozon_html,
-    _is_ozon_blocked_text,
 )
-from app.parsers.alt_sources import fetch_from_alt_sources
-from app.parsers.system_proxy import bypass_system_proxy
 from app.utils.error_research import research_parse_failure
-
 
 OZON_API_URLS = [
     "https://www.ozon.ru/api/composer-api.bx/page/json/v2?url={encoded}",

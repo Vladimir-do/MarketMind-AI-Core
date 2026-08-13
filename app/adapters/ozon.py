@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import perf_counter
 
 from app.core.enums import AvailabilityStatus, FetchStatus, Marketplace
@@ -21,7 +21,7 @@ async def fetch_ozon_snapshot(updater: OzonUpdater, url: str) -> tuple[ProductSn
         snap = ProductSnapshot(
             marketplace=Marketplace.OZON,
             url=url,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             fetch_status=FetchStatus.BLOCKED,
             availability=AvailabilityStatus.UNKNOWN,
             raw=None,
@@ -39,7 +39,7 @@ async def fetch_ozon_snapshot(updater: OzonUpdater, url: str) -> tuple[ProductSn
     snap = ProductSnapshot(
         marketplace=Marketplace.OZON,
         url=url,
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
         fetch_status=FetchStatus.OK,
         availability=av,
         name=data.get("name"),

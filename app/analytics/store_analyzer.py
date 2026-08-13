@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.database import Database, PriceHistory, Product
 from app.products.analyzer import ProductAnalyzer
@@ -123,7 +123,7 @@ class StoreAnalyzer:
     async def get_import_history(
         self, marketplace: str | None = None, days: int = 30
     ) -> list[ImportDay]:
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         # SQLite stores naive datetimes; strip tz for comparison
         since_naive = since.replace(tzinfo=None)
         attempts = await self._db.get_recent_scrape_attempts(

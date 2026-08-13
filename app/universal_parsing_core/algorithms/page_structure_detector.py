@@ -9,7 +9,6 @@ from app.universal_parsing_core.algorithms.price_extractor import extract_price_
 from app.universal_parsing_core.algorithms.text_cleaner import clean_text
 from app.universal_parsing_core.schemas.page_structure import PageStructure
 
-
 _CARD_CLASS_RE = re.compile(r"(?:^|[-_\s])(product|card|item)(?:$|[-_\s])", re.I)
 _DETAIL_LINK_RE = re.compile(r"(?:/product/|/item/|/detail|/catalogue/.+?_\d+/|_\d+/index\.html)", re.I)
 _PAGINATION_CLASS_RE = re.compile(r"(pagination|pager|next)", re.I)

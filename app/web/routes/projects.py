@@ -29,8 +29,8 @@ from app.exports.safety import sanitize_spreadsheet_cell
 from app.exports.service import ProjectExportService
 from app.market_analysis import market_analysis_filename, market_analysis_products_to_rows, run_market_analysis
 from app.pipeline import ImportPipeline
-from app.projects.imports import analyze_import_file, build_products_from_preview
 from app.projects.archive import ProjectArchiveService
+from app.projects.imports import analyze_import_file, build_products_from_preview
 from app.projects.service import (
     ProjectError,
     ProjectNotFoundError,

@@ -6,13 +6,13 @@ import asyncio
 
 from app.config import logger
 from app.parsers.base import BaseParser, ProductData
-from app.parsers.wildberries import WildberriesParser
 from app.parsers.ozon import OzonParser
-from app.parsers.yandex_market import YandexMarketParser
-from app.utils.urls import is_yandex_market_url
 from app.parsers.universal import UniversalParser
+from app.parsers.wildberries import WildberriesParser
+from app.parsers.yandex_market import YandexMarketParser
 from app.searcher import search_ozon
 from app.utils.error_research import research_parse_failure
+from app.utils.urls import is_yandex_market_url
 
 # Все доступные парсеры
 PARSERS: list[type[BaseParser]] = [

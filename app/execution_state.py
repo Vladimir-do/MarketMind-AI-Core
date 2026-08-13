@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 
 
@@ -66,7 +66,7 @@ class ExecutionRun:
         if step is None:
             raise ValueError("No current execution step")
         step.status = ExecutionStatus.EXECUTING
-        step.started_at = datetime.now(timezone.utc)
+        step.started_at = datetime.now(UTC)
         if self.status is not ExecutionStatus.EXECUTING:
             self.transition(ExecutionStatus.EXECUTING)
 
@@ -75,7 +75,7 @@ class ExecutionRun:
         if step is None:
             raise ValueError("No current execution step")
         step.status = ExecutionStatus.FINISHED
-        step.finished_at = datetime.now(timezone.utc)
+        step.finished_at = datetime.now(UTC)
         self.current_index += 1
         if self.current_index >= len(self.steps):
             if self.status is not ExecutionStatus.VALIDATING:
@@ -87,7 +87,7 @@ class ExecutionRun:
         if step is None:
             raise ValueError("No current execution step")
         step.error = error
-        step.finished_at = datetime.now(timezone.utc)
+        step.finished_at = datetime.now(UTC)
         next_status = ExecutionStatus.RECOVERING if recoverable else ExecutionStatus.FAILED
         step.status = next_status
         self.transition(next_status)

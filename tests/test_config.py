@@ -53,6 +53,7 @@ class ConfigTests(unittest.TestCase):
             },
         ):
             import importlib
+
             import app.config
 
             config = importlib.reload(app.config)
@@ -73,6 +74,7 @@ class ConfigTests(unittest.TestCase):
             },
         ):
             import importlib
+
             import app.config
 
             config = importlib.reload(app.config)
@@ -91,6 +93,7 @@ class ConfigTests(unittest.TestCase):
             },
         ):
             import importlib
+
             import app.config
 
             config = importlib.reload(app.config)
@@ -107,6 +110,7 @@ class ConfigTests(unittest.TestCase):
             },
         ):
             import importlib
+
             import app.config
 
             config = importlib.reload(app.config)
@@ -124,6 +128,7 @@ class ConfigTests(unittest.TestCase):
             },
         ):
             import importlib
+
             import app.config
 
             config = importlib.reload(app.config)
@@ -143,6 +148,7 @@ class ConfigTests(unittest.TestCase):
             },
         ):
             import importlib
+
             import app.config
 
             config = importlib.reload(app.config)
@@ -163,6 +169,7 @@ class ConfigTests(unittest.TestCase):
             },
         ):
             import importlib
+
             import app.config
 
             config = importlib.reload(app.config)

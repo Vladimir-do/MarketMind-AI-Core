@@ -16,7 +16,6 @@ from typing import Any
 
 from app.config import logger
 
-
 _ALLOWED_AVAILABILITY = {"in_stock", "out_of_stock", "deleted", "blocked", "unknown"}
 
 
@@ -116,7 +115,7 @@ class McpStdioClient:
         self._next_id = 1
         self._process: asyncio.subprocess.Process | None = None
 
-    async def __aenter__(self) -> "McpStdioClient":
+    async def __aenter__(self) -> McpStdioClient:
         self._process = await asyncio.create_subprocess_exec(
             *self.command,
             stdin=asyncio.subprocess.PIPE,
@@ -134,7 +133,7 @@ class McpStdioClient:
             process.terminate()
             try:
                 await asyncio.wait_for(process.wait(), timeout=2)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 await process.wait()
 

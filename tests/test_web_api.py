@@ -27,8 +27,9 @@ class WebApiTests(unittest.IsolatedAsyncioTestCase):
             {"name": "Другой товар", "price": 2000, "availability": "in_stock"},
         )
 
+        from httpx import ASGITransport, AsyncClient
+
         from app.web.app import create_app
-        from httpx import AsyncClient, ASGITransport
 
         self.app = create_app()
         self.app.state.db = self.db

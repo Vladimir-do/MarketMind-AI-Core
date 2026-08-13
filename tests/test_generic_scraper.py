@@ -8,17 +8,16 @@ from app.generic_scraper import (
     discover_relevant_links,
     enrich_records_from_detail_pages,
     export_csv,
-    extract_records_adaptive,
-    extract_records_from_discovered_pages,
     extract_product_detail_fields,
     extract_product_records,
+    extract_records_adaptive,
+    extract_records_from_discovered_pages,
     fetch_page_sequence,
     normalize_fields,
     run_scraping_task,
     validate_records,
 )
 from app.task_intents import StructuredTask, TaskType
-
 
 BOOKS_HTML = """
 <html>

@@ -1,6 +1,6 @@
 import unittest
 
-from app.card_profiles import load_profile, list_profiles
+from app.card_profiles import list_profiles, load_profile
 
 
 class CardProfilesTests(unittest.TestCase):

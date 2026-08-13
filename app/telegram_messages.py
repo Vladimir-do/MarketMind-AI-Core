@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable
 
 
 def command_limit(text: str | None, command: str, default: int = 10, max_limit: int = 30) -> int:

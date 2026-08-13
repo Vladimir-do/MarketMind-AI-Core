@@ -2,38 +2,31 @@
 import asyncio
 import html
 import re
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
-from datetime import datetime, timezone, timedelta
 
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
+from app.agent import PriceAgent
+from app.card_profiles import list_profiles, load_profile
 from app.config import ADMIN_IDS, PROXY, TELEGRAM_PROXY, logger
 from app.database import Database, url_to_hash
-from app.telegram_read_service import TelegramReadService
-from app.utils.urls import is_yandex_market_url
-from app.parsers.wildberries import WildberriesParser
-from app.telegram_url_utils import (
-    extract_command_payload,
-    extract_supported_urls,
-    extract_urls,
-    is_supported_marketplace_url,
-    validate_search_query,
+from app.parsers.funpay import (
+    build_funpay_search_query,
+    fetch_funpay_offer,
+    format_funpay_offer_summary,
+    is_funpay_offer_url,
 )
 from app.parsers.router import search_all_marketplaces
-from app.telegram_marketplace_utils import (
-    _first_marketplace_product,
-    _format_cross_marketplace_results,
-    _marketplace_result_count,
-)
-from app.worker import worker_add_urls, worker_update_all
+from app.parsers.wildberries import WildberriesParser
 from app.resilience import resilience
-from app.agent import PriceAgent
 from app.searcher import ozon_search_blocked_message, search_ozon
+from app.skill_notes import create_skill_note_proposal, list_pending_skill_proposals
 from app.task_intents import (
     ContextSession,
     StructuredTask,
@@ -41,22 +34,87 @@ from app.task_intents import (
     detect_task_intent,
 )
 from app.task_planner import TaskPlanner
-from app.skill_notes import create_skill_note_proposal, list_pending_skill_proposals
-from app.parsers.funpay import (
-    build_funpay_search_query,
-    fetch_funpay_offer,
-    format_funpay_offer_summary,
-    is_funpay_offer_url,
+from app.telegram_ai_reports import (
+    build_market_overview_message,
+    build_price_alerts_message,
+    build_price_forecast_message,
 )
-from app.card_profiles import load_profile, list_profiles
+
+# Backward-compatible helper re-exports used by tests and older callers.
+from app.telegram_card_handlers import (
+    _build_card_task_from_product_data,
+    _read_text_document,
+    _split_batch_card_sources,  # noqa: F401
+    generate_ozon_batch_card_files,
+    generate_ozon_card_files,
+)
+from app.telegram_card_research import build_card_research_message
+from app.telegram_card_tasks import (
+    build_card_task_from_product as _build_card_task_from_product,
+)
+from app.telegram_card_tasks import build_card_task_from_url as _build_card_task_from_url  # noqa: F401
+from app.telegram_conversation import (
+    _conversation_response,
+    _is_conversation,
+)
 from app.telegram_diagnostics import (
     probe_dns as _probe_dns,
+)
+from app.telegram_diagnostics import (
     probe_https as _probe_https,
+)
+from app.telegram_diagnostics import (
     probe_tcp as _probe_tcp,
 )
-from app.utils.proxy import mask_proxy_url as _mask_proxy_url
+from app.telegram_exports import send_html_report, send_price_export
+from app.telegram_humanize import (
+    access_denied as _h_access,
+)
+from app.telegram_humanize import (
+    analyzing as _h_analyzing,
+)
+from app.telegram_humanize import (
+    empty_database as _h_empty_db,
+)
+from app.telegram_humanize import (
+    help_text as _h_help,
+)
+from app.telegram_humanize import (
+    network_check as _h_network,
+)
+from app.telegram_humanize import (
+    no_blocks as _h_no_blocks,
+)
+from app.telegram_humanize import (
+    no_metrics as _h_no_metrics,
+)
+from app.telegram_humanize import (
+    parser_busy as _h_busy,
+)
+from app.telegram_humanize import (
+    report_generating as _h_report,
+)
+from app.telegram_humanize import (
+    search_started as _h_search_start,
+)
+from app.telegram_humanize import (
+    subscribe_ok as _h_sub_ok,
+)
+from app.telegram_humanize import (
+    unsubscribe_ok as _h_unsub_ok,
+)
+from app.telegram_humanize import (
+    update_started as _h_update_start,
+)
+from app.telegram_marketplace_utils import (
+    _first_marketplace_product,
+    _format_cross_marketplace_results,
+    _marketplace_result_count,
+)
 from app.telegram_messages import (
     command_limit as _message_command_limit,
+)
+from app.telegram_messages import (
     format_blocked_patterns,
     format_marketplace_health,
     format_network_diagnostics,
@@ -64,37 +122,24 @@ from app.telegram_messages import (
     format_recent_scrape_attempts,
     format_status_message,
 )
-from app.telegram_exports import send_html_report, send_price_export
-from app.telegram_ai_reports import (
-    build_market_overview_message,
-    build_price_alerts_message,
-    build_price_forecast_message,
-)
-from app.telegram_card_handlers import (
-    generate_ozon_card_files,
-    generate_ozon_batch_card_files,
-    _read_text_document,
-    _build_card_task_from_product_data,
-)
-from app.telegram_card_research import build_card_research_message
-from app.telegram_card_tasks import (
-    build_card_task_from_product as _build_card_task_from_product,
-)
+from app.telegram_read_service import TelegramReadService
 from app.telegram_runtime import run_telegram_polling, telegram_reconnect_delay
-from app.telegram_scraping import (
+from app.telegram_scraping import (  # noqa: F401
+    build_repair_diagnostic_report,
+    build_scraping_preflight_decision,
     classify_page_before_parsing,
+    fetch_html,
+    format_scraping_preflight_decision,
+    format_structured_task_plan,
     handle_repair_task,
     handle_scraping_task,
-)
-from app.telegram_conversation import (
-    _conversation_response,
-    _is_conversation,
 )
 from app.telegram_text_utils import (
     _build_card_task_from_combined_request,
     _clean_marketplace_search_query,
     _clean_natural_payload,
     _clean_product_search_query,
+    _collect_batch_card_sources_from_tasks,  # noqa: F401
     _extract_wildberries_card_search_query,
     _is_meta_task_instruction,
     _is_training_protocol_fragment,
@@ -104,33 +149,16 @@ from app.telegram_text_utils import (
     _split_card_and_other_tasks,
     split_natural_tasks,
 )
-# Backward-compatible helper re-exports used by tests and older callers.
-from app.telegram_card_handlers import _split_batch_card_sources  # noqa: F401
-from app.telegram_card_tasks import build_card_task_from_url as _build_card_task_from_url  # noqa: F401
-from app.telegram_scraping import (  # noqa: F401
-    build_repair_diagnostic_report,
-    build_scraping_preflight_decision,
-    fetch_html,
-    format_scraping_preflight_decision,
-    format_structured_task_plan,
+from app.telegram_url_utils import (
+    extract_command_payload,
+    extract_supported_urls,
+    extract_urls,
+    is_supported_marketplace_url,
+    validate_search_query,
 )
-from app.telegram_text_utils import _collect_batch_card_sources_from_tasks  # noqa: F401
-
-from app.telegram_humanize import (
-    access_denied as _h_access,
-    analyzing as _h_analyzing,
-    empty_database as _h_empty_db,
-    help_text as _h_help,
-    network_check as _h_network,
-    no_blocks as _h_no_blocks,
-    no_metrics as _h_no_metrics,
-    parser_busy as _h_busy,
-    report_generating as _h_report,
-    search_started as _h_search_start,
-    subscribe_ok as _h_sub_ok,
-    unsubscribe_ok as _h_unsub_ok,
-    update_started as _h_update_start,
-)
+from app.utils.proxy import mask_proxy_url as _mask_proxy_url
+from app.utils.urls import is_yandex_market_url
+from app.worker import worker_add_urls, worker_update_all
 
 # ── Бот ───────────────────────────────────────────────────────────────────────
 bot: Bot | None = None
@@ -1115,7 +1143,7 @@ async def cmd_unsubscribe(message: types.Message):
 
 async def _broadcast_changes():
     try:
-        two_h_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+        two_h_ago = datetime.now(UTC) - timedelta(hours=2)
         rows = await telegram_read_service.get_recent_price_changes(two_h_ago, limit=20)
 
         if not rows:
@@ -1337,6 +1365,7 @@ async def handle_reviews_choice(message: types.Message, state: FSMContext):
     await message.answer(f"🧠 Загружаю и анализирую отзывы: <b>{html.escape(product.name[:60])}</b>...", parse_mode="HTML")
     try:
         import aiohttp
+
         from app.parsers.wildberries import WildberriesParser, _extract_wb_id
 
         nm_id = _extract_wb_id(product.url)

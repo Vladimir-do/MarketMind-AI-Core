@@ -7,7 +7,6 @@ from pathlib import Path
 
 import yaml
 
-
 SESSION_UPDATES_DIR = Path(__file__).resolve().parent.parent / "project_skills" / "session_updates"
 
 

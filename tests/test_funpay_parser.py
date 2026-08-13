@@ -6,7 +6,6 @@ from app.parsers.funpay import (
     parse_funpay_offer_html,
 )
 
-
 FUNPAY_OFFER_HTML = """
 <html>
   <body>

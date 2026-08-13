@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import perf_counter
 
 from app.core.enums import AvailabilityStatus, FetchStatus, Marketplace
@@ -21,7 +21,7 @@ async def fetch_wb_snapshot(url: str, proxy: str | None = None) -> tuple[Product
         snap = ProductSnapshot(
             marketplace=Marketplace.WILDBERRIES,
             url=url,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             fetch_status=FetchStatus.BLOCKED,
             availability=AvailabilityStatus.UNKNOWN,
             raw=None,
@@ -31,7 +31,7 @@ async def fetch_wb_snapshot(url: str, proxy: str | None = None) -> tuple[Product
     snap = ProductSnapshot(
         marketplace=Marketplace.WILDBERRIES,
         url=url,
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
         fetch_status=FetchStatus.OK,
         availability=AvailabilityStatus.IN_STOCK if data.availability == "in_stock" else AvailabilityStatus.OUT_OF_STOCK,
         name=data.name,

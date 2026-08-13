@@ -4,6 +4,7 @@ searcher.py — поиск товаров на Озоне по названию 
 """
 import asyncio
 import os
+import random
 import re
 import time
 from urllib.parse import quote_plus
@@ -11,8 +12,7 @@ from urllib.parse import quote_plus
 from bs4 import BeautifulSoup
 
 from app.config import logger
-from app.updater import USER_AGENTS, VIEWPORTS, BROWSER_INIT_SCRIPT, _is_ozon_blocked_text
-import random
+from app.updater import BROWSER_INIT_SCRIPT, USER_AGENTS, VIEWPORTS, _is_ozon_blocked_text
 
 _ozon_search_blocked_until = 0.0
 _ozon_search_block_reason = ""

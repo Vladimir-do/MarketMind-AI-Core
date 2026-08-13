@@ -14,9 +14,9 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
         os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
         reload_app_modules(database_url="sqlite+aiosqlite://")
 
-        from app.database import Database
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
-        from app.ai_recommendation.suggestions import AISuggestion, AIRecommendationResult
+        from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
+        from app.database import Database
 
         self.db = Database()
         await self.db.init()
@@ -95,8 +95,8 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(alias.json(), legacy.json())
 
     async def test_suggestions_api_empty(self):
-        from app.database import Database
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
+        from app.database import Database
         from app.web.app import create_app
 
         db = Database()

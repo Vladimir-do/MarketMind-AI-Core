@@ -5,7 +5,6 @@ import signal
 import sys
 from pathlib import Path
 
-
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="backslashreplace")
 
@@ -53,6 +52,7 @@ def main():
     if args.migrate:
         async def _run_migrations():
             from alembic.config import Config
+
             from alembic import command
             alembic_cfg = Config("alembic.ini")
             command.upgrade(alembic_cfg, "head")
@@ -303,6 +303,7 @@ def main():
 
     elif args.web:
         import uvicorn
+
         from app.web.app import create_app
 
         application = create_app()

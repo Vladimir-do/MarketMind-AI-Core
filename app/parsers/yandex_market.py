@@ -1,7 +1,7 @@
 import json
 import re
+from collections.abc import Awaitable, Callable
 from time import perf_counter
-from typing import Awaitable, Callable
 from urllib.parse import quote_plus, urljoin
 
 import aiohttp
@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 from app.config import logger
 from app.parsers.base import BaseParser, ProductData
 from app.utils.urls import YANDEX_MARKET_HOSTS, is_yandex_market_url  # noqa: F401 — backward compat re-export
-
 
 AttemptRecorder = Callable[..., Awaitable[None]]
 

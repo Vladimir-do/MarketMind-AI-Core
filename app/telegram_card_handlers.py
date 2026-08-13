@@ -1,16 +1,19 @@
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from aiogram import Bot, types
 
 from app.config import PROXY
-from app.telegram_marketplace_utils import _search_competitors_with_fallback
-from app.telegram_url_utils import extract_supported_urls
 from app.telegram_card_tasks import (
     build_card_task_from_product as _build_card_task_from_product,
+)
+from app.telegram_card_tasks import (
     build_card_task_from_url as _build_card_task_from_url,
 )
+from app.telegram_marketplace_utils import _search_competitors_with_fallback
+from app.telegram_url_utils import extract_supported_urls
 from app.worker import worker_add_urls
 
 if TYPE_CHECKING:
@@ -84,10 +87,10 @@ async def generate_ozon_card_files(
     get_active_profile: Callable[[int], dict],
 ):
     from app.card_filler import (
-        build_ozon_card_search_query,
+        build_enhanced_ozon_card_draft,
         build_ozon_card_draft,
         build_ozon_card_quality_report,
-        build_enhanced_ozon_card_draft,
+        build_ozon_card_search_query,
         export_ozon_card_json,
         export_ozon_card_xlsx,
         format_ozon_card_preview,
@@ -149,9 +152,9 @@ async def generate_ozon_batch_card_files(
 ):
     from app.card_filler import (
         OzonCardBatchItem,
-        build_ozon_card_search_query,
-        build_ozon_card_draft,
         build_enhanced_ozon_card_draft,
+        build_ozon_card_draft,
+        build_ozon_card_search_query,
         export_ozon_cards_batch_json,
         export_ozon_cards_batch_xlsx,
         format_ozon_batch_preview,

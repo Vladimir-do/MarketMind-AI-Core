@@ -30,7 +30,7 @@ class ProductValidator:
         for idx, product in enumerate(products):
             product_errors = self._validate_product(idx, product)
             error_severities = {e.severity for e in product_errors}
-            
+
             # Only include product if no error-level issues
             if "error" not in error_severities:
                 valid_products.append(product)

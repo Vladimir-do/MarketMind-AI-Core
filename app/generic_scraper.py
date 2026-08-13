@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import csv
 import asyncio
+import csv
 import io
 import logging
 import re
@@ -15,7 +15,6 @@ from bs4 import BeautifulSoup, Tag
 
 from app.task_intents import StructuredTask
 from app.universal_parsing_core.parsers.universal_html import UniversalHtmlParser
-
 
 logger = logging.getLogger(__name__)
 

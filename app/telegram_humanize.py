@@ -3,8 +3,6 @@ telegram_humanize.py — Делает ответы бота живыми и че
 Вместо сухих «Метрик нет» → «Пока ничего не парсили, запустите /update».
 """
 import random
-from typing import Optional
-
 
 # ── Приветствия и заглушки ────────────────────────────────────────────────────
 
@@ -62,7 +60,7 @@ def no_health() -> str:
     return "Данных о здоровье маркетплейсов пока нет. Запустите парсинг через /update."
 
 
-def nothing_found(query: Optional[str] = None) -> str:
+def nothing_found(query: str | None = None) -> str:
     """Ничего не найдено."""
     q = f" по запросу «{query}»" if query else ""
     variants = [

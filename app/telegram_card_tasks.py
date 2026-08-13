@@ -4,7 +4,6 @@ import re
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-
 PRODUCT_LABEL = "\u0442\u043e\u0432\u0430\u0440"
 NEW_PRODUCT = "\u041d\u043e\u0432\u044b\u0439 \u0442\u043e\u0432\u0430\u0440"
 NO_BRAND = "\u0431\u0440\u0435\u043d\u0434: \u041d\u0435\u0442 \u0431\u0440\u0435\u043d\u0434\u0430"

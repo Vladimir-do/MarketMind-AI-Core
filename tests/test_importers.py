@@ -6,7 +6,6 @@ import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
-
 from app.importers.csv_importer import CsvImporter
 from app.importers.registry import import_file
 from app.products.schema import UnifiedProduct

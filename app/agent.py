@@ -3,21 +3,20 @@ agent.py — 🤖 Claude AI агент внутри парсера.
 Умеет: анализировать цены, читать отзывы, давать советы,
 искать товары по названию на Озоне.
 """
-from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, desc, func
+from sqlalchemy import desc, func, select
 
 from app.ai_client import ai_is_available, ai_missing_message, ask_ai
 from app.config import logger
-from app.database import Database, Product, PriceHistory
-
+from app.database import Database, PriceHistory, Product
 
 # ── Получение истории цен для анализа ─────────────────────────────────────────
 
 async def get_price_history_text(db: Database, product: Product, days: int = 30) -> str:
     """Формирует текстовое описание истории цен товара для передачи в Claude."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
     async with db.session() as s:
         rows = (await s.execute(
             select(PriceHistory)
@@ -48,7 +47,7 @@ async def get_all_stats(db: Database) -> dict:
         n_products = await s.scalar(select(func.count(Product.id)))
 
         # Товары с изменением цены за последние 24ч
-        since = datetime.now(timezone.utc) - timedelta(hours=24)
+        since = datetime.now(UTC) - timedelta(hours=24)
         changed = (await s.execute(
             select(PriceHistory, Product)
             .join(Product)
@@ -220,7 +219,7 @@ URL: {product.url}
         """Находит товары на минимальной цене за 30 дней."""
         products = await self.db.get_all_products()
         deals = []
-        since = datetime.now(timezone.utc) - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         if not products:
             return []
         product_ids = [product.id for product in products]

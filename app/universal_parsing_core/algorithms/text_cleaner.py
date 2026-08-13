@@ -1,6 +1,5 @@
 import re
 
-
 SCRIPT_STYLE_RE = re.compile(r"\s+")
 INLINE_SPACE_RE = re.compile(r"[ \t\r\f\v]+")
 NEWLINE_RE = re.compile(r"\n+")

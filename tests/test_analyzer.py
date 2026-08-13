@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.products.analyzer import ProductAnalyzer, calculate_quality_score, _get_tier
+from app.products.analyzer import ProductAnalyzer, _get_tier, calculate_quality_score
 from app.products.schema import UnifiedProduct
 
 

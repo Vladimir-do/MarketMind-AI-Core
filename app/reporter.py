@@ -1,9 +1,9 @@
+import asyncio
+import base64
 import io
 import json
-import base64
-import asyncio
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from html import escape
 
 from sqlalchemy import desc, select
@@ -89,8 +89,8 @@ def _as_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _marketplace(url: str) -> str:
@@ -140,7 +140,7 @@ def _sparkline_svg(values: list[int], color: str) -> str:
 
 
 async def collect_report_data(db: Database) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since_30d = now - timedelta(days=30)
     since_24h = now - timedelta(hours=24)
 

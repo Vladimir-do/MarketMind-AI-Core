@@ -1,6 +1,6 @@
 import re
-from html import escape
 from dataclasses import dataclass, field
+from html import escape
 from urllib.parse import urlparse
 
 import aiohttp

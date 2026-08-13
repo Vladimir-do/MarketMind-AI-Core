@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 PRICE_RE = re.compile(
     r"(?:([£$€])\s*)?(\d[\d\s]{0,12}(?:[.,]\d{1,2})?)\s*(₽|руб\.?|р\.?|р|в‚Ѕ|СЂСѓР±\.?|СЂ\.?|СЂ|£|gbp|usd|eur)?(?=\s|$)",
     re.IGNORECASE,

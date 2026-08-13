@@ -7,7 +7,6 @@ from aiogram import Bot, types
 
 from app.database import Database
 
-
 ExportKind = Literal["csv", "excel"]
 
 

@@ -98,8 +98,8 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"product_id": %s' % pid, jobs[0].payload_json)
 
     async def test_ai_suggestion_job_writes_pending_approval(self):
-        from app.ai_recommendation.provider import AIResponse
         from app.ai_recommendation.job_queue import process_product_ai_suggestion_job
+        from app.ai_recommendation.provider import AIResponse
 
         class FakeProvider:
             def is_available(self):

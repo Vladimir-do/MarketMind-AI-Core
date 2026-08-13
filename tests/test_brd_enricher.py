@@ -1,10 +1,10 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from zipfile import ZipFile
 
 import openpyxl
-from unittest.mock import patch
 
 from app.brd_enricher import (
     BRD_REQUIRED_COLUMNS,

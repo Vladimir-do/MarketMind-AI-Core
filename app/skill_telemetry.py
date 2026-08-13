@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -22,7 +22,7 @@ class SkillRunRecord:
     failure_trigger: str | None = None
     recovery: str | None = None
     run_id: str | None = None
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     @property
     def successful(self) -> bool:
@@ -66,7 +66,7 @@ class JsonlSkillTelemetryStore:
                     failure_trigger=raw.get("failure_trigger"),
                     recovery=raw.get("recovery"),
                     run_id=raw.get("run_id"),
-                    created_at=raw.get("created_at") or datetime.now(timezone.utc).isoformat(),
+                    created_at=raw.get("created_at") or datetime.now(UTC).isoformat(),
                 )
             )
         return records

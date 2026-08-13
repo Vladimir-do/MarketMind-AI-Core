@@ -1,8 +1,8 @@
+import asyncio
 import json
 import os
 import tempfile
 import unittest
-import asyncio
 from pathlib import Path
 
 from tests.helpers import reload_app_modules
@@ -425,8 +425,9 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_record_scrape_attempt_rolls_back_when_blocked_pattern_fails(self):
         """If the BlockedPattern insert fails, ScrapeAttempt must NOT be saved."""
-        from app.database import BlockedPattern
         import contextlib
+
+        from app.database import BlockedPattern
 
         original_session_factory = self.db._session_factory
 

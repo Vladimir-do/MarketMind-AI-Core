@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from typing import Sequence
+from collections.abc import Sequence
 
 from app.products.findings import AnalysisResult, BatchAnalysisResult, Finding, Recommendation
 from app.products.schema import UnifiedProduct

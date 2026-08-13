@@ -4,7 +4,6 @@ import re
 
 from app.universal_parsing_core.algorithms.entity_blocker import EntityBlock
 
-
 TRAILING_META_RE = re.compile(r"\b\d+\s*(г|гр|kg|кг|мл|л|шт)\b.*$", re.IGNORECASE)
 LEADING_NOISE_RE = re.compile(r"^(меню|цена|стоимость|от)\s+", re.IGNORECASE)
 

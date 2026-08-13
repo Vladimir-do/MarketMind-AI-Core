@@ -401,7 +401,7 @@ async def handle_scraping_task(message: types.Message, task: StructuredTask) -> 
 
 async def _handle_ozon_scraping(message: types.Message, task: StructuredTask) -> None:
     from app.bot import get_chat_context, parser_lock
-    from app.parsers.alt_sources import fetch_ozon_search_api, fetch_from_alt_sources
+    from app.parsers.alt_sources import fetch_from_alt_sources, fetch_ozon_search_api
 
     await parser_lock.acquire()
     try:

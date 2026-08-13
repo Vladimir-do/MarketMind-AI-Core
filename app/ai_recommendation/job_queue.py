@@ -14,9 +14,9 @@ from app.ai_recommendation.providers.factory import create_configured_provider
 from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
 from app.database import Database, PriceHistory, Product
 from app.effective_card.service import EffectiveProductCardService
-from app.seo_intelligence import audit_unified_product_seo
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
+from app.seo_intelligence import audit_unified_product_seo
 
 logger = logging.getLogger(__name__)
 
