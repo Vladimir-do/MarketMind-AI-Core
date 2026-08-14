@@ -13,7 +13,7 @@ from app.database import Database, ProductCardVersion, ProjectProduct
 from app.editor.schemas import normalize_card_payload
 from app.products.analyzer import ProductAnalyzer
 from app.products.schema import UnifiedProduct
-from app.projects.service import ProjectNotFoundError
+from app.projects.service import ProjectService
 from app.seo_intelligence import (
     FORBIDDEN_MARKETING_WORDS,
     GENERIC_PRODUCT_TYPES,
@@ -55,7 +55,9 @@ class EffectiveProductCardService:
 
     async def get_effective_card(self, project_id: str, product_id: int) -> EffectiveProductCard:
         async with self._db.session() as session:
-            project_product = await self._get_project_product(session, project_id, product_id)
+            project_product = await ProjectService(self._db).get_project_product(
+                project_id, product_id, session=session
+            )
             version = await self._latest_version(session, project_product)
             return self._build_card(project_product, version)
 
@@ -143,17 +145,6 @@ class EffectiveProductCardService:
             "draft_preview": _analysis_to_dict(result),
             "warnings": card.warnings,
         }
-
-    @staticmethod
-    async def _get_project_product(session, project_id: str, product_id: int) -> ProjectProduct:
-        record = await session.scalar(
-            select(ProjectProduct)
-            .where(ProjectProduct.project_id == project_id)
-            .where(ProjectProduct.product_id == product_id)
-        )
-        if record is None:
-            raise ProjectNotFoundError("Товар не найден в проекте")
-        return record
 
     @staticmethod
     async def _latest_version(session, project_product: ProjectProduct) -> ProductCardVersion | None:

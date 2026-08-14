@@ -20,6 +20,8 @@ from app.editor.service import ProductCardEditorService
 from app.workspace.files import StoredProjectFile, project_root
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from app.products.schema import UnifiedProduct
 
 
@@ -326,9 +328,11 @@ class ProjectService:
             )
             return list(result.scalars().all())
 
-    async def get_project_product(self, project_id: str, product_id: int) -> ProjectProduct:
-        async with self._db.session() as session:
-            record = await session.scalar(
+    async def get_project_product(
+        self, project_id: str, product_id: int, *, session: AsyncSession | None = None
+    ) -> ProjectProduct:
+        async def _query(s: AsyncSession) -> ProjectProduct:
+            record = await s.scalar(
                 select(ProjectProduct)
                 .where(ProjectProduct.project_id == project_id)
                 .where(ProjectProduct.product_id == product_id)
@@ -336,6 +340,11 @@ class ProjectService:
             if record is None:
                 raise ProjectNotFoundError("Товар не найден в проекте")
             return record
+
+        if session is not None:
+            return await _query(session)
+        async with self._db.session() as owned_session:
+            return await _query(owned_session)
 
     @staticmethod
     async def _require_project(session, project_id: str) -> ClientProject:
