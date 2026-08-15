@@ -193,7 +193,7 @@ async def build_enhanced_ozon_card_draft(
     profile: dict | None = None,
 ) -> OzonCardDraft:
     draft = build_ozon_card_draft(task)
-    competitors = competitors or []
+    competitors = _filter_relevant_competitors(competitors or [], draft)
     profile = profile or {}
     apply_card_profile(draft, profile)
     _apply_competitor_context(draft, competitors)
@@ -1016,19 +1016,22 @@ AI_CARD_SYSTEM_PROMPT = """Ты эксперт по созданию карто�
 ПРАВИЛА:
 1. Не выдумывай факты — используй только данные из исходного текста
 2. Пиши на русском языке, грамотно и по делу
-3. Название должно начинаться с типа товара (книга, кабель, капсулы), затем бренд, затем ключевые свойства
+3. Формула названия: Тип товара (книга, кабель, капсулы) + Бренд + Модель (если модель есть в исходнике/attributes — не выдумывай её) + ключевое свойство. Если бренда/модели нет — просто пропусти эту часть, не пиши "Нет бренда" в название
 4. Описание должно отвечать на вопрос "зачем мне это покупать?" — конкретные выгоды, не общие слова
-5. Ключевые слова — реальные поисковые запросы покупателей, без спама
+5. Ключевые слова — реальные поисковые запросы покупателей (в т.ч. из competitor_seo_gap, если релевантны), без переспама: каждое слово по делу, не повторяй одну и ту же характеристику разными словами ради количества
 6. Продажные пункты — конкретные, не "удобен для ежедневного использования"
 7. Без медицинских, юридических, гарантийных обещаний
 8. Без абсолютов ("лучший", "единственный", "идеальный")
 9. Без слов "скидка", "акция", "купить недорого" — это запрещено на маркетплейсах
+10. Конкурентная карточка — не та, что прямо сравнивает себя с другими ("дешевле, чем у конкурентов" тоже запрещено), а та, что явно и конкретно закрывает вопросы покупателя раньше, чем он откроет соседнюю карточку: используй competitor_seo_gap для keywords/атрибутов, если слово реально относится к этому товару, и выноси в selling_points самые конкретные факты из исходника (состав, размер, материал, применение) — это и есть отстройка от конкурентов, а не общие фразы
 
 ФОРМАТ ОТВЕТА — только валидный JSON без markdown-обёртки."""
 
 
 def _build_ai_card_prompt(draft: OzonCardDraft, competitors: list[dict], profile: dict | None = None) -> str:
     profile = profile or {}
+    existing_keywords = {kw.lower() for kw in draft.keywords}
+    seo_gap = [word for word, _ in _top_competitor_words(competitors) if word not in existing_keywords][:10]
     payload = {
         "source_text": draft.source_text,
         "draft": asdict(draft),
@@ -1040,6 +1043,7 @@ def _build_ai_card_prompt(draft: OzonCardDraft, competitors: list[dict], profile
         },
         "competitors": _compact_competitors(competitors),
         "competitor_summary": draft.competitor_summary,
+        "competitor_seo_gap": seo_gap,
         "required_json_schema": {
             "name": "SEO-название до 140 символов",
             "description": "продающее описание 700-1500 символов",
@@ -1054,8 +1058,10 @@ def _build_ai_card_prompt(draft: OzonCardDraft, competitors: list[dict], profile
     }
     return (
         "Улучши карточку товара для маркетплейса. "
-        "Сохрани фактические данные из исходника. Конкурентов используй только для SEO-слов, ценового ориентира и чек-листа, "
-        "не копируй чужие названия дословно и не выдумывай свойства товара. "
+        "Сохрани фактические данные из исходника. Конкурентов (уже отфильтрованы по релевантности товару) используй только "
+        "для SEO-слов, ценового ориентира и чек-листа, не копируй чужие названия дословно и не выдумывай свойства товара. "
+        "competitor_seo_gap — частые слова из релевантных карточек конкурентов, которых пока нет в keywords: включи те из них, "
+        "что действительно описывают этот товар, остальные игнорируй. "
         "Если данных не хватает, вынеси это в checklist.\n\n"
         f"{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
@@ -1313,19 +1319,58 @@ def _compact_competitors(competitors: list[dict]) -> list[dict]:
     ]
 
 
+_COMPETITOR_STOP_WORDS = {
+    "для", "или", "без", "при", "под", "над", "товар", "шт", "набор",
+    "ozon", "wb", "wildberries", "черный", "белый",
+}
+
+
 def _top_competitor_words(competitors: list[dict]) -> list[tuple[str, int]]:
-    stop = {
-        "для", "или", "без", "при", "под", "над", "товар", "шт", "набор",
-        "ozon", "wb", "wildberries", "черный", "белый",
-    }
     counts: dict[str, int] = {}
     for item in competitors:
         name = item.get("name") or ""
         for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", name.lower()):
-            if word in stop or word.isdigit():
+            if word in _COMPETITOR_STOP_WORDS or word.isdigit():
                 continue
             counts[word] = counts.get(word, 0) + 1
     return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:20]
+
+
+def _product_type_stems(draft: OzonCardDraft) -> set[str]:
+    """Word stems (first 5 chars) describing what the product *is*, excluding the brand."""
+    brand_tokens = {w.lower()[:5] for w in re.findall(r"[A-Za-zА-Яа-яЁё]{2,}", draft.brand or "")}
+    stems: set[str] = set()
+    for source in (draft.name, draft.category_hint or ""):
+        for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", source.lower()):
+            if word in _COMPETITOR_STOP_WORDS or word.isdigit():
+                continue
+            stem = word[:5]
+            if stem in brand_tokens:
+                continue
+            stems.add(stem)
+    return stems
+
+
+def _filter_relevant_competitors(competitors: list[dict], draft: OzonCardDraft) -> list[dict]:
+    """Drop marketplace search hits that only matched on the brand name, not the product type.
+
+    Competitor search (build_ozon_card_search_query) sends the product name as a plain
+    full-text query to real marketplace search - a brand name that collides with an
+    unrelated real product (e.g. a test brand matching a famous shampoo brand) returns
+    results from a completely different category. Require at least one shared word stem
+    with the product's own name/category (brand words excluded on both sides) before
+    trusting a result as an actual competitor.
+    """
+    type_stems = _product_type_stems(draft)
+    if not type_stems:
+        return competitors
+    relevant = []
+    for item in competitors:
+        name = (item.get("name") or "").lower()
+        comp_stems = {word[:5] for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", name)}
+        if comp_stems & type_stems:
+            relevant.append(item)
+    return relevant
 
 
 TECH_SEO_TERMS = {

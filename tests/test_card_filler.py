@@ -160,6 +160,50 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("держатель", draft.keywords)
         self.assertIn("Проверить, чем карточка отличается от конкурентов в выдаче Ozon", draft.checklist)
 
+    async def test_enhanced_card_drops_competitors_matching_only_brand_name(self):
+        # D31 regression: a test brand ("Клиар") collides with an unrelated real brand
+        # ("Clear" shampoo) - the marketplace search returns it, but it must not be
+        # treated as a real competitor for immunity capsules.
+        with patch("app.card_filler.ai_is_available", return_value=False):
+            draft = await build_enhanced_ozon_card_draft(
+                "товар: Капсулы Клиар для иммунитета, 20 шт\nбренд: Клиар",
+                competitors=[
+                    {"name": "Clear против перхоти, для мужчин, ледяная свежесть, шампунь", "price": 446},
+                ],
+            )
+
+        self.assertEqual(draft.competitor_summary, "")
+        self.assertNotIn("шампунь", draft.keywords)
+        self.assertNotIn("перхоти", draft.keywords)
+
+    async def test_enhanced_card_keeps_competitors_matching_product_type(self):
+        with patch("app.card_filler.ai_is_available", return_value=False):
+            draft = await build_enhanced_ozon_card_draft(
+                "товар: Капсулы Клиар для иммунитета, 20 шт\nбренд: Клиар",
+                competitors=[
+                    {"name": "Витамины для иммунитета в капсулах, 30 шт", "price": 550},
+                ],
+            )
+
+        self.assertIn("Найдено конкурентов: 1", draft.competitor_summary)
+
+    async def test_ai_prompt_offers_relevant_competitor_seo_gap(self):
+        ai_mock = AsyncMock(return_value="AI error: network")  # avoid depending on AI JSON parsing here
+        with (
+            patch("app.card_filler.ai_is_available", return_value=True),
+            patch("app.card_filler.ask_ai", new=ai_mock),
+        ):
+            await build_enhanced_ozon_card_draft(
+                "товар: Капсулы Клиар для иммунитета, 20 шт\nбренд: Клиар",
+                competitors=[
+                    {"name": "Витамины для иммунитета в капсулах с магнием", "price": 550},
+                ],
+            )
+
+        prompt = ai_mock.call_args.args[0]
+        self.assertIn("competitor_seo_gap", prompt)
+        self.assertIn("магнием", prompt)
+
     async def test_enhanced_card_handles_ai_error_as_local_draft(self):
         with (
             patch("app.card_filler.ai_is_available", return_value=True),
