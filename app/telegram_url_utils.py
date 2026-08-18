@@ -1,7 +1,7 @@
 import re
 from urllib.parse import parse_qs, urlparse
 
-from app.utils.urls import is_yandex_market_url
+from app.utils.urls import is_ozon_url, is_wildberries_url, is_yandex_market_url
 
 
 def validate_search_query(query: str) -> tuple[bool, str | None]:
@@ -10,7 +10,7 @@ def validate_search_query(query: str) -> tuple[bool, str | None]:
         return True, None
 
     host = (parsed.netloc or "").lower()
-    if "ozon.ru" in host or "wildberries.ru" in host or "wb.ru" in host or is_yandex_market_url(query):
+    if is_ozon_url(query) or is_wildberries_url(query) or is_yandex_market_url(query):
         if not is_supported_marketplace_url(query):
             return False, (
                 "Это страница маркетплейса, а не ссылка на конкретный товар. "
@@ -33,11 +33,10 @@ def extract_urls(text: str) -> list[str]:
 
 def is_supported_marketplace_url(url: str) -> bool:
     parsed = urlparse(url)
-    host = (parsed.netloc or "").lower()
     path = (parsed.path or "").lower()
-    if "ozon.ru" in host:
+    if is_ozon_url(url):
         return "/product/" in path
-    if "wildberries.ru" in host or "wb.ru" in host:
+    if is_wildberries_url(url):
         query = parse_qs(parsed.query)
         if any(re.fullmatch(r"\d{6,12}", value) for key in ("nm", "nm_id", "nmId") for value in query.get(key, [])):
             return True

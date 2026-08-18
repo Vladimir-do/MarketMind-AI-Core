@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 import aiohttp
 from bs4 import BeautifulSoup
 
+from app.utils.urls import is_funpay_url
+
 
 @dataclass(slots=True)
 class FunPayOffer:
@@ -22,8 +24,7 @@ class FunPayOffer:
 
 def is_funpay_offer_url(url: str) -> bool:
     parsed = urlparse(url)
-    host = (parsed.netloc or "").lower()
-    return host.endswith("funpay.com") and parsed.path.rstrip("/") == "/lots/offer"
+    return is_funpay_url(url) and parsed.path.rstrip("/") == "/lots/offer"
 
 
 def parse_funpay_offer_html(html: str, url: str) -> FunPayOffer:

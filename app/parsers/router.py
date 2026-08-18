@@ -12,7 +12,7 @@ from app.parsers.wildberries import WildberriesParser
 from app.parsers.yandex_market import YandexMarketParser
 from app.searcher import search_ozon
 from app.utils.error_research import research_parse_failure
-from app.utils.urls import is_yandex_market_url
+from app.utils.urls import is_ozon_url, is_wildberries_url, is_yandex_market_url
 
 # Все доступные парсеры
 PARSERS: list[type[BaseParser]] = [
@@ -33,9 +33,9 @@ MARKETPLACE_EMOJI = {
 def detect_marketplace(url: str) -> str:
     """Определяет маркетплейс по URL."""
     url = url.lower()
-    if "ozon.ru" in url:
+    if is_ozon_url(url):
         return "ozon"
-    if "wildberries.ru" in url or "wb.ru" in url:
+    if is_wildberries_url(url):
         return "wildberries"
     if is_yandex_market_url(url):
         return "yandex_market"
