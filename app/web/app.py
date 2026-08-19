@@ -5,11 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+from app.config import logger
 
 WEB_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = WEB_DIR / "templates"
@@ -101,6 +103,26 @@ def create_app() -> FastAPI:
     from app.web.routes.reports import router as reports_router
     from app.web.routes.suggestions import router as suggestions_router
     from app.web.routes.system import router as system_router
+    from app.web.routes.projects import _editor_error
+
+    @app.exception_handler(Exception)
+    async def handle_unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
+        """Last-resort safety net: several routes (e.g. product_detail.py,
+        reports.py) have no local try/except at all and relied entirely on
+        Starlette's default unstructured 500 for any exception a service
+        layer raises. Reuse the same domain-error -> HTTP status mapping
+        projects.py's routes already get via _editor_error(), so a
+        ProjectNotFoundError/EditorNotFoundError/etc. raised from ANY route
+        maps to the same 404/409/422 it would via an explicit _editor_error()
+        call, instead of falling through to a generic 500. This does not
+        affect HTTPException handling: Starlette dispatches HTTPException to
+        FastAPI's own registered handler for that exact type before this
+        catch-all Exception handler is ever considered."""
+        logger.error(
+            "Unhandled exception in %s %s: %r", request.method, request.url.path, exc, exc_info=exc
+        )
+        http_exc = _editor_error(exc)
+        return JSONResponse(status_code=http_exc.status_code, content={"detail": http_exc.detail})
 
     app.include_router(dashboard_router)
     app.include_router(products_router)

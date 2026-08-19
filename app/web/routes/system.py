@@ -40,13 +40,20 @@ async def create_backup(request: Request):
 async def restore_backup(backup_name: str, request: Request):
     form = await request.form()
     try:
-        current_db = request.app.state.db
-        if hasattr(current_db, "_engine"):
-            await current_db._engine.dispose()
+        # Restore the file first, before touching request.app.state.db or
+        # disposing the current engine. If restore_database_backup() raises
+        # anything (BackupError, or e.g. OSError/sqlite3.Error from a
+        # corrupted backup file or a full disk), the app must keep running
+        # on the untouched current_db -- swapping/disposing first would
+        # leave app.state.db pointing at a disposed engine, breaking every
+        # subsequent request across the whole app until a process restart.
         restore_database_backup(backup_name, confirmation=str(form.get("confirmation") or ""))
+        current_db = request.app.state.db
         new_db = Database()
         await new_db.init()
         request.app.state.db = new_db
+        if hasattr(current_db, "_engine"):
+            await current_db._engine.dispose()
     except BackupError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return RedirectResponse("/system", status_code=status.HTTP_303_SEE_OTHER)
