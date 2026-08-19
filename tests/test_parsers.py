@@ -891,3 +891,70 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(added_history, [])
         self.assertEqual(updater.seen_product_id, 7)
         self.assertEqual(callbacks, ["⚠️ Ozon временно заблокировал: Ozon blocked item"])
+
+    async def test_update_all_continues_batch_after_one_product_raises(self):
+        """Regression for OZON-BATCH: a single product's process_url()
+        raising (e.g. Playwright/browser failure) must not abort the rest
+        of the batch -- update_all() must still process and report the
+        remaining products instead of letting the whole run silently drop
+        to 0 updated."""
+        callbacks = []
+        product_failing = SimpleNamespace(
+            id=1,
+            name="Crashes during fetch",
+            url="https://www.ozon.ru/product/fail",
+        )
+        product_ok = SimpleNamespace(
+            id=2,
+            name="Works fine",
+            url="https://www.ozon.ru/product/ok",
+        )
+
+        class FakeSession:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            def add(self, row):
+                pass
+
+            async def commit(self):
+                return None
+
+        class FakeDB:
+            async def get_all_products(self):
+                return [product_failing, product_ok]
+
+            async def get_last_price(self, product_id):
+                return None
+
+            def session(self):
+                return FakeSession()
+
+            async def save_product(self, url, data):
+                return None, True
+
+        class FakeUpdater(OzonUpdater):
+            async def process_url(self, url, product_id=None):
+                if product_id == 1:
+                    raise RuntimeError("Playwright browser crashed (test)")
+                return {"name": "Works fine", "price": 100, "availability": "in_stock"}
+
+            async def _wait_for_network(self, *args, **kwargs):
+                return None
+
+        updater = FakeUpdater(db=FakeDB())
+
+        async def callback(text):
+            callbacks.append(text)
+
+        updated, changes = await updater.update_all(callback=callback)
+
+        # The failing product must not have been counted as updated, but
+        # the second product must still have been reached and processed.
+        self.assertEqual(updated, 1)
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes[0]["name"], "Works fine")
+        self.assertTrue(any("Works fine" in text for text in callbacks))

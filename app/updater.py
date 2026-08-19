@@ -1009,7 +1009,16 @@ class OzonUpdater:
 
         for i, product in enumerate(products, 1):
             logger.info(f"[{i}/{len(products)}] {product.name}")
-            data = await self.process_url(product.url, product_id=product.id)
+            try:
+                data = await self.process_url(product.url, product_id=product.id)
+            except Exception as e:
+                # A single product's browser/session failure (e.g. Playwright
+                # crashed) must not abort the rest of the batch -- fall back
+                # to the existing "no data" handling below instead of
+                # letting the exception propagate out of update_all() and
+                # silently drop every remaining product in this run.
+                logger.error(f"update_all: ошибка на {product.url}: {e}")
+                data = None
 
             if data:
                 _, price_changed = await self.db.save_product(product.url, data)
