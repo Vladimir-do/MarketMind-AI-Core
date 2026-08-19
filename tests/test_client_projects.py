@@ -278,14 +278,27 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_market_analysis_ai_expands_open_ended_niche_task(self):
         project_id = await self._create_project("Market Natural")
 
-        response = await self.client.post(
-            f"/api/projects/{project_id}/market-analysis",
-            json={
-                "query": "сегодня ищем нишу на рынке чем торговать прибыльнее",
-                "marketplace": "wildberries",
-                "max_results": 5,
-            },
+        # market_analysis.py calls app.ai_client.ask_ai() directly (a separate,
+        # simpler AI path than app.ai_recommendation.job_queue's
+        # create_configured_provider(), which asyncSetUp() above already mocks).
+        # Without mocking it here, this test depends on a live call to whatever
+        # AI_PROVIDER/API key happens to be configured in .env.
+        ai_queries = json.dumps(
+            ["органайзер для проводов", "кабель менеджмент", "клипса для кабеля", "чехол для проводов", "держатель кабеля"],
+            ensure_ascii=False,
         )
+        with (
+            patch("app.ai_client.ask_ai", new=AsyncMock(return_value=ai_queries)),
+            patch("app.market_analysis.WildberriesParser.search", return_value=[]),
+        ):
+            response = await self.client.post(
+                f"/api/projects/{project_id}/market-analysis",
+                json={
+                    "query": "сегодня ищем нишу на рынке чем торговать прибыльнее",
+                    "marketplace": "wildberries",
+                    "max_results": 5,
+                },
+            )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -294,14 +307,25 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_market_analysis_ai_expands_profit_task(self):
         project_id = await self._create_project("Market Profit Natural")
 
-        response = await self.client.post(
-            f"/api/projects/{project_id}/market-analysis",
-            json={
-                "query": "сегодня мы ищем чем выгодней торговать",
-                "marketplace": "wildberries",
-                "max_results": 5,
-            },
+        # See comment in test_market_analysis_ai_expands_open_ended_niche_task
+        # above: market_analysis.py's AI call is a separate path from the one
+        # asyncSetUp() mocks, and must be mocked here too.
+        ai_queries = json.dumps(
+            ["беспроводные наушники", "портативная колонка", "внешний аккумулятор", "умные часы", "фитнес браслет"],
+            ensure_ascii=False,
         )
+        with (
+            patch("app.ai_client.ask_ai", new=AsyncMock(return_value=ai_queries)),
+            patch("app.market_analysis.WildberriesParser.search", return_value=[]),
+        ):
+            response = await self.client.post(
+                f"/api/projects/{project_id}/market-analysis",
+                json={
+                    "query": "сегодня мы ищем чем выгодней торговать",
+                    "marketplace": "wildberries",
+                    "max_results": 5,
+                },
+            )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
