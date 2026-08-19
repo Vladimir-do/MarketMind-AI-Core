@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, Request, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.web.app import templates
 from app.web.image_urls import displayable_image_url
@@ -70,9 +70,11 @@ def _wants_html(request: Request) -> bool:
     return request.headers.get("HX-Request", "").lower() == "true"
 
 
-def _import_result_response(request: Request, result: ImportResult):
+def _import_result_response(request: Request, result: ImportResult, *, error: bool = False):
     if _wants_html(request):
         return templates.TemplateResponse(request, "import_result.html", {"result": result})
+    if error:
+        return JSONResponse(status_code=422, content=result.model_dump())
     return result
 
 
@@ -111,7 +113,7 @@ async def import_file(request: Request, file: UploadFile = File(...)):
             total_products=0,
             errors=1,
             message=f"Ошибка импорта: {exc}",
-        ))
+        ), error=True)
     finally:
         tmp.unlink(missing_ok=True)
 

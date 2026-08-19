@@ -1415,6 +1415,7 @@ async def cmd_export_csv(message: types.Message):
     try:
         await send_price_export(bot, db, message.chat.id, "csv")
     except Exception as e:
+        logger.exception("CSV export error")
         await message.answer(f"Export error: {e}")
 
 
@@ -1426,6 +1427,7 @@ async def cmd_export_excel(message: types.Message):
     try:
         await send_price_export(bot, db, message.chat.id, "excel")
     except Exception as e:
+        logger.exception("Excel export error")
         await message.answer(f"Export error: {e}")
 
 
