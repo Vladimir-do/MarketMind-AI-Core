@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,44 @@ logger = logging.getLogger(__name__)
 _MAX_PER_MARKETPLACE = 5
 _MAX_WB_REVIEWS_FETCHED = 3
 
+# Same class of bug as D31 (app/card_filler.py::_filter_relevant_competitors):
+# search_all_marketplaces() is a plain full-text search on the product's own
+# title -- a brand name that collides with an unrelated real product (e.g. a
+# niche brand matching a well-known cosmetics/appliance brand) returns
+# results from a completely different product category. Require at least one
+# shared word stem with the product's own title/category (brand words
+# excluded on both sides) before trusting a marketplace hit as an actual
+# competitor. This mirrors card_filler.py's algorithm, but operates on
+# ProductPassport/ProductData here instead of OzonCardDraft/dict -- unifying
+# the two into one shared utility is a separate, broader change, not part of
+# this fix.
+_COMPETITOR_STOP_WORDS = {
+    "для", "или", "без", "при", "под", "над", "товар", "шт", "набор",
+    "ozon", "wb", "wildberries", "черный", "белый",
+}
+
+
+def _product_type_stems(title: str, category: str | None, brand: str | None) -> set[str]:
+    brand_tokens = {w.lower()[:5] for w in re.findall(r"[A-Za-zА-Яа-яЁё]{2,}", brand or "")}
+    stems: set[str] = set()
+    for source in (title or "", category or ""):
+        for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", source.lower()):
+            if word in _COMPETITOR_STOP_WORDS or word.isdigit():
+                continue
+            stem = word[:5]
+            if stem in brand_tokens:
+                continue
+            stems.add(stem)
+    return stems
+
+
+def _is_relevant_competitor(product: object, type_stems: set[str]) -> bool:
+    if not type_stems:
+        return True
+    name = (getattr(product, "name", "") or "").lower()
+    comp_stems = {word[:5] for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", name)}
+    return bool(comp_stems & type_stems)
+
 
 class CompetitorAnalysisService:
     def __init__(self, db: Database) -> None:
@@ -41,6 +80,12 @@ class CompetitorAnalysisService:
         query = " ".join(passport.title.split())
 
         results = await search_all_marketplaces(query, max_per_site=_MAX_PER_MARKETPLACE)
+
+        type_stems = _product_type_stems(passport.title, passport.category, passport.brand)
+        results = {
+            marketplace: [p for p in products if _is_relevant_competitor(p, type_stems)]
+            for marketplace, products in results.items()
+        }
 
         wb_products = results.get("wildberries") or []
         if wb_products:

@@ -82,7 +82,7 @@ class CompetitorAnalysisRoutesTests(unittest.IsolatedAsyncioTestCase):
     async def test_full_refresh_then_get_competitors_and_job(self):
         search_results = {
             "wildberries": [
-                self._wb_product("WB Конкурент", "https://www.wildberries.ru/catalog/555666777/detail.aspx"),
+                self._wb_product("Термокружка WB конкурент", "https://www.wildberries.ru/catalog/555666777/detail.aspx"),
             ],
             "ozon": [],
         }

@@ -78,9 +78,9 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
 
         search_results = {
             "wildberries": [
-                self._wb_product("WB Конкурент 1", "https://www.wildberries.ru/catalog/111222333/detail.aspx"),
+                self._wb_product("Термокружка WB конкурент", "https://www.wildberries.ru/catalog/111222333/detail.aspx"),
             ],
-            "ozon": [self._ozon_product("Ozon Конкурент 1")],
+            "ozon": [self._ozon_product("Термокружка Ozon конкурент")],
         }
 
         with patch(
@@ -117,7 +117,7 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         from app.competitor_analysis.service import CompetitorAnalysisService
 
         wb_products = [
-            self._wb_product(f"WB {i}", f"https://www.wildberries.ru/catalog/{100000 + i}/detail.aspx")
+            self._wb_product(f"Термокружка WB {i}", f"https://www.wildberries.ru/catalog/{100000 + i}/detail.aspx")
             for i in range(5)
         ]
         search_results = {"wildberries": wb_products, "ozon": []}
@@ -139,7 +139,7 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
 
         with patch(
             "app.competitor_analysis.service.search_all_marketplaces",
-            new=AsyncMock(return_value={"wildberries": [], "ozon": [self._ozon_product("X")]}),
+            new=AsyncMock(return_value={"wildberries": [], "ozon": [self._ozon_product("Термокружка X")]}),
         ), patch(
             "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
             new=AsyncMock(return_value=["отзыв"]),
@@ -148,6 +148,37 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
             _, records = await service.refresh_competitors(self.project.project_id, self.product_id)
 
         mock_reviews.assert_not_awaited()
+        self.assertEqual(len(records), 1)
+
+    async def test_refresh_drops_brand_collision_but_keeps_relevant_competitor(self):
+        """Regression for COMPETITOR-UNFILTERED: search_all_marketplaces()
+        results were saved unfiltered -- a marketplace hit matching only the
+        product's brand name (not what the product actually is) could end
+        up saved as a "competitor" for a completely unrelated product,
+        exactly the class of bug already fixed once for card_filler.py
+        (D31). The product under test is "Термокружка Stanley 500 мл"
+        (brand Stanley); an unrelated "Stanley" product must be dropped,
+        while an actual thermal-mug competitor must be kept."""
+        from app.competitor_analysis.service import CompetitorAnalysisService
+
+        irrelevant = self._ozon_product("Отвертка Stanley набор 6 предметов")
+        relevant = self._wb_product(
+            "Термокружка Stanley Classic 470 мл", "https://www.wildberries.ru/catalog/222333444/detail.aspx"
+        )
+
+        with patch(
+            "app.competitor_analysis.service.search_all_marketplaces",
+            new=AsyncMock(return_value={"wildberries": [relevant], "ozon": [irrelevant]}),
+        ), patch(
+            "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
+            new=AsyncMock(return_value=[]),
+        ):
+            service = CompetitorAnalysisService(self.db)
+            _, records = await service.refresh_competitors(self.project.project_id, self.product_id)
+
+        names = {r.competitor_name for r in records}
+        self.assertIn("Термокружка Stanley Classic 470 мл", names)
+        self.assertNotIn("Отвертка Stanley набор 6 предметов", names)
         self.assertEqual(len(records), 1)
 
 
