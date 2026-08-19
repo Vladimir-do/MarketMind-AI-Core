@@ -135,7 +135,7 @@ async def _ask_groq(prompt: str, *, system: str, max_tokens: int) -> str:
             "Content-Type": "application/json",
         }
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},

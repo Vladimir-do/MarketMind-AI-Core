@@ -35,7 +35,7 @@ _PROVIDER_MODELS: dict[ProviderType, str] = {
     ProviderType.claude: "claude-3-haiku-20240307",
     ProviderType.grok: "grok-1",
     ProviderType.gemini: "gemini-2.5-flash",
-    ProviderType.groq: "llama-3.3-70b-versatile",
+    ProviderType.groq: "openai/gpt-oss-120b",
 }
 
 _PROVIDER_KEYS: dict[ProviderType, str] = {

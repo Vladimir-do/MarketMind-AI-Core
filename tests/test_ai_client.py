@@ -107,6 +107,96 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, "AI error: bad request")
 
+    async def test_ask_groq_uses_new_default_model_not_stale_llama(self):
+        """Regression for AI-MODEL-STALE: "llama-3.3-70b-versatile" was
+        retired by Groq (confirmed against console.groq.com/docs/models,
+        2026-08-19) and every real ask_ai() call with AI_PROVIDER=groq
+        started failing. Pin the new default and make sure the stale id is
+        gone."""
+
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def json(self, content_type=None):
+                return {"choices": [{"message": {"content": "ok"}}]}
+
+        class FakeSession:
+            posted_payloads: list[dict] = []
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            def post(self, *args, **kwargs):
+                FakeSession.posted_payloads.append(kwargs.get("json"))
+                return FakeResponse()
+
+        FakeSession.posted_payloads = []
+        with (
+            patch.object(ai_client, "GROQ_API_KEY", "groq-test"),
+            patch.object(ai_client.aiohttp, "ClientSession", FakeSession),
+            patch.dict("os.environ", {}, clear=False),
+        ):
+            import os as _os
+
+            _os.environ.pop("GROQ_MODEL", None)
+            result = await ai_client._ask_groq("hello", system="system", max_tokens=10)
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(len(FakeSession.posted_payloads), 1)
+        self.assertEqual(FakeSession.posted_payloads[0]["model"], "openai/gpt-oss-120b")
+        self.assertNotEqual(FakeSession.posted_payloads[0]["model"], "llama-3.3-70b-versatile")
+
+    async def test_ask_groq_respects_groq_model_env_override(self):
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def json(self, content_type=None):
+                return {"choices": [{"message": {"content": "ok"}}]}
+
+        class FakeSession:
+            posted_payloads: list[dict] = []
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            def post(self, *args, **kwargs):
+                FakeSession.posted_payloads.append(kwargs.get("json"))
+                return FakeResponse()
+
+        FakeSession.posted_payloads = []
+        with (
+            patch.object(ai_client, "GROQ_API_KEY", "groq-test"),
+            patch.object(ai_client.aiohttp, "ClientSession", FakeSession),
+            patch.dict("os.environ", {"GROQ_MODEL": "some-future-model"}),
+        ):
+            await ai_client._ask_groq("hello", system="system", max_tokens=10)
+
+        self.assertEqual(FakeSession.posted_payloads[0]["model"], "some-future-model")
+
     async def test_gemini_http_429_returns_quota_message(self):
         body = (
             '{"error":{"code":429,"message":"Quota exceeded for metric: '

@@ -197,6 +197,15 @@ class TestFactory(unittest.TestCase):
         p = create_configured_provider()
         self.assertEqual(p._model, "mistral")
 
+    @patch.dict("os.environ", {"AI_PROVIDER": "groq", "GROQ_API_KEY": "gsk-test"})
+    def test_create_configured_provider_groq_default_model_is_not_stale(self):
+        """Regression for AI-MODEL-STALE: "llama-3.3-70b-versatile" was
+        retired by Groq (confirmed against console.groq.com/docs/models,
+        2026-08-19). The factory's default must not resolve to it."""
+        p = create_configured_provider()
+        self.assertEqual(p._model, "openai/gpt-oss-120b")
+        self.assertNotEqual(p._model, "llama-3.3-70b-versatile")
+
     @patch.dict("os.environ", {"AI_PROVIDER": "claude", "ANTHROPIC_API_KEY": "sk-ant-test"})
     def test_create_configured_provider_claude_is_available(self):
         """Regression test: ProviderType.claude previously had no base_url in
