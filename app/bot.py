@@ -164,6 +164,26 @@ from app.worker import worker_add_urls, worker_update_all
 bot: Bot | None = None
 dp = Dispatcher(storage=MemoryStorage())
 
+
+@dp.errors()
+async def handle_unhandled_error(event: types.ErrorEvent) -> bool:
+    """Last-resort safety net: without this, aiogram's own dispatcher loop
+    swallows any exception a handler doesn't catch itself (logs it, sends
+    nothing to the user — see loggers.event.exception in aiogram's
+    Dispatcher._process_update). The user is left with no response at all,
+    looking as if the bot ignored the command."""
+    logger.error(
+        "Unhandled exception in Telegram handler: %r", event.exception, exc_info=event.exception
+    )
+    message = getattr(event.update, "message", None)
+    if message is not None:
+        try:
+            await message.answer("⚠️ Произошла ошибка при обработке команды. Попробуйте ещё раз позже.")
+        except Exception as e:
+            logger.error(f"failed to notify user about handler error: {e}")
+    return True
+
+
 db = Database()
 agent = PriceAgent(db)
 telegram_read_service = TelegramReadService(db)
@@ -1021,7 +1041,7 @@ async def cmd_analyze(message: types.Message):
         return
     await message.answer(_h_analyzing())
     analysis = await agent.analyze_portfolio()
-    await message.answer(f"<b>AI-анализ портфеля:</b>\n\n{analysis}", parse_mode="HTML")
+    await message.answer(f"<b>AI-анализ портфеля:</b>\n\n{html.escape(analysis)}", parse_mode="HTML")
 
 
 # ── /deals — лучшие сделки ────────────────────────────────────────────────────
@@ -1041,7 +1061,7 @@ async def cmd_deals(message: types.Message):
     lines = ["💎 <b>Лучшие сделки (минимум цены за 30 дней):</b>\n"]
     for d in deals:
         lines.append(
-            f"🔥 <a href='{d['url']}'>{d['name'][:55]}</a>\n"
+            f"🔥 <a href='{d['url']}'>{html.escape(d['name'][:55])}</a>\n"
             f"   💰 {d['current_price']} ₽ (было {d['max_price']} ₽, "
             f"экономия {d['savings']} ₽ / {d['savings_pct']}%)\n"
         )
@@ -1062,7 +1082,7 @@ async def cmd_anomalies(message: types.Message):
     lines = [f"⚠️ <b>Резкие изменения цен ({len(anomalies)} товаров):</b>\n"]
     for a in anomalies:
         lines.append(
-            f"{a['direction']} <a href='{a['url']}'>{a['name'][:55]}</a>\n"
+            f"{a['direction']} <a href='{a['url']}'>{html.escape(a['name'][:55])}</a>\n"
             f"   {a['old_price']} ₽ → {a['new_price']} ₽ ({a['change_pct']}%)\n"
         )
 
@@ -1074,7 +1094,7 @@ async def cmd_anomalies(message: types.Message):
             f"Дай краткий комментарий — это распродажа, накрутка или что-то другое? "
             f"Что посоветуешь покупателю?"
         )
-        lines.append(f"\n🤖 <b>AI говорит:</b>\n{ai_comment}")
+        lines.append(f"\n🤖 <b>AI говорит:</b>\n{html.escape(ai_comment)}")
 
     await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
 

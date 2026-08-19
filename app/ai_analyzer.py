@@ -2,6 +2,7 @@
 ai_analyzer.py — глубокий AI анализ с прогнозом цен.
 Использует статистику + Claude для умных выводов.
 """
+import html
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import desc, select
@@ -218,17 +219,17 @@ class DeepAnalyzer:
         if deals:
             lines.append("💎 <b>Лучшие сделки:</b>")
             for d in deals[:3]:
-                lines.append(f"  🔥 {d['name']}: {d['price']} ₽ (-{d['saving_pct']}% от макс)")
+                lines.append(f"  🔥 {html.escape(d['name'])}: {d['price']} ₽ (-{d['saving_pct']}% от макс)")
 
         if falling:
             lines.append("\n📉 <b>Цена падает (выгодно ждать):</b>")
             for f in falling[:3]:
-                lines.append(f"  ↘️ {f['name']}: {f['price']} ₽ ({f['trend']:+.1f}%)")
+                lines.append(f"  ↘️ {html.escape(f['name'])}: {f['price']} ₽ ({f['trend']:+.1f}%)")
 
         if rising:
             lines.append("\n📈 <b>Цена растёт (берите сейчас):</b>")
             for r in rising[:3]:
-                lines.append(f"  ↗️ {r['name']}: {r['price']} ₽ ({r['trend']:+.1f}%)")
+                lines.append(f"  ↗️ {html.escape(r['name'])}: {r['price']} ₽ ({r['trend']:+.1f}%)")
 
         # AI финальный комментарий
         summary_data = f"{len(deals)} сделок, {len(falling)} падают, {len(rising)} растут"
@@ -236,7 +237,7 @@ class DeepAnalyzer:
             f"Краткий рыночный комментарий: {summary_data} из {len(products)} товаров. "
             f"1-2 предложения что интересного происходит на рынке."
         )
-        lines.append(f"\n🤖 {ai_comment}")
+        lines.append(f"\n🤖 {html.escape(ai_comment)}")
 
         return "\n".join(lines)
 
