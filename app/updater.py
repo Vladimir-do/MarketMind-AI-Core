@@ -1009,15 +1009,17 @@ class OzonUpdater:
 
         for i, product in enumerate(products, 1):
             logger.info(f"[{i}/{len(products)}] {product.name}")
+            failure: Exception | None = None
             try:
                 data = await self.process_url(product.url, product_id=product.id)
             except Exception as e:
                 # A single product's browser/session failure (e.g. Playwright
-                # crashed) must not abort the rest of the batch -- fall back
-                # to the existing "no data" handling below instead of
-                # letting the exception propagate out of update_all() and
-                # silently drop every remaining product in this run.
-                logger.error(f"update_all: ошибка на {product.url}: {e}")
+                # crashed) must not abort the rest of the batch -- but it must
+                # not be recorded as "Ozon blocked" either: a local error is
+                # not a marketplace cooldown, and writing availability_status
+                # "blocked" for it would corrupt price history (analytics,
+                # deals, timeline all treat "blocked" as a real data point).
+                failure = e
                 data = None
 
             if data:
@@ -1033,6 +1035,12 @@ class OzonUpdater:
                 if callback:
                     icon = "✅" if data["availability"] == "in_stock" else "❌"
                     await callback(f"{icon} {data['name'][:50]}: {data['price']} ₽")
+            elif failure is not None:
+                # No data was returned because the fetch itself blew up --
+                # report it, skip this product, and leave its history alone.
+                logger.error(f"update_all: ошибка на {product.url}: {failure}")
+                if callback:
+                    await callback(f"⚠️ Ошибка при обновлении {product.name[:50]}: {type(failure).__name__}")
             else:
                 last = await self.db.get_last_price(product.id)
                 if not last or last.availability_status != "blocked":

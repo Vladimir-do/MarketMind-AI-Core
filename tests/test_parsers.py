@@ -899,6 +899,7 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         remaining products instead of letting the whole run silently drop
         to 0 updated."""
         callbacks = []
+        added_history = []
         product_failing = SimpleNamespace(
             id=1,
             name="Crashes during fetch",
@@ -918,7 +919,7 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
                 return None
 
             def add(self, row):
-                pass
+                added_history.append(row)
 
             async def commit(self):
                 return None
@@ -958,3 +959,8 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(changes), 1)
         self.assertEqual(changes[0]["name"], "Works fine")
         self.assertTrue(any("Works fine" in text for text in callbacks))
+
+        # A local fetch error is not a marketplace cooldown: no
+        # availability_status="blocked" row may be written for it.
+        self.assertEqual(added_history, [])
+        self.assertTrue(any("Ошибка при обновлении" in text for text in callbacks))
