@@ -4,7 +4,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-
 WB_CARD_URL = os.getenv(
     "WB_CARD_URL",
     "https://card.wb.ru/cards/v2/detail",

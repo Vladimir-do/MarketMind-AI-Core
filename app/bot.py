@@ -718,7 +718,7 @@ async def _auto_generate_blocked_ozon_cards(message: types.Message, urls: list[s
                 get_active_profile=get_active_profile,
             )
             generated += 1
-        except Exception as exc:
+        except Exception:
             logger.exception("Automatic card generation failed for blocked Ozon URL: %s", url)
             await message.answer(
                 "⚠️ Черновик товара сохранён, но автоматически сформировать файлы не удалось. "

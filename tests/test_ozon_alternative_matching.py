@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from app.parsers.alt_sources import (
     find_ozon_alternative_candidates,
     score_alternative_product_match,

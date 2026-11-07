@@ -245,7 +245,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
         class CapturingSession(_FakeGeminiSession):
             def __init__(self, *args, **kwargs):
                 captured["headers"] = kwargs.get("headers", {})
-                super().__init__(response=response, *args, **kwargs)
+                super().__init__(*args, response=response, **kwargs)
 
             def post(self, *args, **kwargs):
                 captured["url"] = args[0]

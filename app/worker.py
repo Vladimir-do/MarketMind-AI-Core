@@ -10,9 +10,9 @@ from app.parsers.router import MARKETPLACE_EMOJI, detect_marketplace
 from app.parsers.wildberries import WildberriesParser
 from app.parsers.yandex_market import YandexMarketParser
 from app.resilience import resilience
+from app.telegram_card_tasks import build_card_task_from_url, extract_ozon_product_identity
 from app.updater import OzonUpdater, _recommend_strategy
 from app.utils.error_research import research_parse_failure
-from app.telegram_card_tasks import build_card_task_from_url, extract_ozon_product_identity
 
 MAX_CONCURRENT_UPDATES = 3
 

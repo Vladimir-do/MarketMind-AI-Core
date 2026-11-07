@@ -124,6 +124,7 @@ class BotHelperTests(unittest.TestCase):
 
     def test_blocked_ozon_url_automatically_starts_card_generation(self):
         from types import SimpleNamespace
+
         import app.bot as bot_module
 
         class FakeMessage:
@@ -158,6 +159,7 @@ class BotHelperTests(unittest.TestCase):
 
     def test_auto_card_generation_skips_successfully_parsed_ozon_product(self):
         from types import SimpleNamespace
+
         import app.bot as bot_module
 
         async def run():

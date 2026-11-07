@@ -11,7 +11,6 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
 SKIP_DIRS = {
     ".git",
     ".idea",
