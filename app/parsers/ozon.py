@@ -188,6 +188,9 @@ class OzonParser(BaseParser):
                 availability=api_data["availability"],
                 url=url,
                 image_url=api_data.get("image_url"),
+                rating=api_data.get("rating"),
+                reviews_count=api_data.get("reviews_count"),
+                reviews=api_data.get("reviews") or [],
                 marketplace="ozon",
             )
 

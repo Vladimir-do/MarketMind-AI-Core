@@ -629,6 +629,28 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(data["availability"], "unknown")
         self.assertEqual(data["image_url"], "https://cdn.example/img.webp")
 
+    def test_ozon_api_json_parser_extracts_explicit_review_signals(self):
+        payload = {
+            "widgetStates": {
+                "webProductHeading": '{"title": "Car Phone Holder"}',
+                "webPrice": '{"price": "1 299 ₽"}',
+                "webReviewSummary": '{"aggregateRating": {"ratingValue": "4.8", "reviewCount": "153"}, "reviews": [{"text": "Крепкий держатель"}, {"text": "Удобно пользоваться"}]}',
+            },
+        }
+        data = parse_ozon_api_json(payload, "https://www.ozon.ru/product/test")
+        self.assertEqual(data["rating"], 4.8)
+        self.assertEqual(data["reviews_count"], 153)
+        self.assertEqual(data["reviews"], ["Крепкий держатель", "Удобно пользоваться"])
+
+    def test_ozon_api_json_parser_does_not_invent_missing_review_signals(self):
+        data = parse_ozon_api_json(
+            {"widgetStates": {"webProductHeading": '{"title": "Car Phone Holder"}'}},
+            "https://www.ozon.ru/product/test",
+        )
+        self.assertIsNone(data["rating"])
+        self.assertIsNone(data["reviews_count"])
+        self.assertEqual(data["reviews"], [])
+
     def test_mcp_product_payload_normalizer(self):
         data = normalize_mcp_product_payload(
             {

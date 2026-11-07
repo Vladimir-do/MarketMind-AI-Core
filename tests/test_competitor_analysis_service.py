@@ -134,6 +134,41 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(mock_reviews.await_count, 3)  # _MAX_WB_REVIEWS_FETCHED
 
+    async def test_ozon_review_signals_are_enriched_for_top_competitors(self):
+        from app.competitor_analysis.service import CompetitorAnalysisService
+
+        ozon_products = [self._ozon_product(f"Термокружка Ozon {i}") for i in range(3)]
+        search_results = {"wildberries": [], "ozon": ozon_products, "yandex_market": []}
+        api_payload = {
+            "name": "Термокружка",
+            "price": 1100,
+            "availability": "unknown",
+            "rating": 4.8,
+            "reviews_count": 153,
+            "reviews": ["Хорошо держит тепло", "Удобная крышка"],
+        }
+
+        with patch(
+            "app.competitor_analysis.service.search_all_marketplaces",
+            new=AsyncMock(return_value=search_results),
+        ), patch(
+            "app.parsers.ozon.OzonParser._fetch_api_data",
+            new=AsyncMock(return_value=api_payload),
+        ) as mock_api:
+            service = CompetitorAnalysisService(self.db)
+            _, records = await service.refresh_competitors(self.project.project_id, self.product_id)
+
+        self.assertEqual(mock_api.await_count, 2)
+        ozon_records = [r for r in records if r.marketplace == "ozon"]
+        self.assertEqual(ozon_records[0].rating, 4.8)
+        self.assertEqual(ozon_records[0].reviews_count, 153)
+        self.assertEqual(
+            self.store.reviews_of(ozon_records[0]),
+            ["Хорошо держит тепло", "Удобная крышка"],
+        )
+        self.assertIsNone(ozon_records[2].rating)
+        self.assertEqual(self.store.reviews_of(ozon_records[2]), [])
+
     async def test_no_wb_results_skips_review_fetch(self):
         from app.competitor_analysis.service import CompetitorAnalysisService
 

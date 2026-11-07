@@ -181,12 +181,60 @@ def _iter_json_values(value):
                 return
 
 
+def _ozon_review_signals(payload: dict, *, limit: int = 20) -> dict:
+    """Extract only explicit review text and aggregate rating signals from Ozon JSON."""
+    rating = None
+    reviews_count = None
+    reviews: list[str] = []
+    seen: set[str] = set()
+    review_container_keys = {"review", "reviews", "feedbacks", "reviewList", "reviewsList"}
+    review_text_keys = ("reviewBody", "reviewText", "text", "content", "comment", "message")
+
+    for node in _iter_json_values(payload):
+        for key, value in node.items():
+            if key in {"aggregateRating", "ratingSummary", "rating"} and isinstance(value, dict):
+                raw_rating = value.get("ratingValue", value.get("average", value.get("value")))
+                try:
+                    candidate = float(str(raw_rating).replace(",", "."))
+                except (TypeError, ValueError):
+                    candidate = None
+                if candidate is not None and 0 <= candidate <= 5:
+                    rating = candidate
+                for count_key in ("reviewCount", "ratingCount", "count", "total"):
+                    try:
+                        count = int(str(value.get(count_key)).replace(" ", "").replace("\u00a0", ""))
+                    except (TypeError, ValueError):
+                        continue
+                    if count >= 0:
+                        reviews_count = count
+                        break
+            if key not in review_container_keys:
+                continue
+            entries = value if isinstance(value, list) else [value]
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                body = next((entry.get(text_key) for text_key in review_text_keys
+                             if isinstance(entry.get(text_key), str) and entry.get(text_key).strip()), None)
+                if body:
+                    clean = re.sub(r"\s+", " ", body).strip()
+                    if clean and clean.casefold() not in seen:
+                        seen.add(clean.casefold())
+                        reviews.append(clean[:2000])
+                        if len(reviews) >= limit:
+                            break
+        if len(reviews) >= limit:
+            break
+    return {"rating": rating, "reviews_count": reviews_count, "reviews": reviews}
+
+
 def parse_ozon_api_json(payload: dict, url: str) -> dict | None:
     """Извлекает карточку из JSON-ответов Ozon composer/entrypoint API."""
     name_candidates = []
     price = None
     image_url = None
     out_of_stock = False
+    review_signals = _ozon_review_signals(payload)
 
     name_keys = {"name", "title", "productName", "nameText"}
     price_keys = {"price", "finalPrice", "cardPrice", "currentPrice", "priceWithCard"}
@@ -235,7 +283,13 @@ def parse_ozon_api_json(payload: dict, url: str) -> dict | None:
     # A price alone does not prove stock availability. Only explicit stock
     # signals should produce in_stock/out_of_stock; otherwise preserve unknown.
     availability = "out_of_stock" if out_of_stock else "unknown"
-    return {"name": name, "price": price, "availability": availability, "image_url": image_url}
+    return {
+        "name": name,
+        "price": price,
+        "availability": availability,
+        "image_url": image_url,
+        **review_signals,
+    }
 
 
 def _detect_ozon_html_availability(soup: BeautifulSoup, price: int | None) -> str:
