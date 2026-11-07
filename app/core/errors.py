@@ -19,4 +19,3 @@ class ParseError(ScraperError):
 
 class NetworkError(ScraperError):
     """Network/transport error."""
-

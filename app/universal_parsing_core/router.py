@@ -31,9 +31,7 @@ class Router:
         supports_js: bool = False,
     ) -> None:
         registrations = self._parsers.setdefault(task_type, [])
-        registrations.append(
-            ParserRegistration(parser=parser, priority=priority, supports_js=supports_js)
-        )
+        registrations.append(ParserRegistration(parser=parser, priority=priority, supports_js=supports_js))
         registrations.sort(key=lambda item: item.priority)
 
     def parse(

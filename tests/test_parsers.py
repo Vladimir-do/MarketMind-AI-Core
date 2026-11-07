@@ -379,6 +379,7 @@ class ParserTests(unittest.TestCase):
 
             async def text(self):
                 import json
+
                 return json.dumps(payload, ensure_ascii=False)
 
         class FakeSession:
@@ -426,17 +427,19 @@ class ParserTests(unittest.TestCase):
             async def text(self):
                 import json
 
-                return json.dumps({
-                    "data": {
-                        "products": [
-                            {
-                                "id": 123456789,
-                                "name": "Органайзер для проводов",
-                                "sizes": [{"price": {"product": 50000}}],
-                            }
-                        ]
+                return json.dumps(
+                    {
+                        "data": {
+                            "products": [
+                                {
+                                    "id": 123456789,
+                                    "name": "Органайзер для проводов",
+                                    "sizes": [{"price": {"product": 50000}}],
+                                }
+                            ]
+                        }
                     }
-                })
+                )
 
         class FakeSession:
             def __init__(self, *args, **kwargs):
@@ -759,13 +762,15 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
             patch.dict("os.environ", {"OZON_SKIP_BROWSER_AFTER_API_BLOCK": "1"}, clear=True),
             patch(
                 "app.parsers.ozon.fetch_from_alt_sources",
-                AsyncMock(return_value={
-                    "name": "MCP Product",
-                    "price": 1299,
-                    "availability": "in_stock",
-                    "image_url": "https://cdn.example/image.webp",
-                    "brand": "MCPBrand",
-                }),
+                AsyncMock(
+                    return_value={
+                        "name": "MCP Product",
+                        "price": 1299,
+                        "availability": "in_stock",
+                        "image_url": "https://cdn.example/image.webp",
+                        "brand": "MCPBrand",
+                    }
+                ),
             ),
         ):
             data = await parser.fetch_product("https://www.ozon.ru/product/test")
@@ -881,12 +886,14 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
             patch.dict("os.environ", {"OZON_SKIP_BROWSER_AFTER_API_BLOCK": "1"}, clear=True),
             patch(
                 "app.updater.fetch_from_alt_sources",
-                AsyncMock(return_value={
-                    "name": "MCP Product",
-                    "price": 1299,
-                    "availability": "in_stock",
-                    "image_url": "https://cdn.example/image.webp",
-                }),
+                AsyncMock(
+                    return_value={
+                        "name": "MCP Product",
+                        "price": 1299,
+                        "availability": "in_stock",
+                        "image_url": "https://cdn.example/image.webp",
+                    }
+                ),
             ),
         ):
             data = await updater.process_url("https://www.ozon.ru/product/test")
@@ -929,12 +936,14 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         updater = FakeUpdater()
         with patch(
             "app.updater.fetch_from_alt_sources",
-            AsyncMock(return_value={
-                "name": "MCP Product",
-                "price": 1299,
-                "availability": "in_stock",
-                "image_url": "https://cdn.example/image.webp",
-            }),
+            AsyncMock(
+                return_value={
+                    "name": "MCP Product",
+                    "price": 1299,
+                    "availability": "in_stock",
+                    "image_url": "https://cdn.example/image.webp",
+                }
+            ),
         ):
             data = await updater.process_url("https://www.ozon.ru/product/test")
 
@@ -1043,12 +1052,14 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         updater = FakeUpdater()
         with patch(
             "app.updater.fetch_from_alt_sources",
-            AsyncMock(return_value={
-                "name": "MCP Product",
-                "price": 1299,
-                "availability": "in_stock",
-                "image_url": "https://cdn.example/image.webp",
-            }),
+            AsyncMock(
+                return_value={
+                    "name": "MCP Product",
+                    "price": 1299,
+                    "availability": "in_stock",
+                    "image_url": "https://cdn.example/image.webp",
+                }
+            ),
         ):
             data = await updater.process_url("https://www.ozon.ru/product/test")
 

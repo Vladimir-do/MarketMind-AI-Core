@@ -2,6 +2,7 @@
 """
 ozon.py — парсер Озон через Playwright (ninja-режим).
 """
+
 import asyncio
 import contextlib
 import json
@@ -54,11 +55,13 @@ class OzonParser(BaseParser):
 
     async def start(self):
         from playwright.async_api import async_playwright
+
         self._pw = await async_playwright().start()
         launch_args = {
             "headless": True,
             "args": [
-                "--no-sandbox", "--disable-dev-shm-usage",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
                 "--disable-blink-features=AutomationControlled",
                 "--lang=ru-RU",
             ],
@@ -170,8 +173,8 @@ class OzonParser(BaseParser):
                             continue
                         return html
                     except Exception as e:
-                        logger.warning(f"Ozon попытка {attempt+1}: {e}")
-                        base_delay = 5 * (2 ** attempt)
+                        logger.warning(f"Ozon попытка {attempt + 1}: {e}")
+                        base_delay = 5 * (2**attempt)
                         await asyncio.sleep(random.uniform(base_delay, base_delay * 2))
                 return None
             finally:
@@ -253,11 +256,17 @@ class OzonParser(BaseParser):
 
     async def search(self, query: str, max_results: int = 5) -> list[ProductData]:
         from app.searcher import search_ozon
+
         raw = await search_ozon(query, max_results)
         return [
             ProductData(
-                name=r["name"], price=r["price"], old_price=None, discount_pct=None,
-                availability="in_stock", url=r["url"], image_url=r.get("image_url"),
+                name=r["name"],
+                price=r["price"],
+                old_price=None,
+                discount_pct=None,
+                availability="in_stock",
+                url=r["url"],
+                image_url=r.get("image_url"),
                 marketplace="ozon",
             )
             for r in raw

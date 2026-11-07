@@ -32,19 +32,25 @@ def handler(event, context):
     try:
         product_id = _get_product_id(event)
         if not product_id:
-            return _response(400, {
-                "error": "product_id is required",
-                "accepted_keys": list(PRODUCT_ID_KEYS),
-            })
+            return _response(
+                400,
+                {
+                    "error": "product_id is required",
+                    "accepted_keys": list(PRODUCT_ID_KEYS),
+                },
+            )
 
         payload = _fetch_wb_card(product_id)
         products = payload.get("data", {}).get("products") or payload.get("products") or []
         if not products:
-            return _response(404, {
-                "error": "product not found",
-                "product_id": product_id,
-                "wb_response": payload,
-            })
+            return _response(
+                404,
+                {
+                    "error": "product not found",
+                    "product_id": product_id,
+                    "wb_response": payload,
+                },
+            )
         return _response(200, payload)
     except urllib.error.HTTPError as e:
         return _response(e.code, {"error": e.reason})
@@ -72,6 +78,7 @@ def _get_product_id(event):
 
     if event.get("isBase64Encoded"):
         import base64
+
         body = base64.b64decode(body).decode("utf-8")
 
     if isinstance(body, str):
@@ -100,13 +107,15 @@ def _get_from_mapping(mapping):
 
 
 def _fetch_wb_card(product_id):
-    query = urllib.parse.urlencode({
-        "appType": 1,
-        "curr": "rub",
-        "dest": -1257786,
-        "spp": 30,
-        "nm": product_id,
-    })
+    query = urllib.parse.urlencode(
+        {
+            "appType": 1,
+            "curr": "rub",
+            "dest": -1257786,
+            "spp": 30,
+            "nm": product_id,
+        }
+    )
     errors = []
     for base_url in _wb_api_urls():
         url = f"{base_url}?{query}"

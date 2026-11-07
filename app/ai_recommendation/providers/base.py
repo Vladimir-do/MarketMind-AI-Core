@@ -36,12 +36,10 @@ class BaseAIProvider(ABC):
         system: str = "",
         max_tokens: int = 2048,
         temperature: float = 0.3,
-    ) -> AIResponse:
-        ...
+    ) -> AIResponse: ...
 
     @abstractmethod
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
     def _create_error_response(
         self,

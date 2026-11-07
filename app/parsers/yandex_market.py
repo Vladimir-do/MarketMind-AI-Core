@@ -92,22 +92,24 @@ def parse_yandex_market_search_html(html: str, max_results: int = 5) -> list[Pro
         image_url = _image_from_json(node)
         if image_url:
             image_url = urljoin("https://market.yandex.ru/", image_url)
-        products.append(ProductData(
-            name=name,
-            price=price,
-            old_price=None,
-            discount_pct=None,
-            availability=_availability_from_offer(offer, "", price),
-            url=product_url,
-            image_url=image_url,
-            rating=_rating_from_json(node),
-            reviews_count=_reviews_count_from_json(node),
-            seller_name=_seller_from_offer(offer),
-            brand=_brand_from_json(node),
-            category=_category_from_json(node),
-            marketplace="yandex_market",
-            reviews=_reviews_from_json(node),
-        ))
+        products.append(
+            ProductData(
+                name=name,
+                price=price,
+                old_price=None,
+                discount_pct=None,
+                availability=_availability_from_offer(offer, "", price),
+                url=product_url,
+                image_url=image_url,
+                rating=_rating_from_json(node),
+                reviews_count=_reviews_count_from_json(node),
+                seller_name=_seller_from_offer(offer),
+                brand=_brand_from_json(node),
+                category=_category_from_json(node),
+                marketplace="yandex_market",
+                reviews=_reviews_from_json(node),
+            )
+        )
         if len(products) >= max_results:
             break
     return products
@@ -161,7 +163,7 @@ class YandexMarketParser(BaseParser):
                     html = "" if retry_server_error else await response.text(errors="replace")
 
                 if retry_server_error:
-                    delay = RETRY_BASE_DELAY_SECONDS * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY_SECONDS * (2**attempt)
                     logger.warning(
                         "Yandex Market temporary server error: "
                         f"status={status_code}, attempt={attempt + 1}/{MAX_FETCH_ATTEMPTS}; "
@@ -211,7 +213,7 @@ class YandexMarketParser(BaseParser):
             except (TimeoutError, aiohttp.ClientError) as exc:
                 latency_ms = int((perf_counter() - attempt_started) * 1000)
                 if attempt + 1 < MAX_FETCH_ATTEMPTS:
-                    delay = RETRY_BASE_DELAY_SECONDS * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY_SECONDS * (2**attempt)
                     logger.warning(
                         "Yandex Market temporary network error: "
                         f"{type(exc).__name__}, attempt={attempt + 1}/{MAX_FETCH_ATTEMPTS}; "
@@ -271,10 +273,14 @@ class YandexMarketParser(BaseParser):
             latency_ms = int((perf_counter() - started) * 1000)
             if status in {403, 429}:
                 logger.warning(f"Yandex Market search blocked: status={status} query={query!r}")
-                await self._record_attempt(url=url, source="search_jsonld", status="blocked", http_status=status, latency_ms=latency_ms)
+                await self._record_attempt(
+                    url=url, source="search_jsonld", status="blocked", http_status=status, latency_ms=latency_ms
+                )
                 return []
             if status >= 400:
-                await self._record_attempt(url=url, source="search_jsonld", status="http_error", http_status=status, latency_ms=latency_ms)
+                await self._record_attempt(
+                    url=url, source="search_jsonld", status="http_error", http_status=status, latency_ms=latency_ms
+                )
                 return []
             results = parse_yandex_market_search_html(html, max_results=max_results)
             await self._record_attempt(
@@ -288,11 +294,23 @@ class YandexMarketParser(BaseParser):
             return results
         except (TimeoutError, aiohttp.ClientError) as exc:
             logger.warning(f"Yandex Market search network error: {type(exc).__name__}: {exc}")
-            await self._record_attempt(url=url, source="search_jsonld", status="error", latency_ms=int((perf_counter() - started) * 1000), error=exc)
+            await self._record_attempt(
+                url=url,
+                source="search_jsonld",
+                status="error",
+                latency_ms=int((perf_counter() - started) * 1000),
+                error=exc,
+            )
             return []
         except Exception as exc:
             logger.warning(f"Yandex Market search parse error: {type(exc).__name__}: {exc}")
-            await self._record_attempt(url=url, source="search_jsonld", status="error", latency_ms=int((perf_counter() - started) * 1000), error=exc)
+            await self._record_attempt(
+                url=url,
+                source="search_jsonld",
+                status="error",
+                latency_ms=int((perf_counter() - started) * 1000),
+                error=exc,
+            )
             return []
 
 

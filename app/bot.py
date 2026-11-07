@@ -172,9 +172,7 @@ async def handle_unhandled_error(event: types.ErrorEvent) -> bool:
     nothing to the user — see loggers.event.exception in aiogram's
     Dispatcher._process_update). The user is left with no response at all,
     looking as if the bot ignored the command."""
-    logger.error(
-        "Unhandled exception in Telegram handler: %r", event.exception, exc_info=event.exception
-    )
+    logger.error("Unhandled exception in Telegram handler: %r", event.exception, exc_info=event.exception)
     message = getattr(event.update, "message", None)
     if message is not None:
         try:
@@ -198,7 +196,7 @@ task_planner = TaskPlanner()
 
 # ── FSM ───────────────────────────────────────────────────────────────────────
 class Form(StatesGroup):
-    waiting_urls   = State()
+    waiting_urls = State()
     waiting_search = State()
     waiting_search_results = State()  # ожидание выбора из результатов поиска
     waiting_compare = State()
@@ -247,7 +245,6 @@ def get_chat_context(chat_id: int) -> ContextSession:
 # Scraping functions extracted to app.telegram_scraping
 
 
-
 # Conversation patterns imported from app.telegram_conversation
 
 
@@ -281,7 +278,9 @@ def parse_natural_request(
     if _is_meta_task_instruction(raw) and not urls:
         return "task_instruction", raw
 
-    if re.search(r"\b(обнови|обновить|проверь|проверить|перепроверь)\b", low) and re.search(r"\b(цен|цены|товар|товары|прайс)\b", low):
+    if re.search(r"\b(обнови|обновить|проверь|проверить|перепроверь)\b", low) and re.search(
+        r"\b(цен|цены|товар|товары|прайс)\b", low
+    ):
         return "update", None
 
     if re.search(r"\b(список|покажи товары|что отслеж|отслеживаем)\b", low):
@@ -447,10 +446,7 @@ async def handle_funpay_offer_search(message: types.Message, url: str):
         lines = [f"🛍 <b>Найдено {len(results)} товаров на Ozon:</b>\n"]
         for i, result in enumerate(results, 1):
             price_str = f"{result['price']} ₽" if result.get("price") else "цена не определена"
-            lines.append(
-                f"{i}. <a href='{result['url']}'>{html.escape(result['name'][:60])}</a>\n"
-                f"   💰 {price_str}"
-            )
+            lines.append(f"{i}. <a href='{result['url']}'>{html.escape(result['name'][:60])}</a>\n   💰 {price_str}")
         lines.append("\n💡 Чтобы добавить найденный товар в мониторинг, используйте /add и ссылку Ozon.")
         await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
     except Exception:
@@ -602,12 +598,14 @@ async def cmd_health(message: types.Message):
         health = await db.get_marketplace_health(marketplace)
         decision = await db.recommend_scrape_strategy(marketplace)
         circuit_left = resilience.cooldown_remaining(marketplace)
-        items.append({
-            "marketplace": marketplace,
-            "health": health,
-            "decision": decision,
-            "circuit_left": circuit_left,
-        })
+        items.append(
+            {
+                "marketplace": marketplace,
+                "health": health,
+                "decision": decision,
+                "circuit_left": circuit_left,
+            }
+        )
     await message.answer(format_marketplace_health(items), parse_mode="HTML", disable_web_page_preview=True)
 
 
@@ -631,8 +629,7 @@ async def cmd_profile(message: types.Message):
 
     if raw not in profiles:
         return await message.answer(
-            f"❌ Профиль <b>{raw}</b> не найден.\n"
-            f"Доступно: {', '.join(profiles)}",
+            f"❌ Профиль <b>{raw}</b> не найден.\nДоступно: {', '.join(profiles)}",
             parse_mode="HTML",
         )
 
@@ -650,17 +647,16 @@ async def cmd_profile(message: types.Message):
 async def cmd_skills_graph(message: types.Message):
     if not await ensure_allowed(message):
         return
-    mermaid = task_planner.registry.graph.to_mermaid([
-        "scraping.website",
-        "market.search",
-        "ozon.card.generate",
-        "batch.cards",
-    ])
+    mermaid = task_planner.registry.graph.to_mermaid(
+        [
+            "scraping.website",
+            "market.search",
+            "ozon.card.generate",
+            "batch.cards",
+        ]
+    )
     await message.answer(
-        "<b>Skill graph</b>\n"
-        "<pre><code class=\"language-mermaid\">"
-        f"{html.escape(mermaid)}"
-        "</code></pre>",
+        f'<b>Skill graph</b>\n<pre><code class="language-mermaid">{html.escape(mermaid)}</code></pre>',
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
@@ -755,8 +751,7 @@ async def handle_urls(message: types.Message, state: FSMContext):
         latest = await db.get_latest_product()
         if latest:
             await message.answer(
-                "✅ Товар добавлен в мониторинг.\n"
-                "Чтобы сразу собрать карточку товара, отправьте /make_card_last"
+                "✅ Товар добавлен в мониторинг.\nЧтобы сразу собрать карточку товара, отправьте /make_card_last"
             )
 
 
@@ -825,9 +820,7 @@ async def run_search_query(message: types.Message, state: FSMContext, query: str
         results = await search_ozon(query, max_results=5)
         if not results:
             blocked_message = ozon_search_blocked_message()
-            await message.answer(
-                "🔁 На Ozon сейчас пусто или поиск недоступен. Сразу проверяю другие маркетплейсы..."
-            )
+            await message.answer("🔁 На Ozon сейчас пусто или поиск недоступен. Сразу проверяю другие маркетплейсы...")
             all_results = await search_all_marketplaces(
                 query,
                 max_per_site=5,
@@ -855,11 +848,8 @@ async def run_search_query(message: types.Message, state: FSMContext, query: str
 
         lines = [f"🛍 <b>Найдено {len(results)} товаров:</b>\n"]
         for i, r in enumerate(results, 1):
-            price_str = f"{r['price']} ₽" if r['price'] else "цена не определена"
-            lines.append(
-                f"{i}. <a href='{r['url']}'>{html.escape(r['name'][:60])}</a>\n"
-                f"   💰 {price_str}"
-            )
+            price_str = f"{r['price']} ₽" if r["price"] else "цена не определена"
+            lines.append(f"{i}. <a href='{r['url']}'>{html.escape(r['name'][:60])}</a>\n   💰 {price_str}")
 
         lines.append("\n💡 Отправьте /add и вставьте нужные ссылки чтобы добавить в мониторинг")
         await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
@@ -896,7 +886,7 @@ async def handle_search_add(message: types.Message, state: FSMContext):
     if not message.text:
         return await message.answer("❌ Отправьте номер товара текстом, например: <code>1</code>", parse_mode="HTML")
     nums = [int(x.strip()) for x in message.text.replace(",", " ").split() if x.strip().isdigit()]
-    urls = [results[n-1]["url"] for n in nums if 1 <= n <= len(results)]
+    urls = [results[n - 1]["url"] for n in nums if 1 <= n <= len(results)]
 
     if urls:
         await message.answer(f"➕ Добавляю {len(urls)} товаров в мониторинг...")
@@ -941,7 +931,12 @@ async def cmd_ozon_batch_cards(message: types.Message, state: FSMContext):
     text = (message.text or "").replace("/ozon_batch_cards", "", 1).strip()
     if text:
         return await generate_ozon_batch_card_files(
-            message, text, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile, db=db,
+            message,
+            text,
+            parser_lock=parser_lock,
+            bot=bot,
+            get_active_profile=get_active_profile,
+            db=db,
         )
 
     await message.answer(
@@ -1014,7 +1009,9 @@ async def cmd_make_card_last(message: types.Message):
         f"🧩 Собираю карточку по последнему товару:\n<b>{product.name[:80]}</b>",
         parse_mode="HTML",
     )
-    await generate_ozon_card_files(message, task, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile)
+    await generate_ozon_card_files(
+        message, task, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile
+    )
 
 
 @dp.message(Form.waiting_ozon_card)
@@ -1028,7 +1025,9 @@ async def handle_ozon_card_task(message: types.Message, state: FSMContext):
         return await message.answer("Empty card task. Send product description as text.")
 
     try:
-        await generate_ozon_card_files(message, text, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile)
+        await generate_ozon_card_files(
+            message, text, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile
+        )
     except Exception as e:
         logger.exception("Ozon card generation error")
         await message.answer(f"Could not generate Ozon card: {e}")
@@ -1045,7 +1044,12 @@ async def handle_ozon_batch_task(message: types.Message, state: FSMContext):
         return await message.answer("❌ Пустой список. Пришлите ссылки или ТЗ, по одному товару на строку.")
     try:
         await generate_ozon_batch_card_files(
-            message, text, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile, db=db,
+            message,
+            text,
+            parser_lock=parser_lock,
+            bot=bot,
+            get_active_profile=get_active_profile,
+            db=db,
         )
     except Exception as e:
         logger.error("Batch card generation failed: %s", e)
@@ -1081,7 +1085,12 @@ async def handle_batch_card_file(message: types.Message):
         "Подсказка: переключить профиль можно командой /profile имя",
     )
     await generate_ozon_batch_card_files(
-        message, text, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile, db=db,
+        message,
+        text,
+        parser_lock=parser_lock,
+        bot=bot,
+        get_active_profile=get_active_profile,
+        db=db,
     )
 
 
@@ -1158,7 +1167,9 @@ async def cmd_list(message: types.Message):
     if not products:
         return await message.answer(_h_empty_db())
 
-    await message.answer(format_product_list(products, latest_by_product), parse_mode="HTML", disable_web_page_preview=True)
+    await message.answer(
+        format_product_list(products, latest_by_product), parse_mode="HTML", disable_web_page_preview=True
+    )
 
 
 @dp.message(Command("status"))
@@ -1254,6 +1265,7 @@ async def start_bot() -> bool:
         set_active_bot=_set_active_bot,
     )
 
+
 async def _start_bot_once() -> bool:
     return await start_bot()
 
@@ -1264,8 +1276,7 @@ async def cmd_wb(message: types.Message, state: FSMContext):
     if not allowed(message.from_user.id):
         return await message.answer("⛔ Доступ запрещён.")
     await message.answer(
-        "🟣 Отправьте ссылку(и) на товары <b>Wildberries</b>:\n\n"
-        "<code>https://www.wildberries.ru/catalog/...</code>",
+        "🟣 Отправьте ссылку(и) на товары <b>Wildberries</b>:\n\n<code>https://www.wildberries.ru/catalog/...</code>",
         parse_mode="HTML",
     )
     await state.set_state(Form.waiting_urls)
@@ -1278,8 +1289,7 @@ async def cmd_wb_deals(message: types.Message):
     query = (message.text or "").replace("/wb_deals", "", 1).strip()
     if not query:
         return await message.answer(
-            "🟣 Укажите запрос для Wildberries, например:\n"
-            "<code>/wb_deals игровое кресло</code>",
+            "🟣 Укажите запрос для Wildberries, например:\n<code>/wb_deals игровое кресло</code>",
             parse_mode="HTML",
         )
     if parser_lock.locked():
@@ -1295,8 +1305,7 @@ async def cmd_wb_deals(message: types.Message):
         deals = find_wb_deals(results, min_discount_pct=30, limit=15)
         if not deals:
             return await message.answer(
-                "😔 По этому запросу не нашёл скидок от 30%.\n"
-                "Попробуйте другой запрос или проверьте позже."
+                "😔 По этому запросу не нашёл скидок от 30%.\nПопробуйте другой запрос или проверьте позже."
             )
 
         lines = [f"🔥 <b>Найдено скидок WB: {len(deals)}</b>\n"]
@@ -1320,8 +1329,7 @@ async def cmd_compare(message: types.Message, state: FSMContext):
     if not allowed(message.from_user.id):
         return await message.answer("⛔ Доступ запрещён.")
     await message.answer(
-        "🔍 Отправьте название товара для сравнения цен на Озоне и WB:\n"
-        "Например: <code>iPhone 15 128GB</code>",
+        "🔍 Отправьте название товара для сравнения цен на Озоне и WB:\nНапример: <code>iPhone 15 128GB</code>",
         parse_mode="HTML",
     )
     await state.set_state(Form.waiting_compare)
@@ -1355,11 +1363,7 @@ async def handle_compare(message: types.Message, state: FSMContext):
 
         ozon_price = ozon_results[0].get("price") if ozon_results else None
         wb_price = wb_results[0].price if wb_results else None
-        product_name = (
-            ozon_results[0].get("name")
-            if ozon_results
-            else wb_results[0].name if wb_results else query
-        )
+        product_name = ozon_results[0].get("name") if ozon_results else wb_results[0].name if wb_results else query
 
         if not ozon_results and not wb_results:
             return await message.answer("😔 Ничего не найдено. Попробуйте другой запрос.")
@@ -1394,10 +1398,7 @@ async def cmd_reviews(message: types.Message, state: FSMContext):
     products = await telegram_read_service.get_recent_wildberries_products(limit=5)
 
     if not products:
-        return await message.answer(
-            "📭 Нет товаров с Wildberries.\n"
-            "Добавьте через /wb — WB отдаёт отзывы через API."
-        )
+        return await message.answer("📭 Нет товаров с Wildberries.\nДобавьте через /wb — WB отдаёт отзывы через API.")
 
     lines = ["Выберите товар для анализа отзывов (ответьте номером):\n"]
     for i, p in enumerate(products, 1):
@@ -1432,7 +1433,9 @@ async def handle_reviews_choice(message: types.Message, state: FSMContext):
     if not product:
         return await message.answer("❌ Товар не найден.")
 
-    await message.answer(f"🧠 Загружаю и анализирую отзывы: <b>{html.escape(product.name[:60])}</b>...", parse_mode="HTML")
+    await message.answer(
+        f"🧠 Загружаю и анализирую отзывы: <b>{html.escape(product.name[:60])}</b>...", parse_mode="HTML"
+    )
     try:
         import aiohttp
 
@@ -1456,6 +1459,7 @@ async def handle_reviews_choice(message: types.Message, state: FSMContext):
 # ═══════════════════════════════════════════════════════════════════════════════
 # ЭКСПОРТ
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @dp.message(Command("export_csv"))
 async def cmd_export_csv(message: types.Message):
@@ -1563,7 +1567,9 @@ async def handle_natural_card_urls(message: types.Message, urls: list[str]):
         f"🧩 Данные получил, собираю карточку:\n<b>{(product.name or 'товар')[:80]}</b>",
         parse_mode="HTML",
     )
-    await generate_ozon_card_files(message, task, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile)
+    await generate_ozon_card_files(
+        message, task, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile
+    )
 
 
 async def handle_natural_search(message: types.Message, query: str):
@@ -1582,9 +1588,7 @@ async def handle_natural_search(message: types.Message, query: str):
         results = await search_ozon(query, max_results=5)
         if not results:
             blocked_message = ozon_search_blocked_message()
-            await message.answer(
-                "🔁 На Ozon сейчас пусто или поиск недоступен. Сразу проверяю другие маркетплейсы..."
-            )
+            await message.answer("🔁 На Ozon сейчас пусто или поиск недоступен. Сразу проверяю другие маркетплейсы...")
             all_results = await search_all_marketplaces(
                 query,
                 max_per_site=5,
@@ -1610,10 +1614,7 @@ async def handle_natural_search(message: types.Message, query: str):
         lines = [f"🛍 <b>Найдено {len(results)} товаров:</b>\n"]
         for i, r in enumerate(results, 1):
             price_str = f"{r['price']} ₽" if r.get("price") else "цена не определена"
-            lines.append(
-                f"{i}. <a href='{r['url']}'>{r['name'][:60]}</a>\n"
-                f"   💰 {price_str}"
-            )
+            lines.append(f"{i}. <a href='{r['url']}'>{r['name'][:60]}</a>\n   💰 {price_str}")
 
         lines.append("\n💡 Чтобы добавить товар в мониторинг, просто пришлите его ссылку.")
         await message.answer("\n".join(lines), parse_mode="HTML", disable_web_page_preview=True)
@@ -1683,12 +1684,6 @@ async def handle_wildberries_search(message: types.Message, query: str):
         parser_lock.release()
 
 
-
-
-
-
-
-
 async def handle_wildberries_card_search(message: types.Message, query: str):
     if not allowed(message.from_user.id):
         return await message.answer("⛔ Доступ запрещён.")
@@ -1738,35 +1733,46 @@ async def handle_wildberries_card_search(message: types.Message, query: str):
                 disable_web_page_preview=True,
             )
             return await generate_ozon_card_files(
-                message, _build_card_task_from_product_data(product),
-                parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile,
+                message,
+                _build_card_task_from_product_data(product),
+                parser_lock=parser_lock,
+                bot=bot,
+                get_active_profile=get_active_profile,
             )
 
         await message.answer(
             "⚠️ Доступные маркетплейсы сейчас не отдали товары. "
             "Не останавливаюсь: соберу красивый черновик карточки по самому запросу."
         )
-        fallback_task = "\n".join([
-            f"товар: {query}",
-            "бренд: Нет бренда",
-            "категория: витамины и БАДы",
-            "задача: создать максимально привлекательную карточку товара с сильным SEO, выгодами и понятным описанием",
-            "примечание: Wildberries не отдал данные поиска, карточка создана как черновик по запросу пользователя",
-        ])
+        fallback_task = "\n".join(
+            [
+                f"товар: {query}",
+                "бренд: Нет бренда",
+                "категория: витамины и БАДы",
+                "задача: создать максимально привлекательную карточку товара с сильным SEO, выгодами и понятным описанием",
+                "примечание: Wildberries не отдал данные поиска, карточка создана как черновик по запросу пользователя",
+            ]
+        )
         return await generate_ozon_card_files(
-            message, fallback_task, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile,
+            message,
+            fallback_task,
+            parser_lock=parser_lock,
+            bot=bot,
+            get_active_profile=get_active_profile,
         )
 
     product = next((item for item in results if item.price is not None and item.image_url), results[0])
     await message.answer(
-        "🟣 Нашёл товар и собираю карточку:\n"
-        f"<b>{html.escape((product.name or 'товар')[:120])}</b>",
+        f"🟣 Нашёл товар и собираю карточку:\n<b>{html.escape((product.name or 'товар')[:120])}</b>",
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
     await generate_ozon_card_files(
-        message, _build_card_task_from_product_data(product),
-        parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile,
+        message,
+        _build_card_task_from_product_data(product),
+        parser_lock=parser_lock,
+        bot=bot,
+        get_active_profile=get_active_profile,
     )
 
 
@@ -1800,7 +1806,12 @@ async def dispatch_natural_intent(message: types.Message, state: FSMContext, int
         return True
     if intent == "ozon_batch_cards":
         await generate_ozon_batch_card_files(
-            message, payload, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile, db=db,
+            message,
+            payload,
+            parser_lock=parser_lock,
+            bot=bot,
+            get_active_profile=get_active_profile,
+            db=db,
         )
         return True
     if intent == "ozon_batch_prompt":
@@ -1819,7 +1830,9 @@ async def dispatch_natural_intent(message: types.Message, state: FSMContext, int
         await cmd_make_card_last(message)
         return True
     if intent == "ozon_card":
-        await generate_ozon_card_files(message, payload, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile)
+        await generate_ozon_card_files(
+            message, payload, parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile
+        )
         return True
     if intent == "ozon_card_prompt":
         await cmd_ozon_card(message, state)
@@ -1896,13 +1909,16 @@ async def handle_unhandled_message(message: types.Message, state: FSMContext):
         card_sources, other_tasks = _split_card_and_other_tasks(tasks)
         if len(card_sources) > 1:
             await message.answer(
-                f"Принял карточных заданий: <b>{len(card_sources)}</b>. "
-                "Сверну их в один пакетный XLSX/JSON.",
+                f"Принял карточных заданий: <b>{len(card_sources)}</b>. Сверну их в один пакетный XLSX/JSON.",
                 parse_mode="HTML",
             )
             await generate_ozon_batch_card_files(
-                message, "\n".join(card_sources),
-                parser_lock=parser_lock, bot=bot, get_active_profile=get_active_profile, db=db,
+                message,
+                "\n".join(card_sources),
+                parser_lock=parser_lock,
+                bot=bot,
+                get_active_profile=get_active_profile,
+                db=db,
             )
             if not other_tasks:
                 return

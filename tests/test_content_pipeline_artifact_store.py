@@ -45,12 +45,18 @@ class ArtifactStoreTests(unittest.IsolatedAsyncioTestCase):
     async def test_versions_increment_per_artifact_type(self):
         payload = self.SemanticPlan()
         await self.store.save_artifact(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            artifact_type="semantic_plan", payload=payload,
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            artifact_type="semantic_plan",
+            payload=payload,
         )
         second = await self.store.save_artifact(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            artifact_type="semantic_plan", payload=payload,
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            artifact_type="semantic_plan",
+            payload=payload,
         )
         self.assertEqual(second.version_number, 2)
 
@@ -62,12 +68,18 @@ class ArtifactStoreTests(unittest.IsolatedAsyncioTestCase):
     async def test_different_artifact_types_version_independently(self):
         payload = self.SemanticPlan()
         await self.store.save_artifact(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            artifact_type="semantic_plan", payload=payload,
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            artifact_type="semantic_plan",
+            payload=payload,
         )
         other = await self.store.save_artifact(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            artifact_type="fact_check_report", payload=payload,
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            artifact_type="fact_check_report",
+            payload=payload,
         )
         self.assertEqual(other.version_number, 1)
 

@@ -12,6 +12,7 @@ proxy={"server": "direct://"} — единственный надёжный об
 Если gsettings недоступен (не GNOME/MATE-окружение, другая ОС, CI) — просто
 не делает ничего, чтобы не ломать код на других машинах.
 """
+
 import asyncio
 import shutil
 import subprocess
@@ -31,7 +32,9 @@ def _get_mode() -> str | None:
     try:
         result = subprocess.run(
             ["gsettings", "get", _PROXY_SCHEMA, "mode"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
     except Exception:
         return None
@@ -44,7 +47,8 @@ def _set_mode(mode: str) -> None:
     try:
         subprocess.run(
             ["gsettings", "set", _PROXY_SCHEMA, "mode", mode],
-            capture_output=True, timeout=5,
+            capture_output=True,
+            timeout=5,
         )
     except Exception as exc:
         logger.debug(f"gsettings set proxy mode failed: {exc}")

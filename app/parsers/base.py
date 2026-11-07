@@ -2,6 +2,7 @@
 base.py — базовый класс парсера.
 Каждый маркетплейс наследует его и реализует метод fetch_product().
 """
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -9,11 +10,12 @@ from dataclasses import dataclass
 @dataclass
 class ProductData:
     """Унифицированная структура данных товара (любой маркетплейс)."""
+
     name: str
     price: int | None
     old_price: int | None
     discount_pct: int | None
-    availability: str           # in_stock / out_of_stock / deleted / unknown
+    availability: str  # in_stock / out_of_stock / deleted / unknown
     url: str
     image_url: str | None
     # Расширенные поля
@@ -24,7 +26,7 @@ class ProductData:
     brand: str | None = None
     category: str | None = None
     marketplace: str = "unknown"  # ozon / wildberries / aliexpress
-    reviews: list[str] | None = None   # тексты отзывов для AI-анализа
+    reviews: list[str] | None = None  # тексты отзывов для AI-анализа
 
     def to_dict(self) -> dict:
         return {

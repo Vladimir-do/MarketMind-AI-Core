@@ -23,7 +23,9 @@ async def process_competitor_refresh_job(app, job_id: str, project_id: str, prod
     db: Database = app.state.db
     logger.info(
         "Competitor refresh queued job_id=%s project_id=%s product_id=%s stage=queued",
-        job_id, project_id, product_id,
+        job_id,
+        project_id,
+        product_id,
     )
     await db.start_job(job_id)
 
@@ -41,7 +43,10 @@ async def process_competitor_refresh_job(app, job_id: str, project_id: str, prod
         await db.finish_job(job_id, result)
         logger.info(
             "Competitor refresh completed job_id=%s project_id=%s product_id=%s count=%s stage=completed",
-            job_id, project_id, product_id, len(records),
+            job_id,
+            project_id,
+            product_id,
+            len(records),
         )
         return result
     except ProjectNotFoundError as exc:

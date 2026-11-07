@@ -43,8 +43,10 @@ class _FakeGeminiSession:
             class _Raising:
                 async def __aenter__(self):
                     raise outer
+
                 async def __aexit__(self, *a):
                     return False
+
             return _Raising()
         return self._response
 
@@ -78,7 +80,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
         body = (
             '{"error":{"code":429,'
             '"message":"Quota exceeded for metric: '
-            'generativelanguage.googleapis.com/generate_content_free_tier_requests, '
+            "generativelanguage.googleapis.com/generate_content_free_tier_requests, "
             'limit: 0, model: gemini-2.0-flash",'
             '"status":"RESOURCE_EXHAUSTED"}}'
         )
@@ -110,7 +112,11 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             error_raised = False
             try:
                 await process_project_seo_suggestion_job(
-                    mock_app, job_id, "project-test", 99001, action="Расширить описание",
+                    mock_app,
+                    job_id,
+                    "project-test",
+                    99001,
+                    action="Расширить описание",
                 )
             except RuntimeError:
                 error_raised = True
@@ -118,6 +124,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(error_raised, "Expected RuntimeError for 429 error")
 
         from sqlalchemy import select
+
         async with db.session() as s:
             result = await s.execute(select(JobRecord).where(JobRecord.job_id == job_id))
             job = result.scalar_one()
@@ -129,9 +136,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("test-key", job.error_text)
 
         async with db.session() as s:
-            approvals = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.product_id == "99001")
-            )
+            approvals = await s.execute(select(ApprovalRecord).where(ApprovalRecord.product_id == "99001"))
             self.assertEqual(len(approvals.scalars().all()), 0)
 
     async def test_timeout_error_does_not_create_succeeded_job(self):
@@ -165,7 +170,11 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             error_raised = False
             try:
                 await process_project_seo_suggestion_job(
-                    mock_app, job_id, "project-test", 99002, action="Улучшить заголовок",
+                    mock_app,
+                    job_id,
+                    "project-test",
+                    99002,
+                    action="Улучшить заголовок",
                 )
             except RuntimeError:
                 error_raised = True
@@ -173,6 +182,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(error_raised, "Expected RuntimeError for timeout")
 
         from sqlalchemy import select
+
         async with db.session() as s:
             result = await s.execute(select(JobRecord).where(JobRecord.job_id == job_id))
             job = result.scalar_one()
@@ -223,11 +233,10 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
             await db.start_job(job_id)
 
             with contextlib.suppress(RuntimeError):
-                await process_project_seo_suggestion_job(
-                    mock_app, job_id, "project-x", 99003, action="test"
-                )
+                await process_project_seo_suggestion_job(mock_app, job_id, "project-x", 99003, action="test")
 
         from sqlalchemy import select
+
         async with db.session() as s:
             result = await s.execute(select(JobRecord).where(JobRecord.job_id == job_id))
             job = result.scalar_one()
@@ -236,9 +245,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("429", job.error_text)
 
         async with db.session() as s:
-            approvals = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.product_id == "99003")
-            )
+            approvals = await s.execute(select(ApprovalRecord).where(ApprovalRecord.product_id == "99003"))
             self.assertEqual(len(approvals.scalars().all()), 0)
 
 

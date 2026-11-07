@@ -181,8 +181,7 @@ class ProductHistoryBuilder:
         filters: ProductHistoryFilter | None = None,
         pagination: TimelinePagination | None = None,
         sort: TimelineSort = TimelineSort.NEWEST_FIRST,
-    ) -> ProductTimeline:
-        ...
+    ) -> ProductTimeline: ...
 ```
 
 Возврат:

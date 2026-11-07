@@ -144,9 +144,7 @@ class BotHtmlEscapingTests(unittest.TestCase):
         self.assertNotIn("Looks <suspicious> & odd", combined)
 
     def test_format_product_list_escapes_product_name(self):
-        product = type(
-            "P", (), {"id": 1, "url": "https://example.com/a", "name": "Tea & Coffee <Set>"}
-        )()
+        product = type("P", (), {"id": 1, "url": "https://example.com/a", "name": "Tea & Coffee <Set>"})()
         price = type("PH", (), {"price": 150, "availability_status": "in_stock"})()
 
         result = format_product_list([product], {1: price})

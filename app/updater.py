@@ -3,6 +3,7 @@ updater.py — Парсинг Озон через Playwright.
 Максимальная маскировка: случайные UA, имитация человека,
 скрытие webdriver, поддержка прокси.
 """
+
 import asyncio
 import contextlib
 import json
@@ -90,6 +91,7 @@ BROWSER_INIT_SCRIPT = """
 
 
 # ── Извлечение данных из HTML ─────────────────────────────────────────────────
+
 
 def _parse_price(text: str) -> int | None:
     digits = re.sub(r"[^\d]", "", text)
@@ -214,8 +216,14 @@ def _ozon_review_signals(payload: dict, *, limit: int = 20) -> dict:
             for entry in entries:
                 if not isinstance(entry, dict):
                     continue
-                body = next((entry.get(text_key) for text_key in review_text_keys
-                             if isinstance(entry.get(text_key), str) and entry.get(text_key).strip()), None)
+                body = next(
+                    (
+                        entry.get(text_key)
+                        for text_key in review_text_keys
+                        if isinstance(entry.get(text_key), str) and entry.get(text_key).strip()
+                    ),
+                    None,
+                )
                 if body:
                     clean = re.sub(r"\s+", " ", body).strip()
                     if clean and clean.casefold() not in seen:
@@ -357,9 +365,7 @@ def parse_ozon_html(html: str, url: str) -> dict | None:
             break
 
     # Наличие
-    blocked_text = soup.find(string=re.compile(
-        r"доступ ограничен", re.I
-    ))
+    blocked_text = soup.find(string=re.compile(r"доступ ограничен", re.I))
     if blocked_text:
         return None  # страница блокировки
     availability = _detect_ozon_html_availability(soup, price)
@@ -382,6 +388,7 @@ def parse_ozon_html(html: str, url: str) -> dict | None:
 
 
 # ── Ninja браузер ─────────────────────────────────────────────────────────────
+
 
 class OzonUpdater:
     """Парсер Озона через Playwright."""
@@ -461,6 +468,7 @@ class OzonUpdater:
 
     async def __aenter__(self):
         from playwright.async_api import async_playwright
+
         self._pw = await async_playwright().start()
 
         headless_env = os.getenv("OZON_HEADLESS", "").strip()
@@ -506,7 +514,9 @@ class OzonUpdater:
         if self.proxy:
             logger.info("Ozon browser proxy configured: %s", mask_proxy_url(self.proxy))
             if not proxy_is_reachable(self.proxy):
-                logger.warning(f"Прокси недоступен (не слушает порт): {mask_proxy_url(self.proxy)}. Запускаю без прокси.")
+                logger.warning(
+                    f"Прокси недоступен (не слушает порт): {mask_proxy_url(self.proxy)}. Запускаю без прокси."
+                )
                 self.proxy = None
             else:
                 launch_args["proxy"] = {"server": self.proxy}
@@ -522,6 +532,7 @@ class OzonUpdater:
             return
         if not self._pw:
             from playwright.async_api import async_playwright
+
             self._pw = await async_playwright().start()
 
         profile_dir = self._profile_dir or ""
@@ -548,7 +559,9 @@ class OzonUpdater:
             )
         else:
             self._browser = await self._pw.chromium.launch(**launch_args)
-            logger.info(f"🌐 Браузер запущен {'с прокси ' + mask_proxy_url(self.proxy) if self.proxy else '(без прокси)'}")
+            logger.info(
+                f"🌐 Браузер запущен {'с прокси ' + mask_proxy_url(self.proxy) if self.proxy else '(без прокси)'}"
+            )
 
     async def __aexit__(self, *args):
         browser_started = bool(self._context or self._browser)
@@ -619,7 +632,8 @@ class OzonUpdater:
 
             if random.random() < 0.3:
                 import math
-                cx, cy = random.randint(200, vp["width"]-200), random.randint(200, vp["height"]-200)
+
+                cx, cy = random.randint(200, vp["width"] - 200), random.randint(200, vp["height"] - 200)
                 for angle in range(0, 360, 45):
                     rad = math.radians(angle)
                     x = cx + int(20 * math.cos(rad))
@@ -831,9 +845,9 @@ class OzonUpdater:
                         except Exception:
                             t = ""
                         logger.warning(
-                            f"h1/title не появились (попытка {attempt+1}) url={current_url} title_len={len(t)}"
+                            f"h1/title не появились (попытка {attempt + 1}) url={current_url} title_len={len(t)}"
                         )
-                        await self._dump_debug(page, f"ozon_no_title_{attempt+1}")
+                        await self._dump_debug(page, f"ozon_no_title_{attempt + 1}")
                         await self._wait_for_network(3, 6)
                         continue
 
@@ -852,9 +866,9 @@ class OzonUpdater:
                         incident = _extract_ozon_incident_id(html)
                         suffix = f" incident={incident}" if incident else ""
                         logger.warning(
-                            f"Блокировка Ozon/abt-challenge на попытке {attempt+1}/{RETRY_ATTEMPTS}{suffix}"
+                            f"Блокировка Ozon/abt-challenge на попытке {attempt + 1}/{RETRY_ATTEMPTS}{suffix}"
                         )
-                        await self._dump_debug(page, f"ozon_blocked_{attempt+1}")
+                        await self._dump_debug(page, f"ozon_blocked_{attempt + 1}")
                         if attempt + 1 < RETRY_ATTEMPTS:
                             await self._wait_for_network(15, 30)
                             continue
@@ -877,9 +891,9 @@ class OzonUpdater:
                     return html
 
                 except Exception as e:
-                    logger.warning(f"Попытка {attempt+1}/{RETRY_ATTEMPTS} ошибка: {e}")
-                    await self._dump_debug(page, f"ozon_exception_{attempt+1}")
-                    base_delay = 5 * (2 ** attempt)
+                    logger.warning(f"Попытка {attempt + 1}/{RETRY_ATTEMPTS} ошибка: {e}")
+                    await self._dump_debug(page, f"ozon_exception_{attempt + 1}")
+                    base_delay = 5 * (2**attempt)
                     await self._wait_for_network(base_delay, base_delay * 2)
 
             await self._record_attempt(
@@ -1045,10 +1059,7 @@ class OzonUpdater:
                 added += 1
                 if callback:
                     icon = "✅" if data["availability"] == "in_stock" else "❌"
-                    await callback(
-                        f"{icon} <b>{data['name'][:60]}</b>\n"
-                        f"💰 {data['price']} ₽ | {data['availability']}"
-                    )
+                    await callback(f"{icon} <b>{data['name'][:60]}</b>\n💰 {data['price']} ₽ | {data['availability']}")
             else:
                 if callback:
                     await callback(f"⚠️ Не удалось получить данные (Озон заблокировал):\n{url}")
@@ -1080,12 +1091,14 @@ class OzonUpdater:
                 _, price_changed = await self.db.save_product(product.url, data)
                 updated += 1
                 if price_changed:
-                    changes.append({
-                        "name": data["name"],
-                        "price": data["price"],
-                        "availability": data["availability"],
-                        "url": product.url,
-                    })
+                    changes.append(
+                        {
+                            "name": data["name"],
+                            "price": data["price"],
+                            "availability": data["availability"],
+                            "url": product.url,
+                        }
+                    )
                 if callback:
                     icon = "✅" if data["availability"] == "in_stock" else "❌"
                     await callback(f"{icon} {data['name'][:50]}: {data['price']} ₽")
@@ -1093,11 +1106,13 @@ class OzonUpdater:
                 last = await self.db.get_last_price(product.id)
                 if not last or last.availability_status != "blocked":
                     async with self.db.session() as s:
-                        s.add(PriceHistory(
-                            product_id=product.id,
-                            price=None,
-                            availability_status="blocked",
-                        ))
+                        s.add(
+                            PriceHistory(
+                                product_id=product.id,
+                                price=None,
+                                availability_status="blocked",
+                            )
+                        )
                         await s.commit()
                 logger.warning(f"Временно недоступен (blocked): {product.url}")
                 if callback:

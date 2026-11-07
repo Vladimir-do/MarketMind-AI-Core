@@ -44,7 +44,9 @@ class ExcelImporter(BaseImporter):
         for row in rows_iter:
             if row is None:
                 continue
-            row_dict = {headers[i]: row[i] for i in range(min(len(headers), len(row))) if i < len(row) and row[i] is not None}
+            row_dict = {
+                headers[i]: row[i] for i in range(min(len(headers), len(row))) if i < len(row) and row[i] is not None
+            }
             if any(v is not None for v in row_dict.values()):
                 rows.append(row_dict)
 

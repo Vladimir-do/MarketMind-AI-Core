@@ -87,7 +87,10 @@ class OpenAICompatibleProvider(BaseAIProvider):
         start = time.monotonic()
         logger.info(
             "AI request provider=%s model=%s url=%s timeout_s=%s stage=request_started",
-            self.name(), self._model, url, self._timeout,
+            self.name(),
+            self._model,
+            url,
+            self._timeout,
         )
         try:
             timeout_obj = aiohttp.ClientTimeout(total=self._timeout, connect=min(self._timeout, 20.0))
@@ -96,7 +99,8 @@ class OpenAICompatibleProvider(BaseAIProvider):
             # requests through the explicitly configured AI proxy.
             configured_proxy = os.environ.get("AI_HTTP_PROXY")
             proxy_url = (
-                None if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
+                None
+                if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
                 else configured_proxy
                 or os.environ.get("HTTPS_PROXY")
                 or os.environ.get("https_proxy")
@@ -135,7 +139,12 @@ class OpenAICompatibleProvider(BaseAIProvider):
                 )
                 logger.info(
                     "AI response provider=%s model=%s status=%s latency_ms=%s input_tokens=%s output_tokens=%s stage=response_received",
-                    self.name(), result.model, resp.status, result.latency_ms, result.input_tokens, result.output_tokens,
+                    self.name(),
+                    result.model,
+                    resp.status,
+                    result.latency_ms,
+                    result.input_tokens,
+                    result.output_tokens,
                 )
                 return result
         except ProviderHTTPError as exc:

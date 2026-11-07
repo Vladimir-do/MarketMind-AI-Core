@@ -280,7 +280,9 @@ def _excel_rows(path: Path, selected_sheet: str | None) -> list[dict[str, Any]]:
         header_raw = next(rows_iter, None)
         if not header_raw:
             return []
-        headers = [str(value).strip() if value is not None else f"col_{index}" for index, value in enumerate(header_raw)]
+        headers = [
+            str(value).strip() if value is not None else f"col_{index}" for index, value in enumerate(header_raw)
+        ]
         rows: list[dict[str, Any]] = []
         for row in rows_iter:
             row_dict = {
@@ -338,7 +340,16 @@ def _row_to_product(
             continue
         text = str(value).strip()
         if len(text) > IMPORT_MAX_CELL_CHARS:
-            errors.append(_error(row_number, column, "cell_too_large", text, "Слишком длинное значение", "Сократите значение в ячейке."))
+            errors.append(
+                _error(
+                    row_number,
+                    column,
+                    "cell_too_large",
+                    text,
+                    "Слишком длинное значение",
+                    "Сократите значение в ячейке.",
+                )
+            )
             continue
         if target.startswith("attribute:"):
             attributes[target.partition(":")[2] or column] = text
@@ -347,7 +358,16 @@ def _row_to_product(
         elif target in {"price", "old_price", "cost"}:
             parsed = _parse_int(text)
             if parsed is None:
-                errors.append(_error(row_number, column, "invalid_number", text, "Ожидалось числовое значение", "Исправьте число или сопоставьте колонку как характеристику."))
+                errors.append(
+                    _error(
+                        row_number,
+                        column,
+                        "invalid_number",
+                        text,
+                        "Ожидалось числовое значение",
+                        "Исправьте число или сопоставьте колонку как характеристику.",
+                    )
+                )
                 fatal_error = True
             else:
                 fields[target] = parsed
@@ -365,7 +385,16 @@ def _row_to_product(
     title = str(fields.get("name") or "").strip()
     sku = str(fields.get("sku") or fields.get("vendor_code") or "").strip()
     if not title:
-        errors.append(_error(row_number, "title", "missing_title", "", "Не найдено название товара", "Сопоставьте колонку с названием или заполните значение."))
+        errors.append(
+            _error(
+                row_number,
+                "title",
+                "missing_title",
+                "",
+                "Не найдено название товара",
+                "Сопоставьте колонку с названием или заполните значение.",
+            )
+        )
         return None, errors
     if fatal_error:
         return None, errors
@@ -438,14 +467,41 @@ def _validate_size(size_bytes: int) -> None:
 def _validate_rows(rows: list[dict[str, Any]]) -> list[ImportCellError]:
     errors: list[ImportCellError] = []
     if len(rows) > IMPORT_MAX_ROWS:
-        errors.append(_error(0, None, "too_many_rows", str(len(rows)), "В файле слишком много строк", "Разделите файл на несколько импортов."))
+        errors.append(
+            _error(
+                0,
+                None,
+                "too_many_rows",
+                str(len(rows)),
+                "В файле слишком много строк",
+                "Разделите файл на несколько импортов.",
+            )
+        )
     for row_index, row in enumerate(rows[:IMPORT_MAX_ROWS], start=2):
         if len(row) > IMPORT_MAX_COLUMNS:
-            errors.append(_error(row_index, None, "too_many_columns", str(len(row)), "В строке слишком много колонок", "Удалите лишние колонки или разделите файл."))
+            errors.append(
+                _error(
+                    row_index,
+                    None,
+                    "too_many_columns",
+                    str(len(row)),
+                    "В строке слишком много колонок",
+                    "Удалите лишние колонки или разделите файл.",
+                )
+            )
         for column, value in row.items():
             text = "" if value is None else str(value)
             if len(text) > IMPORT_MAX_CELL_CHARS:
-                errors.append(_error(row_index, column, "cell_too_large", text, "Слишком длинное значение", "Сократите значение в ячейке."))
+                errors.append(
+                    _error(
+                        row_index,
+                        column,
+                        "cell_too_large",
+                        text,
+                        "Слишком длинное значение",
+                        "Сократите значение в ячейке.",
+                    )
+                )
     return errors
 
 

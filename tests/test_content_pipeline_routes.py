@@ -73,9 +73,7 @@ class ContentPipelineRoutesTests(unittest.IsolatedAsyncioTestCase):
         await self.db._engine.dispose()
 
     async def test_run_returns_404_for_unknown_product(self):
-        resp = await self.client.post(
-            f"/api/projects/{self.project.project_id}/products/999999/content-pipeline/run"
-        )
+        resp = await self.client.post(f"/api/projects/{self.project.project_id}/products/999999/content-pipeline/run")
         self.assertEqual(resp.status_code, 404)
 
     async def test_artifact_routes_404_before_pipeline_runs(self):

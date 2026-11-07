@@ -13,13 +13,16 @@ class ExecutionStateTests(unittest.TestCase):
 
         self.assertEqual(run.status, ExecutionStatus.FINISHED)
         self.assertEqual(run.steps[0].status, ExecutionStatus.FINISHED)
-        self.assertEqual(run.history, [
-            ExecutionStatus.PLANNING,
-            ExecutionStatus.PREPARING,
-            ExecutionStatus.EXECUTING,
-            ExecutionStatus.VALIDATING,
-            ExecutionStatus.FINISHED,
-        ])
+        self.assertEqual(
+            run.history,
+            [
+                ExecutionStatus.PLANNING,
+                ExecutionStatus.PREPARING,
+                ExecutionStatus.EXECUTING,
+                ExecutionStatus.VALIDATING,
+                ExecutionStatus.FINISHED,
+            ],
+        )
 
     def test_execution_run_rejects_invalid_transition(self):
         run = ExecutionRun(run_id="run-1", skill_ids=["html.fetch"])

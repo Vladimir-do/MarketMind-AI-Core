@@ -94,7 +94,11 @@ class ProjectService:
                 raise ProjectNotFoundError("Проект не найден")
             for field in ("name", "client_name", "marketplace", "description", "notes"):
                 if field in updates:
-                    value = _required_text(updates[field], "Название проекта обязательно") if field == "name" else _optional_text(updates[field])
+                    value = (
+                        _required_text(updates[field], "Название проекта обязательно")
+                        if field == "name"
+                        else _optional_text(updates[field])
+                    )
                     setattr(project, field, value)
             if "status" in updates:
                 project.status = _normalize_status(updates["status"])
@@ -316,7 +320,9 @@ class ProjectService:
             await session.commit()
             return record, True
 
-    async def list_project_products(self, project_id: str, *, limit: int = 100, offset: int = 0) -> list[ProjectProduct]:
+    async def list_project_products(
+        self, project_id: str, *, limit: int = 100, offset: int = 0
+    ) -> list[ProjectProduct]:
         async with self._db.session() as session:
             await self._require_project(session, project_id)
             result = await session.execute(

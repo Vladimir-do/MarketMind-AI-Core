@@ -98,15 +98,16 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
         from datetime import datetime
 
         from app.database import ApprovalRecord
+
         async with self.db.session() as s:
-            record = (await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == aid)
-            )).scalar_one()
-            snapshot = json.dumps({
-                "field": "title",
-                "value": "Original title",
-                "timestamp": datetime.now(UTC).isoformat(),
-            })
+            record = (await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == aid))).scalar_one()
+            snapshot = json.dumps(
+                {
+                    "field": "title",
+                    "value": "Original title",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            )
             record.snapshot_before = snapshot
             record.applied_at = datetime.now(UTC)
             await s.commit()
@@ -145,15 +146,16 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
         from datetime import datetime
 
         from app.database import ApprovalRecord
+
         async with self.db.session() as s:
-            record = (await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == aid)
-            )).scalar_one()
-            snapshot = json.dumps({
-                "field": "title",
-                "value": "Original title",
-                "timestamp": datetime.now(UTC).isoformat(),
-            })
+            record = (await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == aid))).scalar_one()
+            snapshot = json.dumps(
+                {
+                    "field": "title",
+                    "value": "Original title",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            )
             record.snapshot_before = snapshot
             record.applied_at = datetime.now(UTC)
             await s.commit()
@@ -189,9 +191,7 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
         # Apply
         async with self.db.session() as s:
-            product = (await s.execute(
-                select(Product).where(Product.id == product_id)
-            )).scalar_one()
+            product = (await s.execute(select(Product).where(Product.id == product_id))).scalar_one()
 
         applied = await self.queue.apply_approved(product)
         self.assertEqual(applied, ["name"])
@@ -339,7 +339,6 @@ class ApprovalQueueApplicationRestartTests(unittest.IsolatedAsyncioTestCase):
                     pending[0].suggestion.metadata["product_name"],
                     "Persistent product",
                 )
-
 
 
 # Need select for inline queries

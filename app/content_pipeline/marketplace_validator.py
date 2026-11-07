@@ -26,12 +26,8 @@ def validate_for_marketplace(
     rules = get_marketplace_rules(passport.marketplace)
     result = audit_unified_product_seo(product, rules=rules)
 
-    blocking = [
-        f"{item.field}: {item.message}" for item in result.findings if item.severity == "critical"
-    ]
-    warnings = [
-        f"{item.field}: {item.message}" for item in result.findings if item.severity != "critical"
-    ]
+    blocking = [f"{item.field}: {item.message}" for item in result.findings if item.severity == "critical"]
+    warnings = [f"{item.field}: {item.message}" for item in result.findings if item.severity != "critical"]
 
     return MarketplaceValidationResult(
         ready=result.ready,

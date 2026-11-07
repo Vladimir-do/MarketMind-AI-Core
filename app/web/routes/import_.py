@@ -18,9 +18,20 @@ router = APIRouter()
 SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples"
 
 TEMPLATE_HEADERS = [
-    "название", "бренд", "цена", "старая цена", "скидка",
-    "описание", "категория", "артикул", "вес", "ширина", "высота",
-    "глубина", "фото", "валюта",
+    "название",
+    "бренд",
+    "цена",
+    "старая цена",
+    "скидка",
+    "описание",
+    "категория",
+    "артикул",
+    "вес",
+    "ширина",
+    "высота",
+    "глубина",
+    "фото",
+    "валюта",
 ]
 
 
@@ -99,21 +110,28 @@ async def import_file(request: Request, file: UploadFile = File(...)):
 
         saved = await _save_products_to_db(request, [ep.product for ep in result.enriched])
 
-        return _import_result_response(request, ImportResult(
-            task_id=uuid.uuid4().hex[:12],
-            status="completed",
-            total_products=saved,
-            errors=len(result.errors),
-            message=f"Импортировано и сохранено {saved} товаров, ошибок: {len(result.errors)}",
-        ))
+        return _import_result_response(
+            request,
+            ImportResult(
+                task_id=uuid.uuid4().hex[:12],
+                status="completed",
+                total_products=saved,
+                errors=len(result.errors),
+                message=f"Импортировано и сохранено {saved} товаров, ошибок: {len(result.errors)}",
+            ),
+        )
     except Exception as exc:
-        return _import_result_response(request, ImportResult(
-            task_id=uuid.uuid4().hex[:12],
-            status="failed",
-            total_products=0,
-            errors=1,
-            message=f"Ошибка импорта: {exc}",
-        ), error=True)
+        return _import_result_response(
+            request,
+            ImportResult(
+                task_id=uuid.uuid4().hex[:12],
+                status="failed",
+                total_products=0,
+                errors=1,
+                message=f"Ошибка импорта: {exc}",
+            ),
+            error=True,
+        )
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -152,13 +170,16 @@ async def download_xlsx_template():
 async def load_demo_data(request: Request):
     csv_path = SAMPLES_DIR / "products_demo.csv"
     if not csv_path.exists():
-        return _import_result_response(request, ImportResult(
-            task_id=uuid.uuid4().hex[:12],
-            status="failed",
-            total_products=0,
-            errors=1,
-            message=f"Демо-файл не найден: {csv_path}",
-        ))
+        return _import_result_response(
+            request,
+            ImportResult(
+                task_id=uuid.uuid4().hex[:12],
+                status="failed",
+                total_products=0,
+                errors=1,
+                message=f"Демо-файл не найден: {csv_path}",
+            ),
+        )
 
     from app.pipeline import ImportPipeline
 
@@ -167,13 +188,16 @@ async def load_demo_data(request: Request):
 
     saved = await _save_products_to_db(request, [ep.product for ep in result.enriched])
 
-    return _import_result_response(request, ImportResult(
-        task_id=uuid.uuid4().hex[:12],
-        status="completed",
-        total_products=saved,
-        errors=len(result.errors),
-        message=f"Загружено {saved} демо-товаров, ошибок: {len(result.errors)}",
-    ))
+    return _import_result_response(
+        request,
+        ImportResult(
+            task_id=uuid.uuid4().hex[:12],
+            status="completed",
+            total_products=saved,
+            errors=len(result.errors),
+            message=f"Загружено {saved} демо-товаров, ошибок: {len(result.errors)}",
+        ),
+    )
 
 
 @router.get("/import", response_class=HTMLResponse)

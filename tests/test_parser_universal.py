@@ -1,8 +1,8 @@
-
 """
 Тест для универсального парсера (universal.py).
 Проверяет поведение при получении пустого HTML.
 """
+
 import asyncio
 
 import pytest

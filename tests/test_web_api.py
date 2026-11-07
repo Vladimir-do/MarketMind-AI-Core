@@ -47,6 +47,7 @@ class WebApiTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_app_creation(self):
         from app.web.app import create_app
+
         app = create_app()
         self.assertIsNotNone(app)
 

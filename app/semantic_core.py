@@ -188,35 +188,43 @@ def semantic_coverage_findings(core: SemanticCore) -> list[SEOFinding]:
     findings: list[SEOFinding] = []
 
     if not core.primary_terms:
-        findings.append(SEOFinding(
-            rule="seo_semantic_no_primary",
-            field="keywords",
-            severity="warning",
-            message="Нет основных ключевых слов — определите 1-3 ключевых термина товара.",
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_semantic_no_primary",
+                field="keywords",
+                severity="warning",
+                message="Нет основных ключевых слов — определите 1-3 ключевых термина товара.",
+            )
+        )
 
     if len(core.secondary_terms) < 3:
-        findings.append(SEOFinding(
-            rule="seo_semantic_few_secondary",
-            field="keywords",
-            severity="info",
-            message="Мало дополнительных ключевых слов (< 3). Добавьте смежные запросы.",
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_semantic_few_secondary",
+                field="keywords",
+                severity="info",
+                message="Мало дополнительных ключевых слов (< 3). Добавьте смежные запросы.",
+            )
+        )
 
     if core.junk_ratio > 0.3:
-        findings.append(SEOFinding(
-            rule="seo_semantic_high_junk",
-            field="keywords",
-            severity="warning",
-            message=f"Высокая доля мусорных слов ({core.junk_ratio:.0%}). Удалите запрещённые и шумовые токены.",
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_semantic_high_junk",
+                field="keywords",
+                severity="warning",
+                message=f"Высокая доля мусорных слов ({core.junk_ratio:.0%}). Удалите запрещённые и шумовые токены.",
+            )
+        )
 
     if core.coverage_score < 0.3:
-        findings.append(SEOFinding(
-            rule="seo_semantic_low_coverage",
-            field="keywords",
-            severity="warning",
-            message=f"Низкое покрытие ключевых слов ({core.coverage_score:.0%}). Добавьте релевантные термины.",
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_semantic_low_coverage",
+                field="keywords",
+                severity="warning",
+                message=f"Низкое покрытие ключевых слов ({core.coverage_score:.0%}). Добавьте релевантные термины.",
+            )
+        )
 
     return findings

@@ -15,7 +15,10 @@ class TelegramCardTaskTests(unittest.TestCase):
         )
 
         self.assertIn("\u0442\u043e\u0432\u0430\u0440: Avm center kabel dlya mobilnyh ustroystv usb type c", task)
-        self.assertIn("\u0414\u0430\u043d\u043d\u044b\u0435 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u044b \u0438\u0437 \u0441\u0441\u044b\u043b\u043a\u0438", task)
+        self.assertIn(
+            "\u0414\u0430\u043d\u043d\u044b\u0435 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u044b \u0438\u0437 \u0441\u0441\u044b\u043b\u043a\u0438",
+            task,
+        )
 
     def test_extract_ozon_identity_from_product_url(self):
         title, product_id = extract_ozon_product_identity(

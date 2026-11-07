@@ -41,23 +41,20 @@ class NormalizeCardPayloadImageUrlsTests(unittest.TestCase):
         url = "https://example.com/a.jpg"
         result = normalize_card_payload({"image_urls": url})
         self.assertEqual(
-            result["image_urls"], [url],
+            result["image_urls"],
+            [url],
             "a raw string must become a one-item list, not one 'URL' per character",
         )
 
     def test_comma_separated_url_string_is_split_into_real_urls(self):
-        result = normalize_card_payload(
-            {"image_urls": "https://a.com/1.jpg,https://a.com/2.jpg"}
-        )
+        result = normalize_card_payload({"image_urls": "https://a.com/1.jpg,https://a.com/2.jpg"})
         self.assertEqual(
             result["image_urls"],
             ["https://a.com/1.jpg", "https://a.com/2.jpg"],
         )
 
     def test_comma_separated_url_string_strips_whitespace_around_items(self):
-        result = normalize_card_payload(
-            {"image_urls": "https://a.com/1.jpg, https://a.com/2.jpg ,  "}
-        )
+        result = normalize_card_payload({"image_urls": "https://a.com/1.jpg, https://a.com/2.jpg ,  "})
         self.assertEqual(
             result["image_urls"],
             ["https://a.com/1.jpg", "https://a.com/2.jpg"],

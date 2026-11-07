@@ -64,7 +64,9 @@ def _build_card_task_from_product_data(product) -> str:
     if product.image_url:
         lines.append(product.image_url)
     lines.append(f"источник: {product.url}")
-    lines.append("задача: создать максимально привлекательную карточку товара с сильным SEO, выгодами и понятным описанием")
+    lines.append(
+        "задача: создать максимально привлекательную карточку товара с сильным SEO, выгодами и понятным описанием"
+    )
     return "\n".join(lines)
 
 
@@ -187,7 +189,9 @@ async def generate_ozon_batch_card_files(
     profile = get_active_profile(message.chat.id)
     sources = _split_batch_card_sources(text)
     if not sources:
-        return await message.answer("❌ Не нашёл товаров. Пришлите ссылки или текстовые ТЗ, по одному товару на строку.")
+        return await message.answer(
+            "❌ Не нашёл товаров. Пришлите ссылки или текстовые ТЗ, по одному товару на строку."
+        )
     if len(sources) > MAX_BATCH_CARD_SOURCES:
         return await message.answer(
             f"⚠️ За один прогон беру до {MAX_BATCH_CARD_SOURCES} товаров. "
@@ -205,6 +209,7 @@ async def generate_ozon_batch_card_files(
     try:
         url_sources = [source for source in sources if extract_supported_urls(source)]
         if url_sources:
+
             async def quiet_notify(_text: str):
                 return None
 

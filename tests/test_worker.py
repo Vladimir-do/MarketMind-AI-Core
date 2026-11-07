@@ -44,10 +44,12 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         async def notify(text: str):
             messages.append(text)
 
-        with patch("app.worker.OzonUpdater", FakeOzonUpdater), \
-             patch("app.worker._wait_marketplace_window", AsyncMock()), \
-             patch("app.worker._recommend_strategy", AsyncMock(return_value={"skip": False})), \
-             patch("app.worker._mark_block_and_alert", AsyncMock()):
+        with (
+            patch("app.worker.OzonUpdater", FakeOzonUpdater),
+            patch("app.worker._wait_marketplace_window", AsyncMock()),
+            patch("app.worker._recommend_strategy", AsyncMock(return_value={"skip": False})),
+            patch("app.worker._mark_block_and_alert", AsyncMock()),
+        ):
             result = await worker_add_urls(db, [url], notify)
 
         db.save_product.assert_awaited_once()
@@ -72,8 +74,10 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         class FakeDB:
             async def recommend_scrape_strategy(self, marketplace, *, url=None):
                 return {
-                    "strategy": "defer_same_url", "skip": True,
-                    "reason": "same URL recently blocked by browser", "cooldown_sec": 600,
+                    "strategy": "defer_same_url",
+                    "skip": True,
+                    "reason": "same URL recently blocked by browser",
+                    "cooldown_sec": 600,
                 }
 
             async def record_blocked_pattern(self, **kwargs):

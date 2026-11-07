@@ -289,7 +289,9 @@ def detect_next_page_url(html_text: str, current_url: str) -> str | None:
     return None
 
 
-def extract_product_records(html_text: str, base_url: str, fields: list[str] | tuple[str, ...] | None = None) -> list[dict[str, str]]:
+def extract_product_records(
+    html_text: str, base_url: str, fields: list[str] | tuple[str, ...] | None = None
+) -> list[dict[str, str]]:
     selected_fields = normalize_fields(list(fields or DEFAULT_FIELDS))
     soup = BeautifulSoup(html_text or "", "lxml")
     cards = _find_product_cards(soup)

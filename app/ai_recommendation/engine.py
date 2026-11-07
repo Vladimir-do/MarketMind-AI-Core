@@ -65,9 +65,7 @@ class AIRecommendationEngine:
             tokens_used=response.input_tokens + response.output_tokens,
         )
 
-    async def recommend_batch(
-        self, batch: BatchAnalysisResult
-    ) -> AIBatchRecommendationResult:
+    async def recommend_batch(self, batch: BatchAnalysisResult) -> AIBatchRecommendationResult:
         """Generate suggestions for multiple product analyses.
 
         Iterates through products_below_threshold and generates suggestions
@@ -86,9 +84,7 @@ class AIRecommendationEngine:
             results.append(result)
 
         total_suggestions = sum(len(r.suggestions) for r in results)
-        high_confidence = sum(
-            1 for r in results for s in r.suggestions if s.confidence >= 0.8
-        )
+        high_confidence = sum(1 for r in results for s in r.suggestions if s.confidence >= 0.8)
 
         return AIBatchRecommendationResult(
             results=results,

@@ -19,7 +19,12 @@ class CardEditorTests(unittest.IsolatedAsyncioTestCase):
         await self.db.init()
         product, _changed = await self.db.save_product(
             "https://www.ozon.ru/product/editor",
-            {"name": "Исходный товар", "price": 1000, "availability": "in_stock", "image_url": "https://img.test/1.jpg"},
+            {
+                "name": "Исходный товар",
+                "price": 1000,
+                "availability": "in_stock",
+                "image_url": "https://img.test/1.jpg",
+            },
         )
         self.product_id = product.id
 
@@ -216,9 +221,7 @@ class CardEditorTests(unittest.IsolatedAsyncioTestCase):
         """D30: a direct API call (no Pydantic schema guards `payload`) that
         sends image_urls as a comma-separated string must not have it
         exploded into one-character 'URLs' by normalize_card_payload()."""
-        draft = await self._draft(
-            {"image_urls": "https://img.test/a.jpg,https://img.test/b.jpg"}
-        )
+        draft = await self._draft({"image_urls": "https://img.test/a.jpg,https://img.test/b.jpg"})
 
         self.assertEqual(
             draft["payload"]["image_urls"],

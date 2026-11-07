@@ -33,11 +33,12 @@ async def fetch_wb_snapshot(url: str, proxy: str | None = None) -> tuple[Product
         url=url,
         fetched_at=datetime.now(UTC),
         fetch_status=FetchStatus.OK,
-        availability=AvailabilityStatus.IN_STOCK if data.availability == "in_stock" else AvailabilityStatus.OUT_OF_STOCK,
+        availability=AvailabilityStatus.IN_STOCK
+        if data.availability == "in_stock"
+        else AvailabilityStatus.OUT_OF_STOCK,
         name=data.name,
         price=int(data.price) if data.price is not None else None,
         image_url=data.image_url,
         raw=None,
     )
     return snap, None, latency_ms
-

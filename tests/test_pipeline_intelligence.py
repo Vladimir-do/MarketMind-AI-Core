@@ -99,7 +99,10 @@ class AnalysisMetadataTests(unittest.TestCase):
 
     def test_top_issues_structure(self):
         product = UnifiedProduct(
-            name="Product X", source_id="1", source_type="csv", price=100,
+            name="Product X",
+            source_id="1",
+            source_type="csv",
+            price=100,
         )
         pipeline = ImportPipeline()
         result = pipeline.run_products([product])
@@ -117,7 +120,10 @@ class FindingsTests(unittest.TestCase):
 
     def test_intelligence_finds_missing_fields(self):
         product = UnifiedProduct(
-            name="Product X", source_id="1", source_type="csv", price=100,
+            name="Product X",
+            source_id="1",
+            source_type="csv",
+            price=100,
         )
         pipeline = ImportPipeline()
         result = pipeline.run_products([product])
@@ -131,7 +137,10 @@ class FindingsTests(unittest.TestCase):
 
     def test_intelligence_finds_missing_brand_and_category(self):
         product = UnifiedProduct(
-            name="Product X", source_id="1", source_type="csv", price=100,
+            name="Product X",
+            source_id="1",
+            source_type="csv",
+            price=100,
         )
         pipeline = ImportPipeline()
         result = pipeline.run_products([product])
@@ -143,7 +152,10 @@ class FindingsTests(unittest.TestCase):
 
     def test_quality_score_reflects_findings(self):
         product = UnifiedProduct(
-            name="Minimal Product", source_id="1", source_type="csv", price=100,
+            name="Minimal Product",
+            source_id="1",
+            source_type="csv",
+            price=100,
         )
         pipeline = ImportPipeline()
         result = pipeline.run_products([product])

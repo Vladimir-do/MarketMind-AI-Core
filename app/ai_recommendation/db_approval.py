@@ -49,11 +49,13 @@ class DatabaseApprovalQueue:
                     created_at=datetime.now(UTC),
                 )
                 s.add(record)
-                added.append(PendingApproval(
-                    suggestion=suggestion,
-                    product_id=result.product_id,
-                    approval_id=approval_id,
-                ))
+                added.append(
+                    PendingApproval(
+                        suggestion=suggestion,
+                        product_id=result.product_id,
+                        approval_id=approval_id,
+                    )
+                )
             await s.commit()
         return added
 
@@ -61,9 +63,7 @@ class DatabaseApprovalQueue:
         """Mark a suggestion as approved."""
         now = datetime.now(UTC)
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
-            )
+            result = await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id))
             record = result.scalar_one_or_none()
             if record is None:
                 return None
@@ -76,9 +76,7 @@ class DatabaseApprovalQueue:
         """Mark a suggestion as rejected."""
         now = datetime.now(UTC)
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
-            )
+            result = await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id))
             record = result.scalar_one_or_none()
             if record is None:
                 return None
@@ -107,9 +105,7 @@ class DatabaseApprovalQueue:
     async def reset_pending(self, approval_id: str) -> bool:
         """Return a reviewed suggestion to pending state after failed apply."""
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
-            )
+            result = await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id))
             record = result.scalar_one_or_none()
             if record is None:
                 return False
@@ -132,9 +128,7 @@ class DatabaseApprovalQueue:
         """Save apply snapshots for an already approved suggestion."""
         now = datetime.now(UTC)
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
-            )
+            result = await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id))
             record = result.scalar_one_or_none()
             if record is None:
                 return False
@@ -165,9 +159,7 @@ class DatabaseApprovalQueue:
     async def get_all(self) -> list[PendingApproval]:
         """Return all suggestions."""
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).order_by(ApprovalRecord.created_at)
-            )
+            result = await s.execute(select(ApprovalRecord).order_by(ApprovalRecord.created_at))
             return [self._record_to_approval(r) for r in result.scalars().all()]
 
     async def get_status_counts(self) -> dict[str, int]:
@@ -187,9 +179,7 @@ class DatabaseApprovalQueue:
     async def _get_by_status(self, status: str) -> list[PendingApproval]:
         async with self._db.session() as s:
             result = await s.execute(
-                select(ApprovalRecord)
-                .where(ApprovalRecord.status == status)
-                .order_by(ApprovalRecord.created_at)
+                select(ApprovalRecord).where(ApprovalRecord.status == status).order_by(ApprovalRecord.created_at)
             )
             return [self._record_to_approval(r) for r in result.scalars().all()]
 
@@ -212,19 +202,25 @@ class DatabaseApprovalQueue:
                 if hasattr(product, field_name):
                     # Snapshot before
                     current_value = getattr(product, field_name)
-                    snapshot_before = json.dumps({
-                        "field": field_name,
-                        "value": str(current_value) if current_value is not None else None,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    }, ensure_ascii=False)
+                    snapshot_before = json.dumps(
+                        {
+                            "field": field_name,
+                            "value": str(current_value) if current_value is not None else None,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        },
+                        ensure_ascii=False,
+                    )
                     # Apply
                     setattr(product, field_name, record.after_value)
                     # Snapshot after
-                    snapshot_after = json.dumps({
-                        "field": field_name,
-                        "value": record.after_value,
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    }, ensure_ascii=False)
+                    snapshot_after = json.dumps(
+                        {
+                            "field": field_name,
+                            "value": record.after_value,
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        },
+                        ensure_ascii=False,
+                    )
                     record.snapshot_before = snapshot_before
                     record.snapshot_after = snapshot_after
                     record.applied_at = datetime.now(UTC)
@@ -239,9 +235,7 @@ class DatabaseApprovalQueue:
         Returns True if rollback succeeded.
         """
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
-            )
+            result = await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id))
             record = result.scalar_one_or_none()
             if record is None or record.snapshot_before is None:
                 return False
@@ -261,9 +255,7 @@ class DatabaseApprovalQueue:
     async def get_rollback_info(self, approval_id: str) -> dict | None:
         """Get rollback information for a specific approval."""
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
-            )
+            result = await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id))
             record = result.scalar_one_or_none()
             if record is None:
                 return None
@@ -293,9 +285,7 @@ class DatabaseApprovalQueue:
     async def get_record(self, approval_id: str) -> ApprovalRecord | None:
         """Get a raw ApprovalRecord by approval_id."""
         async with self._db.session() as s:
-            result = await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id)
-            )
+            result = await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == approval_id))
             return result.scalar_one_or_none()
 
     @staticmethod

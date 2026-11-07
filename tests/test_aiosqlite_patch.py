@@ -47,6 +47,7 @@ class PatchedConnectionAttributeErrorTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         from aiosqlite.core import Connection
+
         # Ensure the real patch is applied (it normally is via app.database's
         # module-level import), so Connection._connect/_execute/close are the
         # patched versions under test.

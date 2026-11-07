@@ -64,7 +64,7 @@ class SkillRegistry:
         self.scoring_policy = ScoringPolicy(scoring_policy)
         self.graph = graph if graph is not None else load_default_skill_graph(scoring_policy=self.scoring_policy)
         self._skills = _skills_from_graph(self.graph, self.scoring_policy)
-        for skill in (skills or []):
+        for skill in skills or []:
             self._skills.setdefault(skill.skill_id, skill)
 
     def get(self, skill_id: str) -> SkillSpec:
@@ -81,10 +81,12 @@ class SkillRegistry:
             ]
             if task.parameters.get("scope") == "all_pages" or task.parameters.get("pagination"):
                 skill_ids.append("pagination.detect")
-            skill_ids.extend([
-                "scraping.extract_products",
-                "scraping.validate_result",
-            ])
+            skill_ids.extend(
+                [
+                    "scraping.extract_products",
+                    "scraping.validate_result",
+                ]
+            )
             if task.output:
                 skill_ids.append(f"{task.output}.export")
             skill_ids.append("quality.self_critic")
@@ -118,10 +120,12 @@ class SkillRegistry:
         resolution = self.graph.resolve(skill_ids)
         if not resolution.steps:
             return [self.get(skill_id) for skill_id in skill_ids]
-        return _move_self_critic_last([
-            _spec_from_manifest(step.manifest, selected_for=step.selected_for, scoring_policy=self.scoring_policy)
-            for step in resolution.steps
-        ])
+        return _move_self_critic_last(
+            [
+                _spec_from_manifest(step.manifest, selected_for=step.selected_for, scoring_policy=self.scoring_policy)
+                for step in resolution.steps
+            ]
+        )
 
 
 class TaskPlanner:
@@ -352,7 +356,14 @@ def default_skills() -> list[SkillSpec]:
             title="Repair Failure Classification",
             status=SkillStatus.AVAILABLE,
             handles=(TaskType.REPAIR,),
-            outputs=("failure_area", "severity", "evidence_types", "blast_radius", "safety_gates", "verification_scope"),
+            outputs=(
+                "failure_area",
+                "severity",
+                "evidence_types",
+                "blast_radius",
+                "safety_gates",
+                "verification_scope",
+            ),
             requirements=("repair.reproduce",),
             category="repair",
         ),
@@ -405,8 +416,7 @@ def default_skills() -> list[SkillSpec]:
 
 def _skills_from_graph(graph: SkillGraph, scoring_policy: ScoringPolicy | str) -> dict[str, SkillSpec]:
     return {
-        manifest.skill_id: _spec_from_manifest(manifest, scoring_policy=scoring_policy)
-        for manifest in graph.manifests
+        manifest.skill_id: _spec_from_manifest(manifest, scoring_policy=scoring_policy) for manifest in graph.manifests
     }
 
 

@@ -95,7 +95,8 @@ class UniversalHtmlParser(BaseParser):
                 structure_signals=structure_signals,
             )
             return ParseResult(
-                success=bool(entities) or page_structure not in {PageStructure.EMPTY, PageStructure.UNKNOWN, PageStructure.UNKNOWN_JS},
+                success=bool(entities)
+                or page_structure not in {PageStructure.EMPTY, PageStructure.UNKNOWN, PageStructure.UNKNOWN_JS},
                 task_type=self._task_type_for_structure(page_structure),
                 page_structure=page_structure,
                 entities=entities,

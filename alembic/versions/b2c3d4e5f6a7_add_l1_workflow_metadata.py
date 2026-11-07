@@ -24,16 +24,24 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("client_project_files", sa.Column("schema_version", sa.String(length=32), nullable=False, server_default="local-import-v1"))
+    op.add_column(
+        "client_project_files",
+        sa.Column("schema_version", sa.String(length=32), nullable=False, server_default="local-import-v1"),
+    )
     op.add_column("client_project_files", sa.Column("encoding", sa.String(length=64), nullable=True))
     op.add_column("client_project_files", sa.Column("delimiter", sa.String(length=8), nullable=True))
     op.add_column("client_project_files", sa.Column("selected_sheet", sa.Text(), nullable=True))
-    op.add_column("client_project_files", sa.Column("successful_rows", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column(
+        "client_project_files", sa.Column("successful_rows", sa.Integer(), nullable=False, server_default="0")
+    )
     op.add_column("client_project_files", sa.Column("warning_count", sa.Integer(), nullable=False, server_default="0"))
     op.add_column("client_project_files", sa.Column("error_count", sa.Integer(), nullable=False, server_default="0"))
     op.add_column("client_project_files", sa.Column("import_summary_json", sa.Text(), nullable=True))
 
-    op.add_column("project_exports", sa.Column("schema_version", sa.String(length=32), nullable=False, server_default="local-export-v1"))
+    op.add_column(
+        "project_exports",
+        sa.Column("schema_version", sa.String(length=32), nullable=False, server_default="local-export-v1"),
+    )
     op.add_column("project_exports", sa.Column("checksum", sa.String(length=64), nullable=True))
     op.add_column("project_exports", sa.Column("manifest_json", sa.Text(), nullable=True))
 

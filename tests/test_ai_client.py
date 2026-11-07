@@ -78,9 +78,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
         fake_client = SimpleNamespace(
             messages=SimpleNamespace(
-                create=AsyncMock(
-                    return_value=SimpleNamespace(content=[SimpleNamespace(text="claude response")])
-                )
+                create=AsyncMock(return_value=SimpleNamespace(content=[SimpleNamespace(text="claude response")]))
             )
         )
         fake_sdk_client = MagicMock()
@@ -399,6 +397,7 @@ class AiohttpTimeoutCompatTests(unittest.TestCase):
 
     def test_gemini_exception_message_for_ssl_error(self):
         import ssl as _ssl
+
         exc = _ssl.SSLError("certificate verify failed")
         msg = ai_client._gemini_exception_message(exc)
         self.assertEqual(msg, "AI error: Gemini SSL/TLS error")
@@ -441,7 +440,9 @@ class RetryAfterHeaderTests(unittest.TestCase):
             patch.object(ai_client, "GEMINI_API_KEY", "test-key"),
             patch.object(ai_client, "logger", fake_logger),
         ):
-            result = ai_client._gemini_http_error_message(429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp())
+            result = ai_client._gemini_http_error_message(
+                429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp()
+            )
 
         self.assertIn("HTTP 429", result)
         self.assertIn("квот", result.lower())
@@ -470,7 +471,9 @@ class RetryAfterHeaderTests(unittest.TestCase):
             patch.object(ai_client, "GEMINI_API_KEY", "test-key"),
             patch.object(ai_client, "logger", fake_logger),
         ):
-            result = ai_client._gemini_http_error_message(429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp())
+            result = ai_client._gemini_http_error_message(
+                429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp()
+            )
 
         self.assertIn("HTTP 429", result)
         logged = " ".join(str(arg) for call in fake_logger.warning.call_args_list for arg in call.args)

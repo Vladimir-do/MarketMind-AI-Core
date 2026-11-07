@@ -45,12 +45,14 @@ def apply_aiosqlite_future_poll_patch() -> None:
     installed_version = getattr(aiosqlite, "__version__", "unknown")
     if installed_version != _VALIDATED_AIOSQLITE_VERSION:
         from app.config import logger
+
         logger.warning(
             "aiosqlite %s is installed, but app/compat/aiosqlite_patch.py "
             "was last verified against %s. If DB startup hangs or raises "
             "AttributeError from aiosqlite internals, this patch needs "
             "updating for the new version.",
-            installed_version, _VALIDATED_AIOSQLITE_VERSION,
+            installed_version,
+            _VALIDATED_AIOSQLITE_VERSION,
         )
 
     async def _await_future_poll(future: asyncio.Future | None) -> Any:

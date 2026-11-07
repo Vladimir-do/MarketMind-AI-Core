@@ -1,6 +1,7 @@
 """
 worker.py - orchestration for marketplace parsing from bot commands.
 """
+
 import asyncio
 import html
 
@@ -21,10 +22,7 @@ async def _wait_marketplace_window(marketplace: str, notify) -> None:
     if resilience.is_open(marketplace):
         remaining = resilience.cooldown_remaining(marketplace)
         mins = max(1, remaining // 60)
-        await notify(
-            f"{marketplace.title()} cooldown: {mins} мин. "
-            "Жду окно, чтобы не усугублять блокировку."
-        )
+        await notify(f"{marketplace.title()} cooldown: {mins} мин. Жду окно, чтобы не усугублять блокировку.")
         await asyncio.sleep(max(1, remaining))
     await resilience.wait_rate_limit(marketplace)
 
@@ -33,10 +31,7 @@ async def _mark_block_and_alert(marketplace: str, notify) -> None:
     cooldown_sec = resilience.mark_block(marketplace)
     if cooldown_sec and resilience.should_emit_open_alert(marketplace):
         mins = max(1, cooldown_sec // 60)
-        await notify(
-            f"{marketplace.title()} ушел в защиту. "
-            f"Circuit breaker открыт на {mins} мин."
-        )
+        await notify(f"{marketplace.title()} ушел в защиту. Circuit breaker открыт на {mins} мин.")
 
 
 async def _save_ozon_provisional_url(db: Database, url: str, notify) -> bool:
@@ -47,12 +42,15 @@ async def _save_ozon_provisional_url(db: Database, url: str, notify) -> bool:
         provisional_name = title_line.split(":", 1)[1].strip() if ":" in title_line else ""
         if not provisional_name or provisional_name == "Новый товар":
             return False
-        await db.save_product(url, {
-            "name": provisional_name,
-            "price": None,
-            "image_url": None,
-            "availability": "blocked",
-        })
+        await db.save_product(
+            url,
+            {
+                "name": provisional_name,
+                "price": None,
+                "image_url": None,
+                "availability": "blocked",
+            },
+        )
         _, ozon_id = extract_ozon_product_identity(url)
         id_note = f" Артикул Ozon: <code>{ozon_id}</code>." if ozon_id else ""
         await notify(
@@ -68,11 +66,11 @@ async def _save_ozon_provisional_url(db: Database, url: str, notify) -> bool:
             candidates = await find_ozon_alternative_candidates(url, max_results=10)
             reference = next((item for item in candidates if item.get("is_strong_match")), None)
             if reference:
-                price = f'{reference["price"]} ₽' if reference.get("price") is not None else "цена не указана"
+                price = f"{reference['price']} ₽" if reference.get("price") is not None else "цена не указана"
                 await notify(
                     "🔎 Найдено сильное совпадение в другом магазине (справочно):\n"
-                    f'<b>{html.escape(reference["name"][:180])}</b>\n'
-                    f'Цена на Яндекс Маркете: {price}\n'
+                    f"<b>{html.escape(reference['name'][:180])}</b>\n"
+                    f"Цена на Яндекс Маркете: {price}\n"
                     f'<a href="{html.escape(reference["url"], quote=True)}">Открыть предложение</a>\n'
                     "Это не цена Ozon; данные и фото оригинальной карточки не изменялись."
                 )
@@ -263,6 +261,7 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         logger.debug("Telemetry write skipped", exc_info=True)
                     return updated, changes
                 try:
+
                     async def record_wb_attempt(**kwargs):
                         await db.record_scrape_attempt(product_id=product.id, **kwargs)
 
@@ -274,12 +273,14 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         updated = 1
                         resilience.mark_success("wildberries")
                         if price_changed:
-                            changes.append({
-                                "name": data.name,
-                                "price": data.price,
-                                "availability": data.availability,
-                                "marketplace": "wildberries",
-                            })
+                            changes.append(
+                                {
+                                    "name": data.name,
+                                    "price": data.price,
+                                    "availability": data.availability,
+                                    "marketplace": "wildberries",
+                                }
+                            )
                             await notify(f"WB {data.name[:50]}: {data.price} RUB")
                     else:
                         await _mark_block_and_alert("wildberries", notify)
@@ -374,6 +375,7 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         logger.debug("Telemetry write skipped", exc_info=True)
                     return updated, changes
                 try:
+
                     async def record_attempt(**kwargs):
                         await db.record_scrape_attempt(product_id=product.id, **kwargs)
 
@@ -385,12 +387,14 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         updated = 1
                         resilience.mark_success("yandex_market")
                         if price_changed:
-                            changes.append({
-                                "name": data.name,
-                                "price": data.price,
-                                "availability": data.availability,
-                                "marketplace": "yandex_market",
-                            })
+                            changes.append(
+                                {
+                                    "name": data.name,
+                                    "price": data.price,
+                                    "availability": data.availability,
+                                    "marketplace": "yandex_market",
+                                }
+                            )
                             await notify(f"Yandex Market {data.name[:50]}: {data.price} RUB")
                     else:
                         await _mark_block_and_alert("yandex_market", notify)
@@ -414,7 +418,9 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
         return updated, changes
 
     results = await asyncio.gather(
-        update_wildberries(), update_ozon(), update_yandex_market(),
+        update_wildberries(),
+        update_ozon(),
+        update_yandex_market(),
         return_exceptions=True,
     )
     processed = []

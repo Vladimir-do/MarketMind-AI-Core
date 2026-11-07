@@ -24,9 +24,7 @@ TELEGRAM_RECONNECT_DELAYS_SEC = (1, 2, 5, 10, 30, 60)
 def telegram_reconnect_delay(attempt: int) -> int:
     if attempt < 1:
         return TELEGRAM_RECONNECT_DELAYS_SEC[0]
-    return TELEGRAM_RECONNECT_DELAYS_SEC[
-        min(attempt - 1, len(TELEGRAM_RECONNECT_DELAYS_SEC) - 1)
-    ]
+    return TELEGRAM_RECONNECT_DELAYS_SEC[min(attempt - 1, len(TELEGRAM_RECONNECT_DELAYS_SEC) - 1)]
 
 
 def _log_telegram_retry(error: BaseException, delay: int, attempt: int) -> None:

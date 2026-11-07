@@ -66,7 +66,9 @@ def runtime_stack() -> list[dict[str, str]]:
         StackComponent("telegram", "aiogram", _package_version("aiogram")),
         StackComponent("scraping", "Playwright", _package_version("playwright")),
         StackComponent("http", "httpx / aiohttp", f"{_package_version('httpx')} / {_package_version('aiohttp')}"),
-        StackComponent("imports", "pandas / openpyxl", f"{_package_version('pandas')} / {_package_version('openpyxl')}"),
+        StackComponent(
+            "imports", "pandas / openpyxl", f"{_package_version('pandas')} / {_package_version('openpyxl')}"
+        ),
         StackComponent("quality", "pytest / Ruff", f"{_package_version('pytest')} / {_package_version('ruff')}"),
     ]
     return [component.to_dict() for component in components]

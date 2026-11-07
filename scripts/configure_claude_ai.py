@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Securely configure Claude API for MarketMind without exposing the key."""
+
 from __future__ import annotations
 
 import getpass

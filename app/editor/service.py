@@ -197,7 +197,9 @@ class ProductCardEditorService:
                 raise EditorNotFoundError("Товар не найден")
             project_product = None
             if project_id or project_product_id:
-                project_product = await self._require_project_product(session, product_id, project_id, project_product_id)
+                project_product = await self._require_project_product(
+                    session, product_id, project_id, project_product_id
+                )
             draft = await self._get_owned_draft(session, product_id, draft_id, project_id, project_product_id)
             if draft.revision != revision:
                 raise EditorConflictError(
@@ -247,9 +249,7 @@ class ProductCardEditorService:
             snapshot = normalize_card_payload({**before, **draft_payload})
             diff = self._diff(before, snapshot)
             if not diff:
-                raise EditorValidationError(
-                    ValidationResult(False, [])
-                )
+                raise EditorValidationError(ValidationResult(False, []))
 
             checksum = self.checksum(snapshot)
             duplicate = await self._latest_same_checksum(
@@ -296,7 +296,9 @@ class ProductCardEditorService:
                 project_id=project_id,
                 project_product_id=project_product_id,
             )
-            await DomainEventRepository(session).append(event, correlation_id=draft.draft_id, causation_id=draft.draft_id)
+            await DomainEventRepository(session).append(
+                event, correlation_id=draft.draft_id, causation_id=draft.draft_id
+            )
             if project_product is None:
                 self._apply_snapshot_to_product(session, product, snapshot, before, now)
             else:
@@ -326,7 +328,9 @@ class ProductCardEditorService:
                 raise EditorNotFoundError("Товар не найден")
             project_product = None
             if project_id or project_product_id:
-                project_product = await self._require_project_product(session, product_id, project_id, project_product_id)
+                project_product = await self._require_project_product(
+                    session, product_id, project_id, project_product_id
+                )
             repo = ProductEditorRepository(session)
             target = await repo.get_version(
                 product_id,
@@ -388,7 +392,9 @@ class ProductCardEditorService:
                 project_id=project_id,
                 project_product_id=project_product_id,
             )
-            await DomainEventRepository(session).append(event, correlation_id=event_id, causation_id=target.trigger_event_id)
+            await DomainEventRepository(session).append(
+                event, correlation_id=event_id, causation_id=target.trigger_event_id
+            )
             if project_product is None:
                 self._apply_snapshot_to_product(session, product, snapshot, before, now)
             else:

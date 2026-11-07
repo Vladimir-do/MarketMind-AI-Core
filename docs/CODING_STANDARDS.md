@@ -22,9 +22,9 @@ if x > 0:
     result = func(a, b)
 
 # Неправильно
-x=1+2
-if x>0:
-    result=func(a,b)
+x = 1 + 2
+if x > 0:
+    result = func(a, b)
 ```
 
 ### Импорты
@@ -64,17 +64,18 @@ async def fetch_product(url, proxy=None):
 ```python
 from typing import Sequence
 
-def process_items(items: Sequence[Product]) -> dict[str, int]:
-    ...
 
-async def get_urls(db: Database) -> list[str]:
-    ...
+def process_items(items: Sequence[Product]) -> dict[str, int]: ...
+
+
+async def get_urls(db: Database) -> list[str]: ...
 ```
 
 ### Dataclass аннотации
 
 ```python
 from dataclasses import dataclass
+
 
 @dataclass
 class ScrapingResult:
@@ -165,8 +166,11 @@ async def fetch_page(url: str) -> str:
         async with session.get(url) as response:
             return await response.text()
 
+
 # Неправильно
 import requests
+
+
 def fetch_page(url: str) -> str:
     return requests.get(url).text
 ```
@@ -217,6 +221,7 @@ finally:
 class ParsingError(Exception):
     """Ошибка парсинга страницы маркетплейса."""
 
+
 class BlockDetectedError(ParsingError):
     """Обнаружена блокировка антибота."""
 ```
@@ -226,9 +231,9 @@ class BlockDetectedError(ParsingError):
 ```python
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
-async def fetch_with_retry(url: str) -> str:
-    ...
+async def fetch_with_retry(url: str) -> str: ...
 ```
 
 ### Не ловите слишком широко
@@ -309,6 +314,7 @@ def test_parse_ozon_html_blocked_page():
     html = load_fixture("ozon_blocked.html")
     result = parse_ozon_html(html)
     assert result["status"] == "blocked"
+
 
 def test_worker_add_urls_empty_list():
     """Пустой список URL возвращает пустой результат."""

@@ -23,6 +23,7 @@ class TelegramReadServiceTests(unittest.IsolatedAsyncioTestCase):
         await self.db.init()
 
         from app.telegram_read_service import TelegramReadService
+
         self.service = TelegramReadService(self.db)
 
     async def asyncTearDown(self):
@@ -41,9 +42,7 @@ class TelegramReadServiceTests(unittest.IsolatedAsyncioTestCase):
             "https://example.com/a", {"name": "A", "price": 100, "availability": "in_stock"}
         )
         # Second save on the same product changes the price -> new PriceHistory row.
-        await self.db.save_product(
-            "https://example.com/a", {"name": "A", "price": 150, "availability": "in_stock"}
-        )
+        await self.db.save_product("https://example.com/a", {"name": "A", "price": 150, "availability": "in_stock"})
         p2, _ = await self.db.save_product(
             "https://example.com/b", {"name": "B", "price": 200, "availability": "out_of_stock"}
         )
@@ -95,14 +94,22 @@ class TelegramReadServiceTests(unittest.IsolatedAsyncioTestCase):
 
         now = datetime.now(UTC)
         async with self.db.session() as s:
-            s.add(PriceHistory(
-                product_id=product.id, price=90, availability_status="in_stock",
-                recorded_at=now - timedelta(hours=5),
-            ))
-            s.add(PriceHistory(
-                product_id=product.id, price=80, availability_status="in_stock",
-                recorded_at=now - timedelta(minutes=30),
-            ))
+            s.add(
+                PriceHistory(
+                    product_id=product.id,
+                    price=90,
+                    availability_status="in_stock",
+                    recorded_at=now - timedelta(hours=5),
+                )
+            )
+            s.add(
+                PriceHistory(
+                    product_id=product.id,
+                    price=80,
+                    availability_status="in_stock",
+                    recorded_at=now - timedelta(minutes=30),
+                )
+            )
             await s.commit()
 
         rows = await self.service.get_recent_price_changes(now - timedelta(hours=2), limit=20)

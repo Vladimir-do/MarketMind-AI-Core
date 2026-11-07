@@ -35,8 +35,7 @@ class AIProvider(Protocol):
         system: str = "",
         max_tokens: int = 2048,
         temperature: float = 0.3,
-    ) -> AIResponse:
-        ...
+    ) -> AIResponse: ...
 
     def is_available(self) -> bool: ...
 

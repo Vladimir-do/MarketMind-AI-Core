@@ -18,10 +18,7 @@ from app.brd_enricher import (
 
 
 def make_docx(path: Path, lines: list[str]) -> None:
-    body = "".join(
-        f"<w:p><w:r><w:t>{line}</w:t></w:r></w:p>"
-        for line in lines
-    )
+    body = "".join(f"<w:p><w:r><w:t>{line}</w:t></w:r></w:p>" for line in lines)
     document = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'

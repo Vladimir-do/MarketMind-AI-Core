@@ -26,7 +26,9 @@ async def process_content_pipeline_job(app, job_id: str, project_id: str, produc
     db: Database = app.state.db
     logger.info(
         "Content pipeline queued job_id=%s project_id=%s product_id=%s stage=queued",
-        job_id, project_id, product_id,
+        job_id,
+        project_id,
+        product_id,
     )
     await db.start_job(job_id)
 
@@ -45,7 +47,10 @@ async def process_content_pipeline_job(app, job_id: str, project_id: str, produc
         await db.finish_job(job_id, result)
         logger.info(
             "Content pipeline completed job_id=%s project_id=%s product_id=%s cqi=%s stage=completed",
-            job_id, project_id, product_id, run_result.quality_report.cqi,
+            job_id,
+            project_id,
+            product_id,
+            run_result.quality_report.cqi,
         )
         return result
     except (ProjectNotFoundError, PromptNotFoundError, ContentPipelineParseError) as exc:

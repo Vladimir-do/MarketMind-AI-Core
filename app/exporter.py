@@ -2,6 +2,7 @@
 exporter.py — экспорт данных в CSV и Excel.
 Отправляет файлы прямо в Telegram.
 """
+
 import csv
 import io
 from collections import defaultdict
@@ -15,9 +16,9 @@ from sqlalchemy import and_, func, select
 from app.database import Database, PriceHistory, Product
 
 MARKETPLACE_COLORS = {
-    "ozon":        "FF0055FF",  # синий
+    "ozon": "FF0055FF",  # синий
     "wildberries": "FFAA00CC",  # фиолетовый
-    "aliexpress":  "FFFF4400",  # оранжевый
+    "aliexpress": "FFFF4400",  # оранжевый
 }
 
 
@@ -40,22 +41,33 @@ async def get_export_data(db: Database, days: int = 30) -> tuple[list[dict], dic
             .group_by(PriceHistory.product_id)
             .subquery()
         )
-        latest_rows = (await s.execute(
-            select(PriceHistory)
-            .join(
-                latest_at,
-                and_(
-                    PriceHistory.product_id == latest_at.c.product_id,
-                    PriceHistory.recorded_at == latest_at.c.recorded_at,
-                ),
+        latest_rows = (
+            (
+                await s.execute(
+                    select(PriceHistory).join(
+                        latest_at,
+                        and_(
+                            PriceHistory.product_id == latest_at.c.product_id,
+                            PriceHistory.recorded_at == latest_at.c.recorded_at,
+                        ),
+                    )
+                )
             )
-        )).scalars().all()
-        history_rows = (await s.execute(
-            select(PriceHistory)
-            .where(PriceHistory.product_id.in_(product_ids))
-            .where(PriceHistory.recorded_at >= since)
-            .order_by(PriceHistory.product_id, PriceHistory.recorded_at)
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
+        history_rows = (
+            (
+                await s.execute(
+                    select(PriceHistory)
+                    .where(PriceHistory.product_id.in_(product_ids))
+                    .where(PriceHistory.recorded_at >= since)
+                    .order_by(PriceHistory.product_id, PriceHistory.recorded_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     latest_by_product = {row.product_id: row for row in latest_rows}
     history_by_product: dict[int, list[PriceHistory]] = defaultdict(list)
@@ -81,25 +93,26 @@ async def get_export_data(db: Database, days: int = 30) -> tuple[list[dict], dic
                 trend = "📈"
 
         # Маркетплейс
-        marketplace = "ozon" if "ozon" in product.url else \
-                      "wildberries" if "wildberries" in product.url else "unknown"
+        marketplace = "ozon" if "ozon" in product.url else "wildberries" if "wildberries" in product.url else "unknown"
         if "market.yandex" in product.url:
             marketplace = "yandex_market"
 
-        rows.append({
-            "ID": product.id,
-            "Маркетплейс": marketplace.capitalize(),
-            "Название": product.name or "",
-            "Текущая цена (₽)": last.price if last else None,
-            "Мин цена за 30д (₽)": min_price,
-            "Макс цена за 30д (₽)": max_price,
-            "Изменение цены": trend,
-            "Наличие": last.availability_status if last else "unknown",
-            "Изменений цены": len(history),
-            "Первая проверка": product.first_seen.strftime("%d.%m.%Y") if product.first_seen else "",
-            "Последняя проверка": product.last_check.strftime("%d.%m.%Y %H:%M") if product.last_check else "",
-            "URL": product.url,
-        })
+        rows.append(
+            {
+                "ID": product.id,
+                "Маркетплейс": marketplace.capitalize(),
+                "Название": product.name or "",
+                "Текущая цена (₽)": last.price if last else None,
+                "Мин цена за 30д (₽)": min_price,
+                "Макс цена за 30д (₽)": max_price,
+                "Изменение цены": trend,
+                "Наличие": last.availability_status if last else "unknown",
+                "Изменений цены": len(history),
+                "Первая проверка": product.first_seen.strftime("%d.%m.%Y") if product.first_seen else "",
+                "Последняя проверка": product.last_check.strftime("%d.%m.%Y %H:%M") if product.last_check else "",
+                "URL": product.url,
+            }
+        )
 
     return rows, history_by_product
 
@@ -150,8 +163,8 @@ def make_excel(
     )
 
     green_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-    red_fill   = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-    gray_fill  = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+    red_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
 
     # ── Заголовок листа ──────────────────────────────────────────────────────
     ws.merge_cells("A1:L1")
@@ -208,10 +221,18 @@ def make_excel(
 
     # ── Ширина колонок ───────────────────────────────────────────────────────
     col_widths = {
-        "ID": 6, "Маркетплейс": 15, "Название": 45,
-        "Текущая цена (₽)": 18, "Мин цена за 30д (₽)": 20, "Макс цена за 30д (₽)": 20,
-        "Изменение цены": 16, "Наличие": 16, "Изменений цены": 16,
-        "Первая проверка": 16, "Последняя проверка": 20, "URL": 50,
+        "ID": 6,
+        "Маркетплейс": 15,
+        "Название": 45,
+        "Текущая цена (₽)": 18,
+        "Мин цена за 30д (₽)": 20,
+        "Макс цена за 30д (₽)": 20,
+        "Изменение цены": 16,
+        "Наличие": 16,
+        "Изменений цены": 16,
+        "Первая проверка": 16,
+        "Последняя проверка": 20,
+        "URL": 50,
     }
     for col_idx, header in enumerate(headers, 1):
         ws.column_dimensions[get_column_letter(col_idx)].width = col_widths.get(header, 15)
@@ -253,7 +274,8 @@ def make_excel(
                     status_cell.fill = red_fill
                     status_cell.value = "Удалён"
                 date_cell = ws2.cell(
-                    row=history_row_idx, column=4,
+                    row=history_row_idx,
+                    column=4,
                     value=record.recorded_at.strftime("%d.%m.%Y %H:%M") if record.recorded_at else "",
                 )
                 date_cell.border = thin_border

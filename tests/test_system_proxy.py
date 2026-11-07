@@ -21,8 +21,10 @@ class BypassSystemProxyTests(unittest.IsolatedAsyncioTestCase):
                 return _completed(stdout="'manual'\n")
             return _completed()
 
-        with patch("app.parsers.system_proxy.shutil.which", return_value="/usr/bin/gsettings"), \
-                patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run):
+        with (
+            patch("app.parsers.system_proxy.shutil.which", return_value="/usr/bin/gsettings"),
+            patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run),
+        ):
             async with bypass_system_proxy():
                 pass
 
@@ -36,8 +38,10 @@ class BypassSystemProxyTests(unittest.IsolatedAsyncioTestCase):
                 return _completed(stdout="'none'\n")
             return _completed()
 
-        with patch("app.parsers.system_proxy.shutil.which", return_value="/usr/bin/gsettings"), \
-                patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run) as mock_run:
+        with (
+            patch("app.parsers.system_proxy.shutil.which", return_value="/usr/bin/gsettings"),
+            patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run) as mock_run,
+        ):
             async with bypass_system_proxy():
                 pass
 
@@ -45,8 +49,10 @@ class BypassSystemProxyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set_calls, [])
 
     async def test_noop_when_gsettings_unavailable(self):
-        with patch("app.parsers.system_proxy.shutil.which", return_value=None), \
-                patch("app.parsers.system_proxy.subprocess.run") as mock_run:
+        with (
+            patch("app.parsers.system_proxy.shutil.which", return_value=None),
+            patch("app.parsers.system_proxy.subprocess.run") as mock_run,
+        ):
             async with bypass_system_proxy():
                 pass
 
@@ -61,8 +67,11 @@ class BypassSystemProxyTests(unittest.IsolatedAsyncioTestCase):
                 return _completed(stdout="'manual'\n")
             return _completed()
 
-        with patch("app.parsers.system_proxy.shutil.which", return_value="/usr/bin/gsettings"), \
-                patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run), self.assertRaises(ValueError):
+        with (
+            patch("app.parsers.system_proxy.shutil.which", return_value="/usr/bin/gsettings"),
+            patch("app.parsers.system_proxy.subprocess.run", side_effect=fake_run),
+            self.assertRaises(ValueError),
+        ):
             async with bypass_system_proxy():
                 raise ValueError("boom")
 

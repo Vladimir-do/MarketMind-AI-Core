@@ -46,9 +46,7 @@ class BotExportErrorLoggingTests(unittest.TestCase):
             message = FakeMessage()
             with (
                 patch.object(bot_module, "ADMIN_IDS", self.ADMIN_IDS_PATCH),
-                patch.object(
-                    bot_module, "send_price_export", AsyncMock(side_effect=RuntimeError("boom"))
-                ),
+                patch.object(bot_module, "send_price_export", AsyncMock(side_effect=RuntimeError("boom"))),
                 self.assertLogs("parser", level="ERROR") as logs,
             ):
                 await bot_module.cmd_export_csv(message)
@@ -67,9 +65,7 @@ class BotExportErrorLoggingTests(unittest.TestCase):
             message = FakeMessage()
             with (
                 patch.object(bot_module, "ADMIN_IDS", self.ADMIN_IDS_PATCH),
-                patch.object(
-                    bot_module, "send_price_export", AsyncMock(side_effect=RuntimeError("boom"))
-                ),
+                patch.object(bot_module, "send_price_export", AsyncMock(side_effect=RuntimeError("boom"))),
                 self.assertLogs("parser", level="ERROR") as logs,
             ):
                 await bot_module.cmd_export_excel(message)

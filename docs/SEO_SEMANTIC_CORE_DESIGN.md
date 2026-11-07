@@ -54,20 +54,20 @@ class SemanticCore:
 
     product_id: int | str
 
-    primary_keys: list[str]          # 1–3 ключа: точное попадание в товар
-    secondary_keys: list[str]        # 4–10 ключей: смежные запросы
-    long_tail_keys: list[str]        # 11+ ключей: длинные специфичные запросы
-    brand_keys: list[str]            # ключи с упоминанием бренда
-    junk_keys: list[str]             # мусорные/спамные ключи
-    category_keys: list[str]         # ключи, связанные с категорией товара
+    primary_keys: list[str]  # 1–3 ключа: точное попадание в товар
+    secondary_keys: list[str]  # 4–10 ключей: смежные запросы
+    long_tail_keys: list[str]  # 11+ ключей: длинные специфичные запросы
+    brand_keys: list[str]  # ключи с упоминанием бренда
+    junk_keys: list[str]  # мусорные/спамные ключи
+    category_keys: list[str]  # ключи, связанные с категорией товара
 
-    competitor_overlap: list[str]    # ключи, совпадающие с конкурентами
+    competitor_overlap: list[str]  # ключи, совпадающие с конкурентами
     missing_competitor_keys: list[str]  # ключи конкурентов, которых нет у товара
 
-    keyword_coverage: float = 0.0    # покрытие целевых ключей (0.0–1.0)
-    semantic_depth: float = 0.0      # доля хвостовых ключей (0.0–1.0)
-    junk_ratio: float = 0.0          # доля мусорных ключей (0.0–1.0)
-    semantic_score: float = 0.0      # итоговая оценка (0.0–1.0)
+    keyword_coverage: float = 0.0  # покрытие целевых ключей (0.0–1.0)
+    semantic_depth: float = 0.0  # доля хвостовых ключей (0.0–1.0)
+    junk_ratio: float = 0.0  # доля мусорных ключей (0.0–1.0)
+    semantic_score: float = 0.0  # итоговая оценка (0.0–1.0)
 
     @property
     def all_product_keys(self) -> list[str]:
@@ -185,33 +185,41 @@ def audit_unified_product_seo(
 def _check_semantic_core(core: SemanticCore) -> list[SEOFinding]:
     findings = []
     if core.junk_ratio > 0.15:
-        findings.append(SEOFinding(
-            rule="seo_junk_keys_high",
-            field="keywords",
-            severity="warning",
-            message=f"Более 15% ключей — мусорные ({len(core.junk_keys)} из {core.total_keys}).",
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_junk_keys_high",
+                field="keywords",
+                severity="warning",
+                message=f"Более 15% ключей — мусорные ({len(core.junk_keys)} из {core.total_keys}).",
+            )
+        )
     if core.semantic_depth < 0.2 and core.total_keys > 6:
-        findings.append(SEOFinding(
-            rule="seo_long_tail_few",
-            field="keywords",
-            severity="info",
-            message="Мало хвостовых ключей. Добавьте специфичные составные запросы.",
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_long_tail_few",
+                field="keywords",
+                severity="info",
+                message="Мало хвостовых ключей. Добавьте специфичные составные запросы.",
+            )
+        )
     if core.keyword_coverage < 0.5:
-        findings.append(SEOFinding(
-            rule="seo_keyword_coverage_low",
-            field="keywords",
-            severity="warning",
-            message=f"Покрытие целевых ключей: {core.keyword_coverage:.0%}.",
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_keyword_coverage_low",
+                field="keywords",
+                severity="warning",
+                message=f"Покрытие целевых ключей: {core.keyword_coverage:.0%}.",
+            )
+        )
     if core.missing_competitor_keys:
-        findings.append(SEOFinding(
-            rule="seo_competitor_keys_missing",
-            field="keywords",
-            severity="info",
-            message="Ключи конкурентов отсутствуют: " + ", ".join(core.missing_competitor_keys[:5]),
-        ))
+        findings.append(
+            SEOFinding(
+                rule="seo_competitor_keys_missing",
+                field="keywords",
+                severity="info",
+                message="Ключи конкурентов отсутствуют: " + ", ".join(core.missing_competitor_keys[:5]),
+            )
+        )
     return findings
 ```
 

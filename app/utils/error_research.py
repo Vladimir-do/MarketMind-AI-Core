@@ -4,6 +4,7 @@
 Не чинит код автоматически: только собирает ссылки/фрагменты выдачи,
 чтобы быстрее разобраться вручную. Включение: RESEARCH_ON_PARSE_FAILURE=1 в .env
 """
+
 from __future__ import annotations
 
 import re
@@ -56,10 +57,7 @@ def _search_hint_for_marketplace(mp: str) -> str:
 
 def _search_urls(query: str) -> str:
     q = quote_plus(query)
-    return (
-        f"https://duckduckgo.com/?q={q}\n"
-        f"https://www.google.com/search?q={q}\n"
-    )
+    return f"https://duckduckgo.com/?q={q}\nhttps://www.google.com/search?q={q}\n"
 
 
 async def _fetch_ddg_snippets(query: str, max_results: int = 8) -> list[tuple[str, str]]:
@@ -78,11 +76,14 @@ async def _fetch_ddg_snippets(query: str, max_results: int = 8) -> list[tuple[st
     body = f"q={quote_plus(query)}&b="
     out: list[tuple[str, str]] = []
     try:
-        async with aiohttp.ClientSession(headers=headers) as session, session.post(
-            DDG_HTML,
-            data=body.encode("utf-8"),
-            timeout=aiohttp.ClientTimeout(total=15),
-        ) as resp:
+        async with (
+            aiohttp.ClientSession(headers=headers) as session,
+            session.post(
+                DDG_HTML,
+                data=body.encode("utf-8"),
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp,
+        ):
             if resp.status != 200:
                 return out
             html = await resp.text()

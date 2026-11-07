@@ -6,6 +6,7 @@ import aiohttp
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
 
+
 async def smoke_wb_card_json():
     item_id = "311895731"
 
@@ -65,7 +66,9 @@ async def smoke_wb_card_json():
             url = f"https://basket-{b}.wbbasket.ru/vol{vol}/part{part}/{item_id}/info/ru/card.json"
             print(f"Пробую: {url}")
             try:
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
                 async with session.get(url, headers=headers, timeout=5) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -83,6 +86,7 @@ async def smoke_wb_card_json():
                         print(f"FAIL {b}: Код {resp.status}")
             except Exception as e:
                 print(f"WARN Ошибка на {b}: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(smoke_wb_card_json())

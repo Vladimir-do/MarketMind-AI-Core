@@ -107,9 +107,7 @@ async def _get_price_history_for_timeline(
             stmt = stmt.where(PriceHistory.recorded_at >= date_from)
         if date_to is not None:
             stmt = stmt.where(PriceHistory.recorded_at <= date_to)
-        result = await s.execute(
-            stmt.order_by(desc(PriceHistory.recorded_at)).limit(source_limit)
-        )
+        result = await s.execute(stmt.order_by(desc(PriceHistory.recorded_at)).limit(source_limit))
         return list(result.scalars().all())
 
 
@@ -161,9 +159,7 @@ async def _get_approval_record_models_for_timeline(
             stmt = stmt.where(ApprovalRecord.created_at >= date_from)
         if date_to is not None:
             stmt = stmt.where(ApprovalRecord.created_at <= date_to)
-        result = await s.execute(
-            stmt.order_by(desc(ApprovalRecord.created_at)).limit(source_limit)
-        )
+        result = await s.execute(stmt.order_by(desc(ApprovalRecord.created_at)).limit(source_limit))
         return list(result.scalars().all())
 
 
@@ -349,6 +345,7 @@ def _normalize_version_number(value: int) -> int:
 
 # ── HTML routes ─────────────────────────────────────────────────────────
 
+
 @router.get("/products/{product_id}", response_class=HTMLResponse)
 async def product_detail_page(product_id: int, request: Request):
     product = await _get_product(request, product_id)
@@ -424,6 +421,7 @@ async def generate_product_ai_suggestions(product_id: int, request: Request, bac
 
 # ── API routes ──────────────────────────────────────────────────────────
 
+
 @router.get("/api/products/{product_id}")
 async def api_product_detail(product_id: int, request: Request):
     product = await _get_product(request, product_id)
@@ -482,6 +480,7 @@ async def api_product_semantic_core(product_id: int, request: Request):
     last_price = await db_get_last_price(request, product_id)
     unified = _build_unified(product, last_price)
     from app.semantic_core import build_semantic_core
+
     core = build_semantic_core(
         name=unified.name,
         description=unified.description,
@@ -513,6 +512,7 @@ async def product_semantic_core_html(product_id: int, request: Request):
     last_price = await db_get_last_price(request, product_id)
     unified = _build_unified(product, last_price)
     from app.semantic_core import build_semantic_core
+
     core = build_semantic_core(
         name=unified.name,
         description=unified.description,

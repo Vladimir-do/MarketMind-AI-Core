@@ -3,6 +3,7 @@ universal.py — Универсальный парсер для обработк
 Реализует поведение согласно задаче: не паниковать при пустом HTML,
 а возвращать корректный ParseResult с предложением следующей стратегии.
 """
+
 import re
 from dataclasses import dataclass
 
@@ -14,6 +15,7 @@ from app.parsers.base import BaseParser, ProductData
 @dataclass
 class ParseResult:
     """Результат парсинга, который может включать не только данные, но и мета-информацию."""
+
     success: bool
     data: ProductData | None = None
     page_structure: str = "unknown"
@@ -86,6 +88,7 @@ class UniversalParser(BaseParser):
         for script in soup.find_all("script", type="application/ld+json"):
             try:
                 import json
+
                 ld = json.loads(script.string or "")
                 if isinstance(ld, list):
                     ld = next((item for item in ld if item.get("@type") == "Product"), None)
@@ -182,8 +185,8 @@ class UniversalParser(BaseParser):
                 'img[class*="product"]',
                 'div[class*="product"] img',
                 'div[class*="gallery"] img',
-                'main img',
-                'article img',
+                "main img",
+                "article img",
             ):
                 img = soup.select_one(selector)
                 if img:

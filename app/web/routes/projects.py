@@ -498,7 +498,9 @@ async def api_get_project(project_id: str, request: Request):
 @router.patch("/api/projects/{project_id}")
 async def api_update_project(project_id: str, request: Request):
     try:
-        return _project_to_dict(await _project_service(request).update_project(project_id, await _request_data(request)))
+        return _project_to_dict(
+            await _project_service(request).update_project(project_id, await _request_data(request))
+        )
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -512,7 +514,9 @@ async def api_archive_project(project_id: str, request: Request):
 
 
 @router.post("/api/projects/{project_id}/imports")
-async def api_import_project_file(project_id: str, request: Request, file: UploadFile | None = PROJECT_OPTIONAL_UPLOAD_FILE):
+async def api_import_project_file(
+    project_id: str, request: Request, file: UploadFile | None = PROJECT_OPTIONAL_UPLOAD_FILE
+):
     try:
         await _project_service(request).get_project(project_id)
         body: dict[str, Any] = {}
@@ -764,6 +768,7 @@ async def api_project_semantic_core(project_id: str, product_id: int, request: R
         card = await _effective_service(request).get_effective_card(project_id, product_id)
         from app.effective_card.service import _unified_from_snapshot
         from app.semantic_core import build_semantic_core
+
         unified = _unified_from_snapshot(card.effective_snapshot, product_id)
         core = build_semantic_core(
             name=unified.name,
@@ -799,6 +804,7 @@ async def project_product_semantic_core_html(project_id: str, product_id: int, r
         card = await _effective_service(request).get_effective_card(project_id, product_id)
         from app.effective_card.service import _unified_from_snapshot
         from app.semantic_core import build_semantic_core
+
         unified = _unified_from_snapshot(card.effective_snapshot, product_id)
         core = build_semantic_core(
             name=unified.name,
@@ -825,7 +831,9 @@ async def project_product_semantic_core_html(project_id: str, product_id: int, r
 
 
 @router.post("/api/projects/{project_id}/keywords/import")
-async def api_import_keywords(project_id: str, request: Request, file: UploadFile | None = PROJECT_OPTIONAL_UPLOAD_FILE):
+async def api_import_keywords(
+    project_id: str, request: Request, file: UploadFile | None = PROJECT_OPTIONAL_UPLOAD_FILE
+):
     """Импорт ключевых слов из CSV. Не мутирует БД -- только парсинг."""
     try:
         await _project_service(request).get_project(project_id)
@@ -834,6 +842,7 @@ async def api_import_keywords(project_id: str, request: Request, file: UploadFil
         content = await file.read()
         from app.keyword_sources import ManualCSVSource
         from app.products.schema import UnifiedProduct
+
         source = ManualCSVSource(content)
         product = UnifiedProduct(name="", source_id="", source_type="csv_import")
         keywords = source.get_keywords(product)
@@ -872,7 +881,9 @@ async def api_queue_project_seo_suggestions(
         action = str(form.get("action", "")).strip()
         if not action:
             suggestions = await _effective_service(request).seo(project_id, product_id)
-            recommendation_items = suggestions.get("effective", {}).get("recommendations", []) if isinstance(suggestions, dict) else []
+            recommendation_items = (
+                suggestions.get("effective", {}).get("recommendations", []) if isinstance(suggestions, dict) else []
+            )
             action = str(recommendation_items[0].get("action") if recommendation_items else "").strip()
         if not action:
             raise HTTPException(status_code=400, detail="SEO recommendation action is required")
@@ -964,7 +975,9 @@ async def api_project_apply_draft(project_id: str, product_id: int, draft_id: st
 async def api_project_draft_quality_preview(project_id: str, product_id: int, draft_id: str, request: Request):
     body = await _request_data(request)
     try:
-        return await _effective_service(request).draft_quality_preview(project_id, product_id, body.get("payload") or {})
+        return await _effective_service(request).draft_quality_preview(
+            project_id, product_id, body.get("payload") or {}
+        )
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -981,7 +994,11 @@ async def api_project_product_versions(project_id: str, product_id: int, request
         )
         from app.web.routes.editor import _version_to_dict
 
-        return {"project_id": project_id, "product_id": product_id, "items": [_version_to_dict(version) for version in versions]}
+        return {
+            "project_id": project_id,
+            "product_id": product_id,
+            "items": [_version_to_dict(version) for version in versions],
+        }
     except Exception as exc:
         raise _editor_error(exc) from exc
 
@@ -1077,7 +1094,9 @@ async def project_manual_edit_apply(project_id: str, product_id: int, request: R
 @router.get("/api/projects/{project_id}/export-preview")
 async def api_project_export_preview(project_id: str, request: Request, marketplace_profile: str = "universal"):
     try:
-        return await ProjectExportService(request.app.state.db).preview(project_id, marketplace_profile=marketplace_profile)
+        return await ProjectExportService(request.app.state.db).preview(
+            project_id, marketplace_profile=marketplace_profile
+        )
     except Exception as exc:
         raise _editor_error(exc) from exc
 

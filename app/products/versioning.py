@@ -174,11 +174,7 @@ class ProductVersionBuilder:
         sort: str = "newest_first",
         version_type: str = "all",
     ) -> list[ProductVersion]:
-        version_events = [
-            event
-            for event in timeline_events
-            if event.event_type in _VERSION_EVENT_TYPES
-        ]
+        version_events = [event for event in timeline_events if event.event_type in _VERSION_EVENT_TYPES]
         version_events.sort(key=lambda event: event_sort_key(event.occurred_at))
 
         versions: list[ProductVersion] = []
@@ -253,9 +249,7 @@ class ProductVersionBuilder:
                         new_value=new,
                     )
                 )
-        warnings = [
-            "Описание, бренд, характеристики и полный набор изображений исторически не сохранялись полностью."
-        ]
+        warnings = ["Описание, бренд, характеристики и полный набор изображений исторически не сохранялись полностью."]
         return ProductVersionComparison(
             product_id=product_id,
             from_version=from_version.version_number,

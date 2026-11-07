@@ -146,17 +146,25 @@ async def collect_report_data(db: Database) -> dict:
 
     async with db.session() as s:
         products = (await s.execute(select(Product).order_by(desc(Product.last_check)))).scalars().all()
-        history_rows = (await s.execute(
-            select(PriceHistory, Product)
-            .join(Product)
-            .where(PriceHistory.recorded_at >= since_30d)
-            .order_by(PriceHistory.recorded_at)
-        )).all()
-        attempts = (await s.execute(
-            select(ScrapeAttempt)
-            .where(ScrapeAttempt.recorded_at >= since_30d)
-            .order_by(desc(ScrapeAttempt.recorded_at))
-        )).scalars().all()
+        history_rows = (
+            await s.execute(
+                select(PriceHistory, Product)
+                .join(Product)
+                .where(PriceHistory.recorded_at >= since_30d)
+                .order_by(PriceHistory.recorded_at)
+            )
+        ).all()
+        attempts = (
+            (
+                await s.execute(
+                    select(ScrapeAttempt)
+                    .where(ScrapeAttempt.recorded_at >= since_30d)
+                    .order_by(desc(ScrapeAttempt.recorded_at))
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     history_by_product: dict[int, list[PriceHistory]] = defaultdict(list)
     for history, _product in history_rows:
@@ -178,8 +186,7 @@ async def collect_report_data(db: Database) -> dict:
         status_counter[availability] += 1
 
         recent_prices = [
-            h.price for h in history
-            if h.price is not None and (_as_utc(h.recorded_at) or now) >= since_24h
+            h.price for h in history if h.price is not None and (_as_utc(h.recorded_at) or now) >= since_24h
         ]
         if len(set(recent_prices)) > 1:
             changes_24h += 1
@@ -205,31 +212,33 @@ async def collect_report_data(db: Database) -> dict:
             min_price = max_price = avg_price = trend_pct = volatility = forecast_7d = None
             is_deal = False
 
-        product_cards.append({
-            "id": product.id,
-            "name": product.name or "Без названия",
-            "url": product.url,
-            "image_url": _normalize_image_url(product.image_url),
-            "marketplace": marketplace,
-            "current_price": current_price,
-            "min_price": min_price,
-            "max_price": max_price,
-            "avg_price": avg_price,
-            "trend_pct": trend_pct or 0,
-            "volatility": volatility or 0,
-            "pattern": pattern,
-            "pattern_label": PATTERN_ADVICE.get(pattern, ("Нет паттерна", ""))[0],
-            "availability": availability,
-            "forecast_7d": forecast_7d,
-            "observations": len(history),
-            "prices_history": prices[-18:],
-            "last_check": last_check.strftime("%d.%m.%Y %H:%M") if last_check else "нет данных",
-            "is_deal": is_deal,
-        })
+        product_cards.append(
+            {
+                "id": product.id,
+                "name": product.name or "Без названия",
+                "url": product.url,
+                "image_url": _normalize_image_url(product.image_url),
+                "marketplace": marketplace,
+                "current_price": current_price,
+                "min_price": min_price,
+                "max_price": max_price,
+                "avg_price": avg_price,
+                "trend_pct": trend_pct or 0,
+                "volatility": volatility or 0,
+                "pattern": pattern,
+                "pattern_label": PATTERN_ADVICE.get(pattern, ("Нет паттерна", ""))[0],
+                "availability": availability,
+                "forecast_7d": forecast_7d,
+                "observations": len(history),
+                "prices_history": prices[-18:],
+                "last_check": last_check.strftime("%d.%m.%Y %H:%M") if last_check else "нет данных",
+                "is_deal": is_deal,
+            }
+        )
 
     deals = sorted(
         [p for p in product_cards if p["is_deal"]],
-        key=lambda p: ((p["max_price"] or 0) - (p["current_price"] or 0)),
+        key=lambda p: (p["max_price"] or 0) - (p["current_price"] or 0),
         reverse=True,
     )
 
@@ -273,7 +282,11 @@ async def collect_report_data(db: Database) -> dict:
         "availability": dict(status_counter),
         "changes_24h": changes_24h,
         "stale_products": [
-            {"name": p.name or "Без названия", "url": p.url, "last_check": p.last_check.strftime("%d.%m.%Y %H:%M") if p.last_check else "нет данных"}
+            {
+                "name": p.name or "Без названия",
+                "url": p.url,
+                "last_check": p.last_check.strftime("%d.%m.%Y %H:%M") if p.last_check else "нет данных",
+            }
             for p in stale_products[:10]
         ],
         "products": product_cards,
@@ -317,7 +330,7 @@ def generate_html_report(data: dict) -> str:
         for row in data["stale_products"]
     )
     if not stale_html:
-        stale_html = '<li><span>Просроченных проверок нет.</span><span>OK</span></li>'
+        stale_html = "<li><span>Просроченных проверок нет.</span><span>OK</span></li>"
 
     hourly_html = "\n".join(
         f'<div class="hour" title="{hour:02d}:00 - {count} записей" style="--alpha:{0.12 + (count / max_hourly) * 0.78:.2f}"></div>'
@@ -326,10 +339,13 @@ def generate_html_report(data: dict) -> str:
 
     source_html = _render_distribution(parse_stats["by_source"], "source")
     market_html = _render_distribution(parse_stats["by_marketplace"], "market")
-    status_html = "\n".join(
-        f'<div class="bar-row"><span>{escape(status)}</span><div><b style="width:{round(count / max_status * 100)}%"></b></div><strong>{count}</strong></div>'
-        for status, count in sorted(parse_stats["by_status"].items())
-    ) or '<div class="muted">Измерения не найдены</div>'
+    status_html = (
+        "\n".join(
+            f'<div class="bar-row"><span>{escape(status)}</span><div><b style="width:{round(count / max_status * 100)}%"></b></div><strong>{count}</strong></div>'
+            for status, count in sorted(parse_stats["by_status"].items())
+        )
+        or '<div class="muted">Измерения не найдены</div>'
+    )
 
     products_json = escape(json.dumps(products, ensure_ascii=False), quote=False)
 
@@ -338,7 +354,7 @@ def generate_html_report(data: dict) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Отчёт мониторинга цен - {escape(data['generated_at'])}</title>
+<title>Отчёт мониторинга цен - {escape(data["generated_at"])}</title>
 <style>
 :root {{
   --bg:#f5f7fb; --panel:#ffffff; --line:#dfe5ee; --text:#1c2533; --muted:#667085;
@@ -415,16 +431,16 @@ th {{ color:var(--muted); font-weight:650; }}
   <div class="top">
     <div>
       <h1>Отчёт мониторинга цен</h1>
-      <div class="sub">Период: {escape(data['period_label'])}. Данные собраны из базы parser_agent.</div>
+      <div class="sub">Период: {escape(data["period_label"])}. Данные собраны из базы parser_agent.</div>
     </div>
-    <div class="stamp">Сгенерировано: {escape(data['generated_at'])}</div>
+    <div class="stamp">Сгенерировано: {escape(data["generated_at"])}</div>
   </div>
 
   <section class="metrics">
-    <div class="metric"><small>Товаров в мониторинге</small><b>{data['total_products']}</b><span>{escape(', '.join(f'{k}: {v}' for k, v in data['marketplaces'].items()) or 'маркетплейсы не найдены')}</span></div>
-    <div class="metric"><small>Успешность парсинга</small><b>{parse_stats['success_rate'] if parse_stats['success_rate'] is not None else '—'}%</b><span>{parse_stats['success']} OK из {parse_stats['total']} попыток</span></div>
-    <div class="metric"><small>Средняя задержка</small><b>{parse_stats['avg_latency_ms'] if parse_stats['avg_latency_ms'] is not None else '—'} мс</b><span>по scrape_attempts</span></div>
-    <div class="metric"><small>Изменений за 24 часа</small><b>{data['changes_24h']}</b><span>{len(data['deals'])} потенциальных сделок</span></div>
+    <div class="metric"><small>Товаров в мониторинге</small><b>{data["total_products"]}</b><span>{escape(", ".join(f"{k}: {v}" for k, v in data["marketplaces"].items()) or "маркетплейсы не найдены")}</span></div>
+    <div class="metric"><small>Успешность парсинга</small><b>{parse_stats["success_rate"] if parse_stats["success_rate"] is not None else "—"}%</b><span>{parse_stats["success"]} OK из {parse_stats["total"]} попыток</span></div>
+    <div class="metric"><small>Средняя задержка</small><b>{parse_stats["avg_latency_ms"] if parse_stats["avg_latency_ms"] is not None else "—"} мс</b><span>по scrape_attempts</span></div>
+    <div class="metric"><small>Изменений за 24 часа</small><b>{data["changes_24h"]}</b><span>{len(data["deals"])} потенциальных сделок</span></div>
   </section>
 
   <section class="section grid">
@@ -489,20 +505,17 @@ def _render_product_card(product: dict) -> str:
     }.get(product["availability"], product["availability"])
     fallback = (
         f'<span class="thumb-fallback"><b>{escape(product["marketplace"])}</b>'
-        f'<strong>{_money(product["current_price"])}</strong>'
-        f'<span>{escape(product["name"][:70])}</span></span>'
+        f"<strong>{_money(product['current_price'])}</strong>"
+        f"<span>{escape(product['name'][:70])}</span></span>"
     )
-    image = (
-        f'<a class="thumb missing" href="{escape(product["url"])}" target="_blank" rel="noreferrer">'
-        f"{fallback}</a>"
-    )
+    image = f'<a class="thumb missing" href="{escape(product["url"])}" target="_blank" rel="noreferrer">{fallback}</a>'
     if product.get("image_url"):
         image = (
             f'<a class="thumb" href="{escape(product["url"])}" target="_blank" rel="noreferrer">'
             f"{fallback}"
             f'<img src="{escape(product["image_url"])}" alt="{escape(product["name"][:80])}" '
             'loading="lazy" '
-            'onerror="this.parentElement.classList.add(\'missing\'); this.remove()">'
+            "onerror=\"this.parentElement.classList.add('missing'); this.remove()\">"
             "</a>"
             f'<a class="image-url" href="{escape(product["image_url"])}" target="_blank" rel="noreferrer">image source</a>'
         )
@@ -510,22 +523,22 @@ def _render_product_card(product: dict) -> str:
     <article class="{card_class}">
       {image}
       <div class="card-head">
-        <a class="name" href="{escape(product['url'])}">{escape(product['name'][:120])}</a>
-        <span class="badge {escape(product['marketplace'])}">{escape(product['marketplace'])}</span>
+        <a class="name" href="{escape(product["url"])}">{escape(product["name"][:120])}</a>
+        <span class="badge {escape(product["marketplace"])}">{escape(product["marketplace"])}</span>
       </div>
       <div class="price">
-        <strong>{_money(product['current_price'])}</strong>
-        <em class="{trend_class}">{_pct(product['trend_pct'])}</em>
-        {'<em>сделка</em>' if product['is_deal'] else ''}
+        <strong>{_money(product["current_price"])}</strong>
+        <em class="{trend_class}">{_pct(product["trend_pct"])}</em>
+        {"<em>сделка</em>" if product["is_deal"] else ""}
       </div>
       {spark}
       <div class="meta">
         <span><b>{escape(availability)}</b>статус</span>
-        <span><b>{_money(product['min_price'])}</b>минимум</span>
-        <span><b>{_money(product['max_price'])}</b>максимум</span>
-        <span><b>{product['observations']}</b>точек</span>
-        <span><b>{_money(product['forecast_7d'])}</b>прогноз 7д</span>
-        <span><b>{escape(product['last_check'])}</b>проверка</span>
+        <span><b>{_money(product["min_price"])}</b>минимум</span>
+        <span><b>{_money(product["max_price"])}</b>максимум</span>
+        <span><b>{product["observations"]}</b>точек</span>
+        <span><b>{_money(product["forecast_7d"])}</b>прогноз 7д</span>
+        <span><b>{escape(product["last_check"])}</b>проверка</span>
       </div>
     </article>"""
 
@@ -536,7 +549,7 @@ def _render_deal(deal: dict) -> str:
     return f"""
     <div class="deal-line">
       <div>
-        <a href="{escape(deal['url'])}">{escape(deal['name'][:95])}</a>
+        <a href="{escape(deal["url"])}">{escape(deal["name"][:95])}</a>
         <span>Экономия {_money(saving)} относительно максимума</span>
       </div>
       <strong>{saving_pct}%</strong>
@@ -546,10 +559,14 @@ def _render_deal(deal: dict) -> str:
 def _render_distribution(items: dict, css_prefix: str) -> str:
     if not items:
         return '<div class="muted">Измерения не найдены</div>'
-    return '<div class="dist">' + "".join(
-        f'<span class="pill {css_prefix}-{escape(str(key))}">{escape(str(key))}: <b>{value}</b></span>'
-        for key, value in sorted(items.items())
-    ) + "</div>"
+    return (
+        '<div class="dist">'
+        + "".join(
+            f'<span class="pill {css_prefix}-{escape(str(key))}">{escape(str(key))}: <b>{value}</b></span>'
+            for key, value in sorted(items.items())
+        )
+        + "</div>"
+    )
 
 
 def _render_bad_attempt(row: dict) -> str:

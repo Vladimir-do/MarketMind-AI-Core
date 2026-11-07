@@ -16,10 +16,7 @@ from app.config import (
     logger,
 )
 
-DEFAULT_SYSTEM_PROMPT = (
-    "Ты эксперт по анализу цен на маркетплейсах. "
-    "Отвечай кратко, по делу, на русском языке."
-)
+DEFAULT_SYSTEM_PROMPT = "Ты эксперт по анализу цен на маркетплейсах. Отвечай кратко, по делу, на русском языке."
 
 
 def ai_is_available() -> bool:
@@ -85,7 +82,8 @@ async def _ask_claude(prompt: str, *, system: str, max_tokens: int) -> str:
         # SOCKS URLs there. Prefer the explicit HTTP(S) proxy used by this host.
         configured_proxy = os.environ.get("AI_HTTP_PROXY")
         proxy_url = (
-            None if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
+            None
+            if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
             else configured_proxy
             or os.environ.get("HTTPS_PROXY")
             or os.environ.get("https_proxy")
@@ -155,6 +153,7 @@ async def _ask_groq(prompt: str, *, system: str, max_tokens: int) -> str:
     if not GROQ_API_KEY:
         return ai_missing_message()
     import os
+
     proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or None
     try:
         headers = {
@@ -213,15 +212,13 @@ async def _ask_gemini(prompt: str, *, system: str, max_tokens: int) -> str:
             },
         }
         headers["x-goog-api-key"] = GEMINI_API_KEY
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/"
-            f"models/{GEMINI_MODEL}:generateContent"
-        )
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
         # aiohttp does not inherit proxy variables unless trust_env is enabled.
         # Use only the explicit HTTP(S) proxy and ignore stale ALL_PROXY values.
         configured_proxy = os.environ.get("AI_HTTP_PROXY")
         proxy_url = (
-            None if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
+            None
+            if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
             else configured_proxy
             or os.environ.get("HTTPS_PROXY")
             or os.environ.get("https_proxy")

@@ -125,9 +125,11 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
             async def execute(self, *args, **kwargs):
                 self._select_calls += 1
                 if self._select_calls == 1:
+
                     class _EmptyResult:
                         def scalar_one_or_none(self):
                             return None
+
                     return _EmptyResult()
                 return await self._real.execute(*args, **kwargs)
 

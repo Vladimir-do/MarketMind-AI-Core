@@ -224,10 +224,12 @@
 class Form(StatesGroup):
     waiting_urls = State()
 
+
 @router.message(Command("add"))
 async def cmd_add(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_urls)
     await message.answer("Пришлите ссылки, по одной на строку")
+
 
 @router.message(Form.waiting_urls)
 async def handle_urls(message: types.Message, state: FSMContext):
@@ -432,6 +434,7 @@ async def handle_urls(message: types.Message, state: FSMContext):
 
 ```python
 resilience = MarketplaceResilience()
+
 
 async def guarded_fetch(marketplace: str, fetch):
     if resilience.is_open(marketplace):

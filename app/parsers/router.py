@@ -2,6 +2,7 @@
 router.py — роутер маркетплейсов.
 Автоматически определяет какой парсер использовать по URL.
 """
+
 import asyncio
 
 from app.config import logger
