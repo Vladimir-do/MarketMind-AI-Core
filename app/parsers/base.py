@@ -13,7 +13,7 @@ class ProductData:
     price: int | None
     old_price: int | None
     discount_pct: int | None
-    availability: str           # in_stock / out_of_stock / deleted
+    availability: str           # in_stock / out_of_stock / deleted / unknown
     url: str
     image_url: str | None
     # Расширенные поля

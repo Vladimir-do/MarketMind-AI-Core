@@ -43,7 +43,9 @@ def parse_yandex_market_html(html: str, url: str) -> ProductData | None:
     rating = _rating_from_json(product)
     reviews_count = _reviews_count_from_json(product)
     brand = _brand_from_json(product)
-    category = _json_value(product, "category")
+    category = _category_from_json(product)
+    seller_name = _seller_from_offer(offer)
+    reviews = _reviews_from_json(product)
 
     return ProductData(
         name=name,
@@ -55,9 +57,11 @@ def parse_yandex_market_html(html: str, url: str) -> ProductData | None:
         image_url=image_url,
         rating=rating,
         reviews_count=reviews_count,
+        seller_name=seller_name,
         brand=brand,
-        category=category if isinstance(category, str) else None,
+        category=category,
         marketplace="yandex_market",
+        reviews=reviews,
     )
 
 
@@ -309,9 +313,12 @@ def _availability_from_offer(offer, text: str, price: int | None) -> str:
     joined = " ".join(values).lower()
     if "outofstock" in joined or "soldout" in joined or "нет в продаже" in text:
         return "out_of_stock"
-    if "instock" in joined or price:
+    if "instock" in joined:
         return "in_stock"
-    return "out_of_stock"
+    if "outofstock" in joined or "soldout" in joined:
+        return "out_of_stock"
+    # A missing stock signal is not proof that the product is unavailable.
+    return "unknown"
 
 
 def _image_from_json(product: dict) -> str | None:
@@ -327,17 +334,71 @@ def _rating_from_json(product: dict) -> float | None:
     rating = _json_value(product, "aggregateRating")
     value = _json_value(rating, "ratingValue")
     try:
-        return float(str(value).replace(",", ".")) if value is not None else None
-    except ValueError:
+        parsed = float(str(value).replace(",", ".")) if value is not None else None
+    except (TypeError, ValueError):
         return None
+    return parsed if parsed is not None and 0 <= parsed <= 5 else None
 
 
 def _reviews_count_from_json(product: dict) -> int | None:
     rating = _json_value(product, "aggregateRating")
     for key in ("reviewCount", "ratingCount"):
-        value = _int_price(_json_value(rating, key))
-        if value is not None:
+        raw = _json_value(rating, key)
+        try:
+            value = int(str(raw).replace(" ", "").replace("\u00a0", ""))
+        except (TypeError, ValueError):
+            continue
+        if value >= 0:
             return value
+    return None
+
+
+def _reviews_from_json(product: dict, limit: int = 20) -> list[str]:
+    """Extract only explicit review text; never synthesize review content."""
+    raw_reviews = _json_value(product, "review")
+    if isinstance(raw_reviews, dict):
+        raw_reviews = [raw_reviews]
+    if not isinstance(raw_reviews, list):
+        return []
+    reviews = []
+    seen = set()
+    for item in raw_reviews:
+        if not isinstance(item, dict):
+            continue
+        body = item.get("reviewBody") or item.get("description")
+        if not isinstance(body, str):
+            continue
+        body = re.sub(r"\s+", " ", body).strip()
+        if body and body.casefold() not in seen:
+            seen.add(body.casefold())
+            reviews.append(body[:2000])
+        if len(reviews) >= limit:
+            break
+    return reviews
+
+
+def _seller_from_offer(offer) -> str | None:
+    offers = offer if isinstance(offer, list) else [offer]
+    for item in offers:
+        if not isinstance(item, dict):
+            continue
+        seller = item.get("seller")
+        if isinstance(seller, dict):
+            name = seller.get("name")
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        elif isinstance(seller, str) and seller.strip():
+            return seller.strip()
+    return None
+
+
+def _category_from_json(product: dict) -> str | None:
+    value = _json_value(product, "category")
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, list):
+        parts = [str(part).strip() for part in value if str(part).strip()]
+        return " / ".join(parts) or None
     return None
 
 

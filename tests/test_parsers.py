@@ -72,6 +72,43 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(data.brand, "Example")
         self.assertEqual(data.marketplace, "yandex_market")
 
+    def test_yandex_market_extracts_explicit_reviews_and_seller(self):
+        html = """
+        <script type="application/ld+json">
+        {
+          "@type": "Product",
+          "name": "Кофемолка",
+          "review": [
+            {"@type": "Review", "reviewBody": "Мелет быстро и равномерно."},
+            {"@type": "Review", "reviewBody": "   Мелет быстро и равномерно.  "},
+            {"@type": "Review", "reviewBody": "Шумновата ночью."},
+            {"@type": "Review", "reviewBody": ""}
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "2500",
+            "seller": {"@type": "Organization", "name": "Магазин Пример"}
+          }
+        }
+        </script>
+        """
+        data = parse_yandex_market_html(html, "https://market.yandex.ru/product--coffee/123")
+        self.assertIsNotNone(data)
+        self.assertEqual(data.seller_name, "Магазин Пример")
+        self.assertEqual(data.reviews, ["Мелет быстро и равномерно.", "Шумновата ночью."])
+        self.assertEqual(data.availability, "unknown")
+
+    def test_yandex_market_does_not_invent_stock_or_accept_invalid_rating(self):
+        html = """
+        <script type="application/ld+json">
+        {"@type":"Product", "name":"Товар", "aggregateRating":{"ratingValue":"8.9"}}
+        </script>
+        """
+        data = parse_yandex_market_html(html, "https://market.yandex.ru/product--item/123")
+        self.assertIsNotNone(data)
+        self.assertIsNone(data.rating)
+        self.assertEqual(data.availability, "unknown")
+
     def test_yandex_market_attempt_recorder_gets_normalized_fields(self):
         attempts = []
 
