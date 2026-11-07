@@ -96,6 +96,97 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(attempts[0]["http_status"], 403)
         self.assertEqual(attempts[0]["latency_ms"], 42)
 
+    def test_yandex_market_retries_transient_5xx_then_succeeds(self):
+        html = "<html><body><h1>Тестовый товар</h1></body></html>"
+        statuses = [503, 200]
+        session_count = 0
+
+        class FakeResponse:
+            def __init__(self, status):
+                self.status = status
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def text(self, errors="strict"):
+                return html
+
+        class FakeSession:
+            def __init__(self, **kwargs):
+                nonlocal session_count
+                session_count += 1
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            def get(self, url, timeout=None):
+                return FakeResponse(statuses.pop(0))
+
+        parser = YandexMarketParser()
+        with (
+            patch("app.parsers.yandex_market.aiohttp.ClientSession", side_effect=FakeSession),
+            patch("app.parsers.yandex_market.asyncio.sleep", new_callable=AsyncMock) as sleep,
+        ):
+            data = asyncio.run(parser.fetch_product("https://market.yandex.ru/product--test/1"))
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data.name, "Тестовый товар")
+        self.assertEqual(session_count, 2)
+        sleep.assert_awaited_once_with(1.0)
+
+    def test_yandex_market_does_not_retry_rate_limit(self):
+        session_count = 0
+
+        class FakeResponse:
+            status = 429
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def text(self, errors="strict"):
+                return "rate limited"
+
+        class FakeSession:
+            def __init__(self, **kwargs):
+                nonlocal session_count
+                session_count += 1
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            def get(self, url, timeout=None):
+                return FakeResponse()
+
+        attempts = []
+
+        async def recorder(**kwargs):
+            attempts.append(kwargs)
+
+        parser = YandexMarketParser(attempt_recorder=recorder)
+        with (
+            patch("app.parsers.yandex_market.aiohttp.ClientSession", side_effect=FakeSession),
+            patch("app.parsers.yandex_market.asyncio.sleep", new_callable=AsyncMock) as sleep,
+        ):
+            data = asyncio.run(parser.fetch_product("https://market.yandex.ru/product--test/1"))
+
+        self.assertIsNone(data)
+        self.assertEqual(session_count, 1)
+        sleep.assert_not_awaited()
+        self.assertEqual(attempts[0]["status"], "blocked")
+        self.assertEqual(attempts[0]["http_status"], 429)
+
     def test_cache_html_service_title_is_ignored(self):
         html = "<html><head><title>Google Search</title></head><body></body></html>"
 
