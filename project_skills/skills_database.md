@@ -426,6 +426,7 @@ async def handle_urls(message: types.Message, state: FSMContext):
 - Уровень сложности: `senior`
 - Maturity: `usable`
 - Теги: `rate-limit`, `circuit-breaker`, `cooldown`, `anti-block`
+- Telegram fallback note: when one marketplace is in cooldown, exclude only that source from concurrent competitor search, continue querying independent marketplaces with `return_exceptions=True`, and tell the user which sources remain active. Escape user-derived query text before embedding it in Telegram HTML.
 
 Пример кода:
 
@@ -545,6 +546,7 @@ async def guarded_fetch(marketplace: str, fetch):
 - Уровень сложности: `middle`
 - Maturity: `usable`
 - Теги: `ai`, `grok`, `claude`, `provider`
+- Claude card-generation setup: keep the Anthropic key only in the local `.env` (mode `600`); use `scripts/configure_claude_ai.py` for hidden interactive entry and automatic backup; `ANTHROPIC_MODEL` defaults to the current `claude-sonnet-5-5` API model and can be overridden through environment configuration. Claude Pro subscription does not supply API credits.
 
 Пример кода:
 

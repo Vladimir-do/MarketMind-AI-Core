@@ -2,7 +2,7 @@ id: title_generator
 version: "1"
 status: active
 purpose: "Генерация SEO-заголовка карточки товара с альтернативами"
-model: claude-3-5-sonnet-latest
+model: claude-sonnet-5-5
 marketplace: universal
 category: null
 input_schema: app.content_pipeline.schemas.ProductPassport

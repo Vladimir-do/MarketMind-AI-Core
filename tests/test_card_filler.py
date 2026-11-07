@@ -49,6 +49,34 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(draft.attributes["Цвет"], "черный")
         self.assertEqual(draft.images, ["https://example.com/photo.jpg"])
 
+    def test_wireless_headphones_are_not_misclassified_as_cable(self):
+        draft = build_ozon_card_draft(
+            "товар: Беспроводные наушники\n"
+            "бренд: Baseus\n"
+            "категория: Наушники\n"
+            "цвет: черный\n"
+            "подключение: Bluetooth"
+        )
+
+        self.assertIn("Беспроводные наушники", draft.name)
+        self.assertIn("Baseus", draft.name)
+        self.assertNotIn("Кабель", draft.name)
+        self.assertIn("Наушники", draft.category_hint)
+        self.assertNotIn("Кабели", build_ozon_card_search_query(draft))
+
+    def test_competitor_search_query_uses_core_product_and_brand_not_color(self):
+        draft = build_ozon_card_draft(
+            "товар: Беспроводные наушники\n"
+            "бренд: Baseus\n"
+            "категория: Наушники\n"
+            "цвет: черный\n"
+            "подключение: Bluetooth"
+        )
+        query = build_ozon_card_search_query(draft)
+        self.assertEqual(query, "Беспроводные наушники")
+        self.assertNotIn("черный", query.lower())
+        self.assertNotIn("baseus", query.lower())
+
     def test_build_ozon_import_payload_contains_item(self):
         draft = build_ozon_card_draft("товар: Кабель USB-C\nцена: 299\nвес: 50 г\nразмер: 100x80x20 мм")
         payload = build_ozon_import_payload(draft)
@@ -91,6 +119,14 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Откройте XLSX", preview)
         self.assertIn("JSON пока нужен как техфайл", preview)
 
+    def test_preview_shows_competitor_price_summary_safely(self):
+        draft = build_ozon_card_draft("товар: Беспроводные наушники\nбренд: Baseus")
+        draft.competitor_summary = "Найдено конкурентов: 8; цены: 1712–2766 ₽; медиана 1796 ₽ <img>"
+        preview = format_ozon_card_preview(draft)
+        self.assertIn("Найдено конкурентов: 8", preview)
+        self.assertIn("медиана 1796 ₽", preview)
+        self.assertIn("&lt;img&gt;", preview)
+
     def test_batch_exports_xlsx_and_json(self):
         ready = build_ozon_card_draft(
             "товар: Кабель USB-C\nкатегория: Кабели\nцена: 299\nвес: 50 г\nразмер: 100x80x20 мм\nhttps://example.com/photo.jpg"
@@ -113,6 +149,9 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(xlsx_buf.getvalue()), 1000)
         with ZipFile(xlsx_buf) as archive:
             self.assertIn("xl/workbook.xml", archive.namelist())
+        workbook = openpyxl.load_workbook(xlsx_buf)
+        self.assertIn("Конкуренты", workbook.sheetnames)
+        self.assertEqual(workbook["Конкуренты"].cell(1, 4).value, "Название конкурента")
 
     def test_batch_preview_shows_summary_and_problem_items(self):
         draft = build_ozon_card_draft("товар: Кусачки маникюрные\nцена: 444")
@@ -143,6 +182,53 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ежедневной зарядки", draft.description)
         self.assertEqual(draft.attributes["Назначение"], "зарядка и передача данных")
         self.assertEqual(draft.checklist, ["Проверить длину кабеля"])
+
+    async def test_supplement_local_fallback_removes_unverified_manufacturer_claim(self):
+        with patch("app.card_filler.ai_is_available", return_value=False):
+            draft = await build_enhanced_ozon_card_draft(
+                "товар: Комплекс витаминов группы B и магний\nбренд: Нет бренда"
+            )
+        self.assertNotIn("производителем", draft.description.lower())
+        self.assertNotIn("преимущества:", draft.description.lower())
+        self.assertIn("сверьте полный состав", draft.description.lower())
+
+    async def test_enhanced_supplement_drops_unverified_manufacturer_and_usage_claims(self):
+        ai_response = json.dumps({
+            "name": "Комплекс витаминов группы B и магний",
+            "description": "Комплекс витаминов группы B и магний поставляется напрямую от производителя. Подходит для регулярного приёма дома и в поездке. Сверьте состав и дозировку на упаковке.",
+            "category_hint": "Красота и здоровье/Витамины и БАДы/Минералы",
+            "brand": "Нет бренда",
+            "attributes": {},
+            "keywords": ["витамины группы B", "магний"],
+            "selling_points": ["Поставка напрямую от производителя", "Удобно принимать каждый день"],
+            "checklist": ["Уточнить дозировку и количество капсул"],
+            "notes": "Удалены неподтверждённые утверждения.",
+        })
+        with (
+            patch("app.card_filler.ai_is_available", return_value=True),
+            patch("app.card_filler.ask_ai", new=AsyncMock(return_value=ai_response)),
+        ):
+            draft = await build_enhanced_ozon_card_draft(
+                "товар: Комплекс витаминов группы B и магний\nкатегория: Красота и здоровье/Витамины и БАДы/Минералы"
+            )
+        self.assertNotIn("производителя", draft.description.lower())
+        self.assertNotIn("регулярного приёма", draft.description.lower())
+        self.assertFalse(any("производителя" in point.lower() for point in draft.selling_points))
+        self.assertFalse(any("каждый день" in point.lower() for point in draft.selling_points))
+        self.assertIn("дозировку", draft.description.lower())
+
+    def test_supplement_filter_removes_unverified_manufacturer_course_and_dose_claims(self):
+        from app.card_filler import _remove_unverified_supplement_claims
+        text = (
+            "Преимущества: форма выпуска и дозировка указаны прямо в карточке. "
+            "Упаковка рассчитана на курс — не нужно пересчитывать дозы самостоятельно. "
+            "Информация предоставлена производителем. Перед покупкой проверьте состав на упаковке."
+        )
+        cleaned = _remove_unverified_supplement_claims(text, "товар: витамины и магний")
+        low = cleaned.lower()
+        for unsupported in ("преимущества", "рассчитана на курс", "производителем", "дозировка указаны"):
+            self.assertNotIn(unsupported, low)
+        self.assertIn("проверьте состав", low)
 
     async def test_enhanced_card_uses_competitor_context_without_ai(self):
         with patch("app.card_filler.ai_is_available", return_value=False):
@@ -196,13 +282,16 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
             await build_enhanced_ozon_card_draft(
                 "товар: Капсулы Клиар для иммунитета, 20 шт\nбренд: Клиар",
                 competitors=[
-                    {"name": "Витамины для иммунитета в капсулах с магнием", "price": 550},
+                    {"marketplace": "yandex_market", "name": "Витамины для иммунитета в капсулах с магнием", "price": 550,
+                     "rating": 4.8, "reviews_count": 42, "availability": "in_stock"},
                 ],
             )
 
         prompt = ai_mock.call_args.args[0]
         self.assertIn("competitor_seo_gap", prompt)
         self.assertIn("магнием", prompt)
+        self.assertIn("reviews_count", prompt)
+        self.assertIn("yandex_market", prompt)
 
     async def test_enhanced_card_handles_ai_error_as_local_draft(self):
         with (
@@ -296,6 +385,44 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("B6", draft.description)
         self.assertNotIn("в6", draft.name.lower())
         self.assertNotIn("в6", draft.description.lower())
+
+    def test_competitor_references_are_exported_separately_not_as_own_images(self):
+        draft = build_ozon_card_draft(
+            "товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники"
+        )
+        draft.competitors = [{
+            "marketplace": "wildberries",
+            "name": "Беспроводные наушники Baseus конкурент",
+            "price": 1990,
+            "url": "https://example.com/product",
+            "image_url": "https://example.com/competitor.jpg",
+        }]
+        exported = export_ozon_card_xlsx(draft)
+        workbook = openpyxl.load_workbook(exported)
+        self.assertIn("Конкуренты", workbook.sheetnames)
+        sheet = workbook["Конкуренты"]
+        self.assertEqual(sheet.cell(2, 2).value, "Беспроводные наушники Baseus конкурент")
+        self.assertEqual(sheet.cell(2, 11).value, "https://example.com/competitor.jpg")
+        self.assertEqual(draft.images, [])
+        self.assertIn("фото", build_ozon_card_quality_report(draft).missing)
+
+    async def test_competitor_summary_has_per_marketplace_price_context_and_metadata(self):
+        draft = build_ozon_card_draft(
+            "товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники"
+        )
+        draft = await build_enhanced_ozon_card_draft(draft.source_text, competitors=[
+            {"marketplace": "yandex_market", "name": "Наушники Baseus One", "price": 2000,
+             "rating": 4.8, "reviews_count": 25, "availability": "in_stock",
+             "url": "https://market.yandex.ru/card/one/1", "image_url": "https://img.example/one.jpg"},
+            {"marketplace": "wildberries", "name": "Наушники Baseus Two", "price": 3000,
+             "old_price": 3500, "discount_pct": 14, "url": "https://www.wildberries.ru/catalog/2/detail.aspx"},
+        ])
+        self.assertIn("Найдено конкурентов: 2", draft.competitor_summary)
+        self.assertIn("Wildberries — 1", draft.competitor_summary)
+        self.assertIn("Яндекс Маркет — 1", draft.competitor_summary)
+        self.assertIn("медиана 2500", draft.competitor_summary)
+        self.assertEqual(draft.competitors[0]["reviews_count"], 25)
+        self.assertEqual(draft.competitors[1]["discount_pct"], 14)
 
     def test_quality_report_highlights_ready_draft(self):
         draft = build_ozon_card_draft(

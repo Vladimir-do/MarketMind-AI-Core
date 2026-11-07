@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import ssl
 import time
 from typing import Any
@@ -90,9 +91,22 @@ class OpenAICompatibleProvider(BaseAIProvider):
         )
         try:
             timeout_obj = aiohttp.ClientTimeout(total=self._timeout, connect=min(self._timeout, 20.0))
+            # aiohttp does not read proxy environment variables by default.
+            # MarketMind runs behind HAPP on this host, so route provider
+            # requests through the explicitly configured AI proxy.
+            configured_proxy = os.environ.get("AI_HTTP_PROXY")
+            proxy_url = (
+                None if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
+                else configured_proxy
+                or os.environ.get("HTTPS_PROXY")
+                or os.environ.get("https_proxy")
+                or os.environ.get("HTTP_PROXY")
+                or os.environ.get("http_proxy")
+                or None
+            )
             async with (
                 aiohttp.ClientSession(timeout=timeout_obj) as session,
-                session.post(url, json=payload, headers=headers) as resp,
+                session.post(url, json=payload, headers=headers, proxy=proxy_url) as resp,
             ):
                 try:
                     body = await resp.json(content_type=None)

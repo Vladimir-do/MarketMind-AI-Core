@@ -6,13 +6,17 @@ from typing import TYPE_CHECKING
 from aiogram import Bot, types
 
 from app.config import PROXY
+from app.searcher import ozon_search_blocked_message
 from app.telegram_card_tasks import (
     build_card_task_from_product as _build_card_task_from_product,
 )
 from app.telegram_card_tasks import (
     build_card_task_from_url as _build_card_task_from_url,
 )
-from app.telegram_marketplace_utils import _search_competitors_with_fallback
+from app.telegram_marketplace_utils import (
+    _search_competitors_with_fallback,
+    build_competitor_search_status,
+)
 from app.telegram_url_utils import extract_supported_urls
 from app.worker import worker_add_urls
 
@@ -103,10 +107,32 @@ async def generate_ozon_card_files(
         try:
             search_query = build_ozon_card_search_query(base_draft)
             await message.answer(
-                f"🔎 Ищу конкурентов для карточки: <b>{search_query}</b>...",
+                build_competitor_search_status(search_query),
                 parse_mode="HTML",
             )
             competitors = await _search_competitors_with_fallback(search_query, max_per_site=8)
+            if competitors:
+                by_market = {}
+                for item in competitors:
+                    market = item.get("marketplace") or "другая площадка"
+                    by_market[market] = by_market.get(market, 0) + 1
+                market_labels = {"wildberries": "Wildberries", "ozon": "Ozon", "yandex_market": "Яндекс Маркет"}
+                summary = ", ".join(
+                    f"{market_labels.get(market, market)}: {count}" for market, count in sorted(by_market.items())
+                )
+                source_note = ozon_search_blocked_message()
+                source_note = f"\n⚠️ {source_note}" if source_note else ""
+                await message.answer(
+                    f"✅ Получено предложений от площадок: <b>{len(competitors)}</b> ({summary}). "
+                    "Ссылки, цены и фото конкурентов сохранены на отдельном листе XLSX как справочные данные."
+                    f"{source_note}",
+                    parse_mode="HTML",
+                )
+            else:
+                await message.answer(
+                    "⚠️ Релевантные предложения конкурентов не получены. "
+                    "Карточка создана без конкурентной статистики; цены и фото конкурентов не подставлялись.",
+                )
         except Exception as e:
             logger.warning(f"card competitor search failed: {e}")
             await message.answer("⚠️ Конкурентов сейчас не удалось собрать, продолжаю по данным товара.")
@@ -115,7 +141,7 @@ async def generate_ozon_card_files(
 
     draft = await build_enhanced_ozon_card_draft(text, competitors=competitors, profile=profile)
     quality = build_ozon_card_quality_report(draft)
-    quality_lines = [f"Оценка качества: <b>{quality.score}/100</b>"]
+    quality_lines = [f"Оценка готовности данных: <b>{quality.score}/100</b>"]
     if quality.missing:
         quality_lines.append("Не хватает: " + ", ".join(quality.missing))
     if quality.warnings:

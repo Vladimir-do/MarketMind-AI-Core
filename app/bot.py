@@ -263,6 +263,10 @@ def parse_natural_request(
     raw = (text or "").strip()
     if _is_training_protocol_fragment(raw):
         return "unknown", None
+    # Explicit product briefs should always enter card generation, never
+    # marketplace search (e.g. "товар: Беспроводные наушники").
+    if re.search(r"(?im)^\s*(?:товар|название товара|product(?: name)?)\s*[:=]\s*\S+", raw):
+        return "ozon_card", raw
     structured_task = detect_task_intent(raw, context=context)
     if structured_task.type is TaskType.REPAIR:
         return "repair_task", structured_task
@@ -680,6 +684,49 @@ async def cmd_add(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_urls)
 
 
+async def _auto_generate_blocked_ozon_cards(message: types.Message, urls: list[str]) -> int:
+    """Automatically create a card draft for Ozon URLs saved after scraping was blocked."""
+    generated = 0
+    for url in urls:
+        host = (urlparse(url).netloc or "").lower()
+        if "ozon.ru" not in host:
+            continue
+        product = await db.get_product_by_hash(url_to_hash(url))
+        if not product:
+            continue
+        last_price = await db.get_last_price(product.id)
+        if not last_price or (last_price.availability_status or "").lower() != "blocked":
+            continue
+
+        task = _build_card_task_from_product(product, last_price.price if last_price else None)
+        task += (
+            "\nВАЖНО: исходная карточка Ozon заблокировала парсинг. "
+            "Название из URL не подтверждено страницей товара. Не придумывай цену, фотографии, "
+            "бренд, состав, дозировки, характеристики, наличие или отзывы. "
+            "Явно пометь отсутствующие сведения как требующие проверки."
+        )
+        await message.answer(
+            "🤖 Ozon не отдал карточку товара. Не останавливаюсь — автоматически создаю "
+            "проверочный AI-черновик по доступным данным."
+        )
+        try:
+            await generate_ozon_card_files(
+                message,
+                task,
+                parser_lock=parser_lock,
+                bot=bot,
+                get_active_profile=get_active_profile,
+            )
+            generated += 1
+        except Exception as exc:
+            logger.exception("Automatic card generation failed for blocked Ozon URL: %s", url)
+            await message.answer(
+                "⚠️ Черновик товара сохранён, но автоматически сформировать файлы не удалось. "
+                "Можно повторить через /make_card_last."
+            )
+    return generated
+
+
 @dp.message(Form.waiting_urls)
 async def handle_urls(message: types.Message, state: FSMContext):
     if not await ensure_allowed(message):
@@ -700,14 +747,17 @@ async def handle_urls(message: types.Message, state: FSMContext):
 
     try:
         await worker_add_urls(db, urls, lambda t: notify_chat(message.chat.id, t), proxy=proxy)
+    finally:
+        parser_lock.release()
+
+    auto_cards = await _auto_generate_blocked_ozon_cards(message, urls)
+    if not auto_cards:
         latest = await db.get_latest_product()
         if latest:
             await message.answer(
                 "✅ Товар добавлен в мониторинг.\n"
                 "Чтобы сразу собрать карточку товара, отправьте /make_card_last"
             )
-    finally:
-        parser_lock.release()
 
 
 # ── /update ───────────────────────────────────────────────────────────────────
@@ -1483,6 +1533,8 @@ async def handle_natural_add_urls(message: types.Message, urls: list[str]):
         await worker_add_urls(db, urls, lambda t: notify_chat(message.chat.id, t), proxy=proxy)
     finally:
         parser_lock.release()
+
+    await _auto_generate_blocked_ozon_cards(message, urls)
 
 
 async def handle_natural_card_urls(message: types.Message, urls: list[str]):

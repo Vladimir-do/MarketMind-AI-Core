@@ -1,9 +1,20 @@
 import json
+import os
 import ssl
 
 import aiohttp
+import httpx
 
-from app.config import AI_PROVIDER, ANTHROPIC_API_KEY, GEMINI_API_KEY, GROK_API_KEY, GROQ_API_KEY, logger
+from app.config import (
+    AI_PROVIDER,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    GROK_API_KEY,
+    GROQ_API_KEY,
+    logger,
+)
 
 DEFAULT_SYSTEM_PROMPT = (
     "Ты эксперт по анализу цен на маркетплейсах. "
@@ -70,14 +81,30 @@ async def _ask_claude(prompt: str, *, system: str, max_tokens: int) -> str:
     try:
         import anthropic
 
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-        response = await client.messages.create(
-            model="claude-3-5-sonnet-latest",
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
+        # Ignore ALL_PROXY: desktop VPN clients may export unsupported or stale
+        # SOCKS URLs there. Prefer the explicit HTTP(S) proxy used by this host.
+        configured_proxy = os.environ.get("AI_HTTP_PROXY")
+        proxy_url = (
+            None if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
+            else configured_proxy
+            or os.environ.get("HTTPS_PROXY")
+            or os.environ.get("https_proxy")
+            or os.environ.get("HTTP_PROXY")
+            or os.environ.get("http_proxy")
+            or None
         )
-        return response.content[0].text
+        http_client = httpx.AsyncClient(proxy=proxy_url, trust_env=False)
+        async with anthropic.AsyncAnthropic(
+            api_key=ANTHROPIC_API_KEY,
+            http_client=http_client,
+        ) as client:
+            response = await client.messages.create(
+                model=ANTHROPIC_MODEL,
+                max_tokens=max_tokens,
+                system=system,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text
     except Exception as e:
         logger.error("Claude API error: %r", e, exc_info=True)
         return f"AI error: {type(e).__name__}: {e}" if str(e) else f"AI error: {type(e).__name__}"
@@ -182,18 +209,32 @@ async def _ask_gemini(prompt: str, *, system: str, max_tokens: int) -> str:
             "generationConfig": {
                 "maxOutputTokens": max_tokens,
                 "temperature": 0.3,
+                "responseMimeType": "application/json" if "required_json_schema" in prompt else "text/plain",
             },
         }
         headers["x-goog-api-key"] = GEMINI_API_KEY
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
-            "models/gemini-2.0-flash:generateContent"
+            f"models/{GEMINI_MODEL}:generateContent"
+        )
+        # aiohttp does not inherit proxy variables unless trust_env is enabled.
+        # Use only the explicit HTTP(S) proxy and ignore stale ALL_PROXY values.
+        configured_proxy = os.environ.get("AI_HTTP_PROXY")
+        proxy_url = (
+            None if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
+            else configured_proxy
+            or os.environ.get("HTTPS_PROXY")
+            or os.environ.get("https_proxy")
+            or os.environ.get("HTTP_PROXY")
+            or os.environ.get("http_proxy")
+            or None
         )
         async with aiohttp.ClientSession(headers=headers) as session:  # noqa: SIM117
             async with session.post(
                 url,
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=60),
+                proxy=proxy_url,
             ) as resp:
                 body_text = await resp.text()
                 data = _safe_json_loads(body_text)

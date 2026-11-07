@@ -109,8 +109,10 @@ def require_bot_token() -> str:
 
 # ── Claude AI ─────────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")  # legacy
+ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 GROK_API_KEY: str = os.getenv("GROK_API_KEY", "")
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 AI_PROVIDER: str = os.getenv("AI_PROVIDER", "grok")  # grok / claude / gemini
 AI_ENABLED: bool = _env_bool("AI_ENABLED", "0")

@@ -258,6 +258,94 @@ def extract_product_from_cache_html(html: str, url: str) -> dict | None:
     return None
 
 
+
+
+def _normalize_product_text(value: str) -> str:
+    value = (value or "").lower().replace("ё", "е")
+    return re.sub(r"[^a-zа-я0-9]+", " ", value).strip()
+
+
+def _ozon_slug_identity(url: str) -> dict:
+    parsed = urlparse(url)
+    match = re.search(r"/product/([^/?#]+?)-(\d+)(?:/|$)", parsed.path, re.I)
+    if not match:
+        return {"title": "", "article_id": None}
+    return {"title": match.group(1).replace("-", " "), "article_id": match.group(2)}
+
+
+def score_alternative_product_match(original_title: str, candidate_title: str) -> dict:
+    """Conservative identity match; category similarity alone is insufficient."""
+    original = _normalize_product_text(original_title)
+    candidate = _normalize_product_text(candidate_title)
+    groups = {
+        "brand": ("immunit",),
+        "magnesium": ("магний", "magnesium"),
+        "b_vitamins": ("b6", "в6", "группы b", "группы в", "витаминов группы b", "витаминов группы в"),
+        "effervescent": ("шипуч", "effervescent"),
+        "pack_20": ("20",),
+    }
+    checks = {key: (bool(re.search(r"(?<!\d)20(?!\d)", candidate)) if key == "pack_20" else any(token in candidate for token in tokens)) for key, tokens in groups.items()}
+    source_checks = {
+        "brand": "immunit" in original,
+        "magnesium": "магний" in original or "magnesium" in original or "magniy" in original,
+        "b_vitamins": any(token in original for token in ("b6", "в6", "группы b", "группы в", "gruppy b")),
+        "effervescent": "шипуч" in original or "effervescent" in original or "shipuch" in original,
+        "pack_20": bool(re.search(r"(?<!\d)20(?!\d)", original)),
+    }
+    strong_match = all(checks.values()) and all(source_checks.values())
+    return {
+        # No cross-marketplace SKU/barcode identity has been verified.
+        "is_exact_match": False,
+        "is_strong_match": strong_match,
+        "confidence": 0.90 if strong_match else 0.0,
+        "match_basis": [key for key, matched in checks.items() if matched],
+        "required_checks": checks,
+    }
+
+
+async def find_ozon_alternative_candidates(url: str, *, max_results: int = 10) -> list[dict]:
+    """Find Yandex Market reference offers; never relabel them as Ozon facts."""
+    identity = _ozon_slug_identity(url)
+    if not identity["title"]:
+        return []
+    from datetime import UTC, datetime
+    from app.parsers.yandex_market import YandexMarketParser
+
+    products = await YandexMarketParser().search(identity["title"], max_results=max_results)
+    candidates = []
+    for product in products:
+        match = score_alternative_product_match(identity["title"], product.name)
+        fields = ("name", "price", "image_url", "rating", "reviews_count", "brand", "availability")
+        candidates.append({
+            "role": "reference_offer",
+            "marketplace": product.marketplace,
+            "name": product.name,
+            "url": product.url,
+            "price": product.price,
+            "image_url": product.image_url,
+            "rating": product.rating,
+            "reviews_count": product.reviews_count,
+            "brand": product.brand,
+            "availability": product.availability,
+            "source_url": product.url,
+            "source_marketplace": product.marketplace,
+            "confidence": match["confidence"],
+            "is_exact_match": match["is_exact_match"],
+            "is_strong_match": match["is_strong_match"],
+            "match_basis": match["match_basis"],
+            "verified_at": datetime.now(UTC).isoformat(),
+            "field_sources": {
+                field: {
+                    "source_url": product.url,
+                    "source_marketplace": product.marketplace,
+                    "confidence": match["confidence"],
+                }
+                for field in fields if getattr(product, field, None) is not None
+            },
+        })
+    return candidates
+
+
 # ── Основная функция ────────────────────────────────────────────────────────
 
 async def fetch_from_alt_sources(url: str, query: str = "") -> dict | None:

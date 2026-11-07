@@ -73,6 +73,27 @@ class WebHealthTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("access-control-allow-origin", response.headers)
 
+    async def test_cors_wildcard_never_enables_credentials(self):
+        os.environ["CORS_ORIGINS"] = "*"
+        from app.web.app import create_app
+
+        wildcard_app = create_app()
+        async with AsyncClient(
+            transport=ASGITransport(app=wildcard_app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.options(
+                "/health",
+                headers={
+                    "Origin": "https://public.example",
+                    "Access-Control-Request-Method": "GET",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("access-control-allow-origin"), "*")
+        self.assertNotIn("access-control-allow-credentials", response.headers)
+
 
 if __name__ == "__main__":
     unittest.main()

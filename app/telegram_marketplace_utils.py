@@ -55,6 +55,19 @@ def _format_cross_marketplace_results(
     return "\n".join(lines)
 
 
+def build_competitor_search_status(query: str) -> str:
+    """Tell the user which sources are searched when Ozon is cooling down."""
+    blocked_message = ozon_search_blocked_message()
+    safe_query = html.escape(query)
+    if blocked_message:
+        return (
+            f"🔎 {html.escape(blocked_message)} "
+            "Ищу альтернативы на Wildberries и Яндекс Маркете "
+            f"для карточки: <b>{safe_query}</b>..."
+        )
+    return f"🔎 Ищу конкурентов для карточки: <b>{safe_query}</b>..."
+
+
 def _flatten_competitor_results(results_by_marketplace: dict[str, list]) -> list[dict]:
     items: list[dict] = []
     for marketplace in ("wildberries", "ozon", "yandex_market"):

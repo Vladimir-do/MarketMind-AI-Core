@@ -2,7 +2,7 @@ id: content_strategy_builder
 version: "1"
 status: active
 purpose: "Построение стратегии карточки товара: ЦА, УТП, тональность, возражения"
-model: claude-3-5-sonnet-latest
+model: claude-sonnet-5-5
 marketplace: universal
 category: null
 input_schema: app.content_pipeline.schemas.ProductPassport

@@ -95,6 +95,40 @@ class TestOpenAICompatibleProvider(unittest.TestCase):
         self.assertEqual(result.input_tokens, 5)
         self.assertEqual(result.output_tokens, 3)
 
+    def test_complete_uses_configured_ai_http_proxy(self):
+        p = OpenAICompatibleProvider(api_key="sk-test", provider_label="gemini")
+        post_resp = _make_async_response(_mock_openai_response("proxy works"))
+        session_mock = _make_session_mock(post_resp)
+        mock_aiohttp = MagicMock()
+        mock_aiohttp.ClientSession.return_value = session_mock
+        mock_aiohttp.ClientTimeout.return_value = MagicMock()
+
+        with (
+            patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp),
+            patch.dict("os.environ", {"AI_HTTP_PROXY": "http://127.0.0.1:10809"}),
+        ):
+            result = _run(p.complete("say hello"))
+
+        self.assertEqual(result.text, "proxy works")
+        self.assertEqual(session_mock.__aenter__.return_value.post.call_args.kwargs["proxy"], "http://127.0.0.1:10809")
+
+    def test_complete_direct_mode_bypasses_environment_proxy(self):
+        p = OpenAICompatibleProvider(api_key="sk-test", provider_label="gemini")
+        post_resp = _make_async_response(_mock_openai_response("direct works"))
+        session_mock = _make_session_mock(post_resp)
+        mock_aiohttp = MagicMock()
+        mock_aiohttp.ClientSession.return_value = session_mock
+        mock_aiohttp.ClientTimeout.return_value = MagicMock()
+
+        with (
+            patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp),
+            patch.dict("os.environ", {"AI_HTTP_PROXY": "direct", "HTTPS_PROXY": "http://127.0.0.1:10809"}),
+        ):
+            result = _run(p.complete("say hello"))
+
+        self.assertEqual(result.text, "direct works")
+        self.assertIsNone(session_mock.__aenter__.return_value.post.call_args.kwargs["proxy"])
+
     def test_complete_http_error(self):
         p = OpenAICompatibleProvider(api_key="sk-test", provider_label="openai")
 
@@ -216,6 +250,7 @@ class TestFactory(unittest.TestCase):
         self.assertEqual(p.name(), "claude")
         self.assertTrue(p.is_available(), "claude provider must be available with a valid API key")
         self.assertTrue(p.base_url, "claude provider must resolve a non-empty base_url")
+        self.assertEqual(p._model, "claude-sonnet-5-5")
 
     def test_create_configured_provider_default_matches_config_ai_provider_default(self):
         """When AI_PROVIDER is unset, the factory's hardcoded default must

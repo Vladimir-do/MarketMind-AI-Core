@@ -73,6 +73,44 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "ok")
         ask_claude.assert_awaited_once()
 
+    async def test_ask_claude_uses_configured_current_model(self):
+        from types import SimpleNamespace
+
+        fake_client = SimpleNamespace(
+            messages=SimpleNamespace(
+                create=AsyncMock(
+                    return_value=SimpleNamespace(content=[SimpleNamespace(text="claude response")])
+                )
+            )
+        )
+        fake_sdk_client = MagicMock()
+        fake_sdk_client.__aenter__ = AsyncMock(return_value=fake_client)
+        fake_sdk_client.__aexit__ = AsyncMock(return_value=False)
+        anthropic_factory = MagicMock(return_value=fake_sdk_client)
+        fake_anthropic = SimpleNamespace(AsyncAnthropic=anthropic_factory)
+        fake_http_client = MagicMock()
+        with (
+            patch.object(ai_client, "ANTHROPIC_API_KEY", "sk-ant-test"),
+            patch.object(ai_client, "ANTHROPIC_MODEL", "claude-sonnet-5-5"),
+            patch.object(ai_client.httpx, "AsyncClient", return_value=fake_http_client) as http_factory,
+            patch.dict(
+                "os.environ",
+                {"AI_HTTP_PROXY": "", "HTTPS_PROXY": "http://127.0.0.1:10809", "ALL_PROXY": "socks://127.0.0.1:3067"},
+            ),
+            patch.dict("sys.modules", {"anthropic": fake_anthropic}),
+        ):
+            result = await ai_client._ask_claude("test prompt", system="system", max_tokens=123)
+
+        self.assertEqual(result, "claude response")
+        http_factory.assert_called_once_with(proxy="http://127.0.0.1:10809", trust_env=False)
+        anthropic_factory.assert_called_once_with(api_key="sk-ant-test", http_client=fake_http_client)
+        fake_client.messages.create.assert_awaited_once_with(
+            model="claude-sonnet-5-5",
+            max_tokens=123,
+            system="system",
+            messages=[{"role": "user", "content": "test prompt"}],
+        )
+
     async def test_grok_string_error_payload_does_not_crash(self):
         class FakeResponse:
             status = 400
@@ -196,6 +234,39 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
             await ai_client._ask_groq("hello", system="system", max_tokens=10)
 
         self.assertEqual(FakeSession.posted_payloads[0]["model"], "some-future-model")
+
+    async def test_gemini_uses_configured_model_and_explicit_https_proxy(self):
+        captured = {}
+        response = _FakeGeminiResponse(
+            200,
+            '{"candidates":[{"content":{"parts":[{"text":"Gemini ready"}]}}]}',
+        )
+
+        class CapturingSession(_FakeGeminiSession):
+            def __init__(self, *args, **kwargs):
+                captured["headers"] = kwargs.get("headers", {})
+                super().__init__(response=response, *args, **kwargs)
+
+            def post(self, *args, **kwargs):
+                captured["url"] = args[0]
+                captured["kwargs"] = kwargs
+                return super().post(*args, **kwargs)
+
+        with (
+            patch.object(ai_client, "GEMINI_API_KEY", "gemini-secret"),
+            patch.object(ai_client, "GEMINI_MODEL", "gemini-3.5-flash-lite"),
+            patch.object(ai_client.aiohttp, "ClientSession", CapturingSession),
+            patch.dict(
+                "os.environ",
+                {"AI_HTTP_PROXY": "", "HTTPS_PROXY": "http://127.0.0.1:10809", "ALL_PROXY": "socks://127.0.0.1:3067"},
+            ),
+        ):
+            result = await ai_client._ask_gemini("hello", system="system", max_tokens=10)
+
+        self.assertEqual(result, "Gemini ready")
+        self.assertTrue(captured["url"].endswith("/models/gemini-3.5-flash-lite:generateContent"))
+        self.assertEqual(captured["kwargs"]["proxy"], "http://127.0.0.1:10809")
+        self.assertEqual(captured["headers"]["x-goog-api-key"], "gemini-secret")
 
     async def test_gemini_http_429_returns_quota_message(self):
         body = (

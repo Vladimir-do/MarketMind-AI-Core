@@ -2,7 +2,7 @@ id: description_generator
 version: "1"
 status: active
 purpose: "Генерация описания карточки товара из стратегии, семантики и преимуществ"
-model: claude-3-5-sonnet-latest
+model: claude-sonnet-5-5
 marketplace: universal
 category: null
 input_schema: app.content_pipeline.schemas.ProductPassport

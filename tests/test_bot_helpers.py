@@ -122,6 +122,62 @@ class BotHelperTests(unittest.TestCase):
         self.assertEqual(command_limit("/metrics@price_bot 99", "metrics", max_limit=30), 30)
         self.assertEqual(command_limit("/metrics bad", "metrics", default=7), 7)
 
+    def test_blocked_ozon_url_automatically_starts_card_generation(self):
+        from types import SimpleNamespace
+        import app.bot as bot_module
+
+        class FakeMessage:
+            chat = SimpleNamespace(id=123)
+            def __init__(self): self.answers = []
+            async def answer(self, text, **kwargs): self.answers.append(text)
+
+        async def run():
+            url = "https://www.ozon.ru/product/test-product-123456789/"
+            product = SimpleNamespace(id=7, name="Test product", url=url, image_url=None)
+            last = SimpleNamespace(price=None, availability_status="blocked")
+            fake_db = SimpleNamespace(
+                get_product_by_hash=AsyncMock(return_value=product),
+                get_last_price=AsyncMock(return_value=last),
+            )
+            message = FakeMessage()
+            with (
+                patch.object(bot_module, "db", fake_db),
+                patch.object(bot_module, "parser_lock", asyncio.Lock()),
+                patch.object(bot_module, "generate_ozon_card_files", AsyncMock()) as generate,
+                patch.object(bot_module, "get_active_profile", return_value={}),
+            ):
+                count = await bot_module._auto_generate_blocked_ozon_cards(message, [url])
+            self.assertEqual(count, 1)
+            generate.assert_awaited_once()
+            task = generate.await_args.args[1]
+            self.assertIn("123456789", task)
+            self.assertIn("не придумывай цену", task.lower())
+            self.assertTrue(any("автоматически создаю" in item.lower() for item in message.answers))
+
+        asyncio.run(run())
+
+    def test_auto_card_generation_skips_successfully_parsed_ozon_product(self):
+        from types import SimpleNamespace
+        import app.bot as bot_module
+
+        async def run():
+            url = "https://www.ozon.ru/product/test-product-123456789/"
+            product = SimpleNamespace(id=7, name="Test product", url=url, image_url=None)
+            last = SimpleNamespace(price=100, availability_status="in_stock")
+            fake_db = SimpleNamespace(
+                get_product_by_hash=AsyncMock(return_value=product),
+                get_last_price=AsyncMock(return_value=last),
+            )
+            with (
+                patch.object(bot_module, "db", fake_db),
+                patch.object(bot_module, "generate_ozon_card_files", AsyncMock()) as generate,
+            ):
+                count = await bot_module._auto_generate_blocked_ozon_cards(SimpleNamespace(), [url])
+            self.assertEqual(count, 0)
+            generate.assert_not_awaited()
+
+        asyncio.run(run())
+
     def test_run_search_query_releases_lock_when_ai_advice_fails(self):
         import app.bot as bot_module
 
@@ -153,6 +209,24 @@ class BotHelperTests(unittest.TestCase):
             "составь карточки: https://www.ozon.ru/product/one/, https://www.ozon.ru/product/two/"
         )
         self.assertEqual(sources, ["https://www.ozon.ru/product/one/", "https://www.ozon.ru/product/two/"])
+
+    def test_product_card_spec_is_kept_as_one_task(self):
+        prompt = (
+            "товар: Беспроводные наушники\n"
+            "бренд: Baseus\n"
+            "категория: Наушники\n"
+            "цвет: черный\n"
+            "подключение: Bluetooth"
+        )
+        self.assertEqual(split_natural_tasks(prompt), [prompt])
+        intent, payload = parse_natural_request(prompt)
+        self.assertEqual(intent, "ozon_card")
+        self.assertEqual(payload, prompt)
+
+    def test_single_explicit_product_line_is_not_marketplace_search(self):
+        intent, payload = parse_natural_request("товар: Беспроводные наушники")
+        self.assertEqual(intent, "ozon_card")
+        self.assertEqual(payload, "товар: Беспроводные наушники")
 
     def test_split_natural_tasks_preserves_multiple_user_commands(self):
         tasks = split_natural_tasks(

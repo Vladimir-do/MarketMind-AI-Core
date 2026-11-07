@@ -213,6 +213,31 @@ def _is_training_protocol_fragment(text: str) -> bool:
 
 
 def _looks_like_single_technical_spec(text: str) -> bool:
+    # Product card briefs are one structured task, not one task per field.
+    # This also covers the common Telegram flow where the FSM state was lost
+    # after /ozon_card and the catch-all handler receives the multiline text.
+    product_field_lines = 0
+    has_product_name = False
+    for line in (text or "").splitlines():
+        match = re.match(
+            r"^\s*([а-яёa-z_ ]+)\s*[:=]\s*.+$", line, flags=re.I
+        )
+        if not match:
+            continue
+        field = re.sub(r"\s+", " ", match.group(1).strip().lower())
+        if field in {
+            "товар", "название товара", "название", "product", "product name",
+            "бренд", "brand", "категория", "category", "цена", "price",
+            "цвет", "color", "материал", "material", "вес", "weight",
+            "размер", "size", "подключение", "connection", "характеристики",
+            "параметры", "модель", "артикул", "комплектация", "назначение",
+        }:
+            product_field_lines += 1
+            if field in {"товар", "название товара", "product", "product name"}:
+                has_product_name = True
+    if has_product_name or product_field_lines >= 2:
+        return True
+
     if _looks_like_training_prompt(text):
         return True
 

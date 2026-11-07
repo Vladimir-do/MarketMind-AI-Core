@@ -19,13 +19,42 @@ URL_RECOVERY_NOTE = (
 )
 
 
+def extract_ozon_product_identity(url: str) -> tuple[str | None, str | None]:
+    """Return a conservative title-from-slug and Ozon product ID from a URL."""
+    parsed = urlparse(url or "")
+    if "ozon.ru" not in (parsed.netloc or "").lower():
+        return None, None
+    parts = [part for part in parsed.path.split("/") if part]
+    if "product" not in parts:
+        return None, None
+    idx = parts.index("product")
+    if idx + 1 >= len(parts):
+        return None, None
+    slug = unquote(parts[idx + 1])
+    id_match = re.search(r"-(\d{6,})$", slug)
+    product_id = id_match.group(1) if id_match else None
+    if id_match:
+        slug = slug[:id_match.start()]
+    title = re.sub(r"\s+", " ", re.sub(r"[-_]+", " ", slug)).strip()
+    if title:
+        title = title[:1].upper() + title[1:]
+    return title or None, product_id
+
+
 def build_card_task_from_product(product: Any, price: int | None) -> str:
+    url_title, ozon_id = extract_ozon_product_identity(getattr(product, "url", ""))
     lines = [
-        f"{PRODUCT_LABEL}: {product.name or NEW_PRODUCT}",
+        f"{PRODUCT_LABEL}: {product.name or url_title or NEW_PRODUCT}",
         NO_BRAND,
     ]
+    if ozon_id:
+        lines.append(f"артикул Ozon: {ozon_id}")
+    if url_title and not price and not getattr(product, "image_url", None):
+        lines.append("примечание: название восстановлено из URL, не подтверждено страницей товара; проверить вручную")
     if price:
         lines.append(f"{PRICE_LABEL}: {price}")
+    elif url_title and (product.name or "").strip() == url_title:
+        lines.append("примечание: название восстановлено из URL, не подтверждено страницей товара; проверить вручную")
     if product.image_url:
         lines.append(product.image_url)
     lines.append(f"{SOURCE_LABEL}: {product.url}")
@@ -33,24 +62,16 @@ def build_card_task_from_product(product: Any, price: int | None) -> str:
 
 
 def build_card_task_from_url(url: str) -> str:
-    parsed = urlparse(url)
-    parts = [part for part in parsed.path.split("/") if part]
-    slug = ""
-    if "product" in parts:
-        idx = parts.index("product")
-        if idx + 1 < len(parts):
-            slug = parts[idx + 1]
-    if not slug and parts:
-        slug = parts[-1]
-
-    slug = unquote(slug)
-    slug = re.sub(r"-\d{6,}$", "", slug)
-    title = re.sub(r"[-_]+", " ", slug).strip()
-    title = re.sub(r"\s+", " ", title)
-    title = title[:1].upper() + title[1:] if title else NEW_PRODUCT
-    return "\n".join([
-        f"{PRODUCT_LABEL}: {title}",
-        NO_BRAND,
-        f"{SOURCE_LABEL}: {url}",
-        URL_RECOVERY_NOTE,
-    ])
+    title, ozon_id = extract_ozon_product_identity(url)
+    if not title:
+        parsed = urlparse(url)
+        parts = [part for part in parsed.path.split("/") if part]
+        slug = unquote(parts[-1]) if parts else ""
+        slug = re.sub(r"-\d{6,}$", "", slug)
+        title = re.sub(r"\s+", " ", re.sub(r"[-_]+", " ", slug)).strip()
+        title = title[:1].upper() + title[1:] if title else NEW_PRODUCT
+    lines = [f"{PRODUCT_LABEL}: {title}", NO_BRAND]
+    if ozon_id:
+        lines.append(f"артикул Ozon: {ozon_id}")
+    lines.extend([f"{SOURCE_LABEL}: {url}", URL_RECOVERY_NOTE])
+    return "\n".join(lines)
