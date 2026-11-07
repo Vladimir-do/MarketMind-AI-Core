@@ -96,6 +96,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
         mock_app.state.ai_queue = None
 
         with (
+            patch.dict("os.environ", {"AI_PROVIDER": "gemini", "GEMINI_API_KEY": "test-key"}),
             patch.object(ai_client, "GEMINI_API_KEY", "test-key"),
             patch.object(ai_client.aiohttp, "ClientSession", session_factory),
             patch(
@@ -150,6 +151,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
         mock_app.state.ai_queue = None
 
         with (
+            patch.dict("os.environ", {"AI_PROVIDER": "gemini", "GEMINI_API_KEY": "test-key"}),
             patch.object(ai_client, "GEMINI_API_KEY", "test-key"),
             patch.object(ai_client.aiohttp, "ClientSession", session_factory),
             patch(
@@ -209,6 +211,7 @@ class GeminiErrorToJobRecordsTests(unittest.IsolatedAsyncioTestCase):
         mock_app.state.ai_queue = None
 
         with (
+            patch.dict("os.environ", {"AI_PROVIDER": "gemini", "GEMINI_API_KEY": "test-key"}),
             patch.object(ai_client, "GEMINI_API_KEY", "test-key"),
             patch.object(ai_client.aiohttp, "ClientSession", session_factory),
             patch(

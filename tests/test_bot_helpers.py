@@ -255,7 +255,10 @@ https://books.toscrape.com/
         async def run():
             message = FakeMessage()
             state = AsyncMock()
-            with patch.object(bot_module, "handle_natural_search", AsyncMock()) as search:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [956343475]),
+                patch.object(bot_module, "handle_natural_search", AsyncMock()) as search,
+            ):
                 await bot_module.handle_unhandled_message(message, state)
             return message, search
 
@@ -301,6 +304,7 @@ https://books.toscrape.com/
             message = FakeMessage()
             state = AsyncMock()
             with (
+                patch.object(bot_module, "ADMIN_IDS", [956343475]),
                 patch.object(bot_module, "classify_page_before_parsing", AsyncMock(return_value="classified")) as classify,
                 patch.object(bot_module, "handle_scraping_task", AsyncMock()) as scraping,
                 patch.object(bot_module, "handle_natural_add_urls", AsyncMock()) as add_urls,
@@ -356,6 +360,7 @@ https://books.toscrape.com/
             message = FakeMessage()
             state = AsyncMock()
             with (
+                patch.object(bot_module, "ADMIN_IDS", [956343475]),
                 patch.object(bot_module, "classify_page_before_parsing", AsyncMock(return_value="classified")) as classify,
                 patch.object(bot_module, "handle_scraping_task", AsyncMock()) as scraping,
             ):
@@ -656,7 +661,10 @@ https://books.toscrape.com/
             bot_module.CHAT_CONTEXTS[FakeChat.id] = context
             message = FakeMessage()
             state = AsyncMock()
-            with patch.object(bot_module, "handle_scraping_task", AsyncMock()) as scraping:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [956343475]),
+                patch.object(bot_module, "handle_scraping_task", AsyncMock()) as scraping,
+            ):
                 await bot_module.handle_unhandled_message(message, state)
             return message, scraping
 
@@ -704,7 +712,10 @@ https://books.toscrape.com/
             bot_module.CHAT_CONTEXTS[FakeChat.id] = context
             message = FakeMessage()
             state = AsyncMock()
-            with patch.object(bot_module, "handle_natural_search", AsyncMock()) as search:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [956343475]),
+                patch.object(bot_module, "handle_natural_search", AsyncMock()) as search,
+            ):
                 await bot_module.handle_unhandled_message(message, state)
             return message, search
 
@@ -838,7 +849,10 @@ https://books.toscrape.com/
             message = FakeMessage()
             fake_path = Path(__file__).resolve().parent.parent / "project_skills" / "session_updates" / "test.yaml"
             proposal = type("Proposal", (), {"path": fake_path, "proposed_id": "router-training"})()
-            with patch.object(bot_module, "create_skill_note_proposal", return_value=proposal) as create:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [956343475]),
+                patch.object(bot_module, "create_skill_note_proposal", return_value=proposal) as create,
+            ):
                 await bot_module.cmd_skill_note(message)
             return message, create
 
@@ -866,7 +880,10 @@ https://books.toscrape.com/
         async def run():
             message = FakeMessage()
             path = Path("D:/LLM/parser_agent/project_skills/session_updates/test.yaml")
-            with patch.object(bot_module, "list_pending_skill_proposals", return_value=[path]):
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [956343475]),
+                patch.object(bot_module, "list_pending_skill_proposals", return_value=[path]),
+            ):
                 await bot_module.cmd_skill_pending(message)
             return message
 
