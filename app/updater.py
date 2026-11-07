@@ -232,7 +232,9 @@ def parse_ozon_api_json(payload: dict, url: str) -> dict | None:
     if not name:
         return None
 
-    availability = "out_of_stock" if out_of_stock and not price else "in_stock" if price else "out_of_stock"
+    # A price alone does not prove stock availability. Only explicit stock
+    # signals should produce in_stock/out_of_stock; otherwise preserve unknown.
+    availability = "out_of_stock" if out_of_stock else "unknown"
     return {"name": name, "price": price, "availability": availability, "image_url": image_url}
 
 
@@ -252,7 +254,7 @@ def _detect_ozon_html_availability(soup: BeautifulSoup, price: int | None) -> st
     if re.search(r"нет в наличии|товар недоступен|закончился|сообщить о поступлении", stock_text):
         return "out_of_stock"
 
-    return "in_stock" if price else "out_of_stock"
+    return "unknown"
 
 
 def parse_ozon_html(html: str, url: str) -> dict | None:

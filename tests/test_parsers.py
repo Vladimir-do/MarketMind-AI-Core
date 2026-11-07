@@ -290,6 +290,62 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(data.availability, "in_stock")
         self.assertEqual(data.marketplace, "wildberries")
 
+    def test_wildberries_product_without_stock_rows_is_unknown_not_out_of_stock(self):
+        data = WildberriesParser()._parse_product(
+            {
+                "name": "Органайзер",
+                "brand": "Brand",
+                "sizes": [{"price": {"product": 50000}}],
+            },
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+            session=None,
+        )
+
+        self.assertEqual(data.availability, "unknown")
+        self.assertEqual(data.brand, "Brand")
+
+    def test_wildberries_product_with_explicit_zero_stock_is_out_of_stock(self):
+        data = WildberriesParser()._parse_product(
+            {
+                "name": "Органайзер",
+                "sizes": [{"stocks": [{"qty": 0}]}],
+            },
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+            session=None,
+        )
+
+        self.assertEqual(data.availability, "out_of_stock")
+
+    def test_wildberries_brand_is_not_misreported_as_seller(self):
+        data = WildberriesParser()._parse_product(
+            {
+                "name": "Наушники",
+                "brand": "Acme",
+                "supplier": "ООО Продавец",
+                "supplierRating": 4.9,
+                "sizes": [{"stocks": [{"qty": 1}]}],
+            },
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+            session=None,
+        )
+
+        self.assertEqual(data.brand, "Acme")
+        self.assertEqual(data.seller_name, "ООО Продавец")
+        self.assertEqual(data.seller_rating, 4.9)
+
+    def test_wildberries_cloud_payload_missing_availability_is_unknown(self):
+        data = WildberriesParser()._parse_cloud_payload(
+            {"name": "Товар", "price": 100, "brand": "Acme"},
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+        )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data.availability, "unknown")
+
     def test_wb_search_parses_old_price_and_discount(self):
         parser = WildberriesParser()
         payload = {
@@ -496,7 +552,7 @@ class ParserTests(unittest.TestCase):
         self.assertIsNotNone(data)
         self.assertEqual(data["name"], "Car Phone Holder")
         self.assertEqual(data["price"], 1299)
-        self.assertEqual(data["availability"], "in_stock")
+        self.assertEqual(data["availability"], "unknown")
         self.assertEqual(data["image_url"], "https://cdn.example/img.webp")
 
     def test_ozon_html_parser_accepts_lazy_and_protocol_relative_images(self):
@@ -532,6 +588,17 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(data["price"], 248)
         self.assertEqual(data["availability"], "in_stock")
 
+    def test_ozon_html_without_stock_evidence_returns_unknown(self):
+        html = """
+        <html><body>
+          <h1>Car Phone Holder</h1>
+          <div data-widget="webPrice"><span>248 ₽</span></div>
+        </body></html>
+        """
+        data = parse_ozon_html(html, "https://www.ozon.ru/product/test")
+        self.assertIsNotNone(data)
+        self.assertEqual(data["availability"], "unknown")
+
     def test_ozon_html_detects_product_out_of_stock_widget(self):
         html = """
         <html>
@@ -559,7 +626,7 @@ class ParserTests(unittest.TestCase):
         self.assertIsNotNone(data)
         self.assertEqual(data["name"], "Car Phone Holder")
         self.assertEqual(data["price"], 1299)
-        self.assertEqual(data["availability"], "in_stock")
+        self.assertEqual(data["availability"], "unknown")
         self.assertEqual(data["image_url"], "https://cdn.example/img.webp")
 
     def test_mcp_product_payload_normalizer(self):

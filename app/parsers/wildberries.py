@@ -370,12 +370,13 @@ class WildberriesParser(BaseParser):
                 price=payload.get("price"),
                 old_price=payload.get("old_price"),
                 discount_pct=payload.get("discount_pct"),
-                availability=payload.get("availability", "out_of_stock"),
+                availability=payload.get("availability") or "unknown",
                 url=url,
                 image_url=payload.get("image_url"),
                 rating=payload.get("rating"),
                 reviews_count=payload.get("reviews_count"),
                 seller_name=payload.get("seller_name"),
+                seller_rating=payload.get("seller_rating"),
                 brand=payload.get("brand"),
                 marketplace="wildberries",
             )
@@ -403,12 +404,23 @@ class WildberriesParser(BaseParser):
         if price and old_price and old_price > price:
             discount_pct = round((old_price - price) / old_price * 100)
 
+        has_stock_rows = any(
+            bool(size.get("stocks"))
+            for size in sizes
+            if isinstance(size, dict)
+        )
         in_stock = any(
             stock.get("qty", 0) > 0
             for size in sizes
-            for stock in size.get("stocks", [])
+            if isinstance(size, dict)
+            for stock in (size.get("stocks") or [])
+            if isinstance(stock, dict)
         )
-        availability = "in_stock" if in_stock else "out_of_stock"
+        availability = (
+            "unknown"
+            if not has_stock_rows
+            else ("in_stock" if in_stock else "out_of_stock")
+        )
 
         image_url = _build_wb_image_url(nm_id)
 
@@ -427,7 +439,8 @@ class WildberriesParser(BaseParser):
             image_url=image_url,
             rating=p.get("reviewRating"),
             reviews_count=p.get("feedbacks"),
-            seller_name=p.get("brand"),
+            seller_name=p.get("supplier") or p.get("supplierName"),
+            seller_rating=p.get("supplierRating"),
             brand=p.get("brand"),
             marketplace="wildberries",
         )

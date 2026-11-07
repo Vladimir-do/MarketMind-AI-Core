@@ -96,7 +96,7 @@ class ImportFileErrorStatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("boom (test)", response.text)
 
     async def test_successful_import_stays_200_completed(self):
-        csv_bytes = "название,бренд,цена\nКроссовки RunMax,RunMax,4500\n".encode("utf-8")
+        csv_bytes = "название,бренд,цена\nКроссовки RunMax,RunMax,4500\n".encode()
 
         response = await self.client.post(
             "/api/import/file",

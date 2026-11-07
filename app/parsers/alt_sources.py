@@ -300,18 +300,17 @@ async def fetch_from_alt_sources(url: str, query: str = "") -> dict | None:
             return extract_product_from_cache_html(html, url)
 
     # Для WB — WB API уже надёжный, но пробуем suggestions
-    elif "wildberries.ru" in host or "wb.ru" in host:
-        if query:
-            items = await fetch_wb_suggestions(query)
-            if items:
-                item = items[0]
-                return {
-                    "url": f"https://www.wildberries.ru/catalog/{item.get('id')}/detail.aspx",
-                    "name": item.get("name"),
-                    "price": item.get("sizes", [{}])[0].get("price", {}).get("product") if item.get("sizes") else None,
-                    "availability": "in_stock",
-                    "brand": item.get("brand"),
-                    "image_url": None,
-                }
+    elif ("wildberries.ru" in host or "wb.ru" in host) and query:
+        items = await fetch_wb_suggestions(query)
+        if items:
+            item = items[0]
+            return {
+                "url": f"https://www.wildberries.ru/catalog/{item.get('id')}/detail.aspx",
+                "name": item.get("name"),
+                "price": item.get("sizes", [{}])[0].get("price", {}).get("product") if item.get("sizes") else None,
+                "availability": "unknown",
+                "brand": item.get("brand"),
+                "image_url": None,
+            }
 
     return None
