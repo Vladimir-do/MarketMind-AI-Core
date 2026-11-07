@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -81,12 +82,42 @@ def create_app() -> FastAPI:
             return Response(file_path.read_text(encoding="utf-8"), media_type=media_type)
         return Response(file_path.read_bytes(), media_type=media_type)
 
+    cors_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:8000,http://127.0.0.1:8000",
+        ).split(",")
+        if origin.strip()
+    ]
+    # Browsers reject credentialed CORS with a wildcard origin. Keep
+    # credentials disabled unless the operator supplies explicit origins.
+    allow_credentials = bool(cors_origins) and "*" not in cors_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=cors_origins,
+        allow_credentials=allow_credentials,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "HX-Boosted",
+            "HX-Current-URL",
+            "HX-History-Restore-Request",
+            "HX-Location",
+            "HX-Prompt",
+            "HX-Push",
+            "HX-Push-Url",
+            "HX-Request",
+            "HX-Reselect",
+            "HX-Reswap",
+            "HX-Retarget",
+            "HX-Target",
+            "HX-Trigger",
+            "HX-Trigger-After-Settle",
+            "HX-Trigger-After-Swap",
+            "HX-Trigger-Name",
+        ],
     )
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -96,14 +127,15 @@ def create_app() -> FastAPI:
     from app.content_pipeline.routes import router as content_pipeline_router
     from app.web.routes.dashboard import router as dashboard_router
     from app.web.routes.editor import router as editor_router
+    from app.web.routes.health import router as health_router
     from app.web.routes.import_ import router as import_router
     from app.web.routes.product_detail import router as product_detail_router
     from app.web.routes.products import router as products_router
+    from app.web.routes.projects import _editor_error
     from app.web.routes.projects import router as projects_router
     from app.web.routes.reports import router as reports_router
     from app.web.routes.suggestions import router as suggestions_router
     from app.web.routes.system import router as system_router
-    from app.web.routes.projects import _editor_error
 
     @app.exception_handler(Exception)
     async def handle_unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
@@ -136,5 +168,6 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router)
     app.include_router(reports_router)
     app.include_router(system_router)
+    app.include_router(health_router)
 
     return app
