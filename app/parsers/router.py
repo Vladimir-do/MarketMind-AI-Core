@@ -112,7 +112,10 @@ async def search_all_marketplaces(
                 price=item.get("price"),
                 old_price=None,
                 discount_pct=None,
-                availability="in_stock" if item.get("price") else "unknown",
+                # Search snippets expose a price but do not prove stock status.
+                # Keep availability unknown until a product-detail response provides
+                # an explicit in-stock/out-of-stock signal.
+                availability="unknown",
                 url=item.get("url", ""),
                 image_url=item.get("image_url"),
                 marketplace="ozon",
