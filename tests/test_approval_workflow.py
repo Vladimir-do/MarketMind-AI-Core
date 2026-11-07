@@ -289,6 +289,59 @@ class ApprovalWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(counts["rolled_back"], 0)
 
 
+class ApprovalQueueApplicationRestartTests(unittest.IsolatedAsyncioTestCase):
+    async def test_web_lifespan_restores_pending_approvals_from_disk(self):
+        """Pending approvals survive disposing and recreating the app database."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database_url = f"sqlite+aiosqlite:///{(Path(temp_dir) / 'approvals.db').as_posix()}"
+            _, database_module = reload_app_modules(database_url=database_url)
+
+            from app.ai_recommendation.db_approval import DatabaseApprovalQueue
+            from app.ai_recommendation.suggestions import AIRecommendationResult, AISuggestion
+
+            first_db = database_module.Database()
+            await first_db.init()
+            first_queue = DatabaseApprovalQueue(first_db)
+            result = AIRecommendationResult(
+                product_id="restart-product",
+                suggestions=[
+                    AISuggestion(
+                        field="title",
+                        suggestion_type="improve",
+                        before="Before restart",
+                        after="After restart",
+                        reason="Persistence regression test",
+                        confidence=0.95,
+                        metadata={"product_name": "Persistent product"},
+                    )
+                ],
+            )
+            added = await first_queue.add(result)
+            approval_id = added[0].approval_id
+            await first_db._engine.dispose()
+
+            # Exercise the real FastAPI lifespan, which creates a fresh Database
+            # and DatabaseApprovalQueue exactly as a web-process restart would.
+            from app.web.app import create_app
+
+            app = create_app()
+            async with app.router.lifespan_context(app):
+                self.assertIsInstance(app.state.ai_queue, DatabaseApprovalQueue)
+                pending = await app.state.ai_queue.get_pending()
+                self.assertEqual(len(pending), 1)
+                self.assertEqual(pending[0].approval_id, approval_id)
+                self.assertEqual(pending[0].product_id, "restart-product")
+                self.assertEqual(pending[0].suggestion.after, "After restart")
+                self.assertEqual(
+                    pending[0].suggestion.metadata["product_name"],
+                    "Persistent product",
+                )
+
+
+
 # Need select for inline queries
 from sqlalchemy import select  # noqa: E402
 
