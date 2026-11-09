@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "MarketMind: локальный Web UI (127.0.0.1:8000)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app.main",
+      "args": ["--web", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": true,
+      "console": "integratedTerminal"
+    }
+  ]
+}
