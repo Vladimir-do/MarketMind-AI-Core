@@ -51,6 +51,24 @@ class TelegramMarketplaceUtilsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item["marketplace"] for item in competitors], ["wildberries", "yandex_market"])
         self.assertEqual([item["name"] for item in competitors], ["WB product", "YM product"])
 
+    async def test_competitor_search_can_exclude_yandex_market(self):
+        search = AsyncMock(return_value={"wildberries": [], "ozon": [], "yandex_market": []})
+        with (
+            patch("app.telegram_marketplace_utils.ozon_search_blocked_message", return_value=None),
+            patch("app.telegram_marketplace_utils.search_all_marketplaces", search),
+        ):
+            await _search_competitors_with_fallback(
+                "query",
+                max_per_site=8,
+                exclude_marketplaces=("yandex_market",),
+            )
+
+        search.assert_awaited_once_with(
+            "query",
+            max_per_site=8,
+            exclude_marketplaces=("yandex_market",),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

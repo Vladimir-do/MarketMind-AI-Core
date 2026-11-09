@@ -42,6 +42,7 @@ from app.telegram_ai_reports import (
 
 # Backward-compatible helper re-exports used by tests and older callers.
 from app.telegram_card_handlers import (
+    MAX_BATCH_CARD_SOURCES,  # noqa: F401
     _build_card_task_from_product_data,
     _read_text_document,
     _split_batch_card_sources,  # noqa: F401
@@ -187,7 +188,6 @@ agent = PriceAgent(db)
 telegram_read_service = TelegramReadService(db)
 parser_lock = asyncio.Lock()
 MAX_NATURAL_TASKS = 300
-MAX_BATCH_CARD_SOURCES = 300
 DEFAULT_PROFILE_NAME = "default"
 CHAT_PROFILES: dict[int, str] = {}
 CHAT_CONTEXTS: dict[int, ContextSession] = {}

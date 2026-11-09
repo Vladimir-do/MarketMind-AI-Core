@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-MAX_BATCH_CARD_SOURCES = 300
+MAX_BATCH_CARD_SOURCES = 30
 CARD_GENERATION_SEMAPHORE = asyncio.Semaphore(2)
 CARD_GENERATION_TIMEOUT = 45.0
 
@@ -230,7 +230,7 @@ async def generate_ozon_batch_card_files(
 
             await worker_add_urls(db, url_sources, quiet_notify, proxy=PROXY if PROXY else None)
 
-        for source in sources:
+        for index, source in enumerate(sources, start=1):
             try:
                 task = source
                 fallback_message = ""
@@ -248,9 +248,11 @@ async def generate_ozon_batch_card_files(
                 base_draft = await _run_card_generation_task(build_ozon_card_draft, task)
                 competitors = []
                 try:
+                    excluded_marketplaces = () if index <= 3 else ("yandex_market",)
                     competitors = await _search_competitors_with_fallback(
                         build_ozon_card_search_query(base_draft),
                         max_per_site=8,
+                        exclude_marketplaces=excluded_marketplaces,
                     )
                 except Exception as e:
                     logger.warning(f"batch competitor search failed for {base_draft.name[:80]}: {e}")
@@ -282,9 +284,18 @@ async def generate_ozon_batch_card_files(
             except Exception as e:
                 logger.exception("Ошибка пакетной генерации карточки")
                 items.append(OzonCardBatchItem(None, source, "error", str(e)[:300]))
+            if index % 5 == 0:
+                await message.answer(f"Прогресс пакетной генерации: {index}/{len(sources)}")
     finally:
         parser_lock.release()
 
+    ready_count = sum(item.status == "ready" for item in items)
+    review_count = sum(item.status == "needs_review" for item in items)
+    error_count = sum(item.status == "error" for item in items)
+    await message.answer(
+        f"Пакет завершён. Обработано: {len(items)}; готово: {ready_count}; "
+        f"на проверку: {review_count}; ошибок: {error_count}."
+    )
     xlsx = export_ozon_cards_batch_xlsx(items)
     json_buf = export_ozon_cards_batch_json(items)
     await message.answer(format_ozon_batch_preview(items), parse_mode="HTML")

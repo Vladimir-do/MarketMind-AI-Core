@@ -598,7 +598,9 @@
       ],
       "source_paths": [
         "app/bot.py",
-        "app/card_filler.py"
+        "app/card_filler.py",
+        "app/telegram_card_handlers.py",
+        "app/telegram_marketplace_utils.py"
       ]
     },
     {

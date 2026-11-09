@@ -700,6 +700,7 @@ async def build_enhanced_card(task: str, competitors: list[dict], profile: dict)
 - Выходной результат: batch XLSX и JSON.
 - Пошаговый алгоритм: принять команду/caption/file; прочитать текст; split lines; для каждой строки собрать task; сгенерировать draft; собрать statuses; экспортировать batch files; отправить документы.
 - Правила качества: ограничить размер файла/количество строк; поэлементные ошибки; summary counts.
+- Batch budget note: cap batches before starting work; run costly Yandex competitor search only for the first few items (three in the current workflow), exclude Yandex for the rest, and report progress at a fixed interval while preserving per-item failures.
 - Типичные ошибки: файл не UTF-8; пустые строки; один bad item ломает batch.
 - Антипаттерны: требовать ручного запуска по одной карточке.
 - Production рекомендации: background jobs, progress per N items, persistent batch id.

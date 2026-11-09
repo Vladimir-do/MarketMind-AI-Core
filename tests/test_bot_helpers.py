@@ -1,6 +1,7 @@
 import asyncio
 import time
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -261,6 +262,89 @@ class BotHelperTests(unittest.TestCase):
             self.assertLessEqual(max_active, handlers.CARD_GENERATION_SEMAPHORE._value)
 
         asyncio.run(run())
+
+    def test_batch_cards_cap_progress_yandex_budget_and_partial_failure(self):
+        import app.bot as bot_module
+        import app.card_filler as card_filler
+        import app.telegram_card_handlers as handlers
+
+        class FakeBuffer:
+            name = "batch.xlsx"
+
+            def read(self):
+                return b""
+
+        sources = [f"source {index}" for index in range(1, 7)]
+        message = SimpleNamespace(chat=SimpleNamespace(id=1), answer=AsyncMock())
+        search = AsyncMock(return_value=[])
+
+        async def run_generation(func, task, **kwargs):
+            if func.__name__ == "build_ozon_card_draft":
+                if task == "source 2":
+                    raise RuntimeError("item failed")
+                return SimpleNamespace(name=task)
+            return SimpleNamespace(
+                name=task,
+                category_hint="category",
+                price=100,
+                images=["image"],
+                weight_g=1,
+                width_mm=1,
+                height_mm=1,
+                depth_mm=1,
+            )
+
+        async def run():
+            with (
+                patch.object(handlers, "_split_batch_card_sources", return_value=sources),
+                patch.object(handlers, "_run_card_generation_task", side_effect=run_generation),
+                patch.object(handlers, "_search_competitors_with_fallback", search),
+                patch.object(card_filler, "build_ozon_card_search_query", return_value="query"),
+                patch.object(card_filler, "export_ozon_cards_batch_xlsx", return_value=FakeBuffer()),
+                patch.object(card_filler, "export_ozon_cards_batch_json", return_value=FakeBuffer()),
+                patch.object(card_filler, "format_ozon_batch_preview", return_value="preview"),
+            ):
+                await handlers.generate_ozon_batch_card_files(
+                    message,
+                    "ignored by patched splitter",
+                    parser_lock=asyncio.Lock(),
+                    bot=None,
+                    get_active_profile=lambda _chat_id: {},
+                    db=SimpleNamespace(),
+                )
+
+        self.assertEqual(handlers.MAX_BATCH_CARD_SOURCES, 30)
+        self.assertEqual(bot_module.MAX_BATCH_CARD_SOURCES, 30)
+        asyncio.run(run())
+
+        self.assertEqual(
+            [call.kwargs["exclude_marketplaces"] for call in search.await_args_list],
+            [(), (), ("yandex_market",), ("yandex_market",), ("yandex_market",)],
+        )
+        answers = [call.args[0] for call in message.answer.await_args_list]
+        self.assertTrue(any("5/6" in answer for answer in answers))
+        self.assertTrue(any("ошибок: 1" in answer.lower() for answer in answers))
+
+    def test_batch_cards_above_cap_are_rejected(self):
+        import app.telegram_card_handlers as handlers
+
+        message = SimpleNamespace(chat=SimpleNamespace(id=1), answer=AsyncMock())
+
+        async def run():
+            with patch.object(handlers, "_split_batch_card_sources", return_value=[f"source {i}" for i in range(31)]):
+                await handlers.generate_ozon_batch_card_files(
+                    message,
+                    "ignored by patched splitter",
+                    parser_lock=asyncio.Lock(),
+                    bot=None,
+                    get_active_profile=lambda _chat_id: {},
+                    db=SimpleNamespace(),
+                )
+
+        asyncio.run(run())
+
+        message.answer.assert_awaited_once()
+        self.assertIn("30 товаров", message.answer.await_args.args[0])
 
     def test_product_card_spec_is_kept_as_one_task(self):
         prompt = (
