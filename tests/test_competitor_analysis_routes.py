@@ -44,7 +44,10 @@ class CompetitorAnalysisRoutesTests(unittest.IsolatedAsyncioTestCase):
         self.project = await project_service.create_project(name="Тест роутов конкурентов", marketplace="ozon")
 
         unified = UnifiedProduct(
-            name="Термокружка Stanley 500 мл", source_id="sku-comp-1", source_type="ozon", marketplace="ozon",
+            name="Термокружка Stanley 500 мл",
+            source_id="sku-comp-1",
+            source_type="ozon",
+            marketplace="ozon",
         )
         async with self.db.session() as session:
             product_obj = await session.get(Product, self.product_id)
@@ -63,35 +66,44 @@ class CompetitorAnalysisRoutesTests(unittest.IsolatedAsyncioTestCase):
         from app.parsers.base import ProductData
 
         return ProductData(
-            name=name, price=1000, old_price=None, discount_pct=None, availability="in_stock",
-            url=url, image_url=None, rating=4.5, reviews_count=10, marketplace="wildberries",
+            name=name,
+            price=1000,
+            old_price=None,
+            discount_pct=None,
+            availability="in_stock",
+            url=url,
+            image_url=None,
+            rating=4.5,
+            reviews_count=10,
+            marketplace="wildberries",
         )
 
     async def test_competitors_404_before_refresh(self):
-        resp = await self.client.get(
-            f"/api/projects/{self.project.project_id}/products/{self.product_id}/competitors"
-        )
+        resp = await self.client.get(f"/api/projects/{self.project.project_id}/products/{self.product_id}/competitors")
         self.assertEqual(resp.status_code, 404)
 
     async def test_refresh_unknown_product_404(self):
-        resp = await self.client.post(
-            f"/api/projects/{self.project.project_id}/products/999999/competitors/refresh"
-        )
+        resp = await self.client.post(f"/api/projects/{self.project.project_id}/products/999999/competitors/refresh")
         self.assertEqual(resp.status_code, 404)
 
     async def test_full_refresh_then_get_competitors_and_job(self):
         search_results = {
             "wildberries": [
-                self._wb_product("Термокружка WB конкурент", "https://www.wildberries.ru/catalog/555666777/detail.aspx"),
+                self._wb_product(
+                    "Термокружка WB конкурент", "https://www.wildberries.ru/catalog/555666777/detail.aspx"
+                ),
             ],
             "ozon": [],
         }
-        with patch(
-            "app.competitor_analysis.service.search_all_marketplaces",
-            new=AsyncMock(return_value=search_results),
-        ), patch(
-            "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
-            new=AsyncMock(return_value=["Хорошо держит тепло"]),
+        with (
+            patch(
+                "app.competitor_analysis.service.search_all_marketplaces",
+                new=AsyncMock(return_value=search_results),
+            ),
+            patch(
+                "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
+                new=AsyncMock(return_value=["Хорошо держит тепло"]),
+            ),
         ):
             run_resp = await self.client.post(
                 f"/api/projects/{self.project.project_id}/products/{self.product_id}/competitors/refresh"
@@ -103,9 +115,7 @@ class CompetitorAnalysisRoutesTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(job_resp.status_code, 200)
             self.assertEqual(job_resp.json()["status"], "succeeded")
 
-        resp = await self.client.get(
-            f"/api/projects/{self.project.project_id}/products/{self.product_id}/competitors"
-        )
+        resp = await self.client.get(f"/api/projects/{self.project.project_id}/products/{self.product_id}/competitors")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(len(data["competitors"]), 1)

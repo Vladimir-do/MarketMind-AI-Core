@@ -73,7 +73,12 @@ async def _recent_jobs(request: Request, limit: int = 10) -> list[dict[str, Any]
     jobs = await db.get_recent_jobs(limit=limit)
     result = []
     for job in jobs:
-        if job.job_type not in {"seo_ai_suggestions", "ai_product_suggestions", "content_pipeline", "competitor_analysis_refresh"}:
+        if job.job_type not in {
+            "seo_ai_suggestions",
+            "ai_product_suggestions",
+            "content_pipeline",
+            "competitor_analysis_refresh",
+        }:
             continue
         parsed_result = None
         if job.result_json:
@@ -81,22 +86,24 @@ async def _recent_jobs(request: Request, limit: int = 10) -> list[dict[str, Any]
                 parsed_result = json.loads(job.result_json)
             except (TypeError, ValueError):
                 parsed_result = None
-        result.append({
-            "job_id": job.job_id,
-            "job_type": job.job_type,
-            "status": job.status,
-            "progress": job.progress,
-            "payload": job.payload_json,
-            "result": parsed_result,
-            "result_raw": job.result_json,
-            "diagnostics": parsed_result if job.status == "failed" and isinstance(parsed_result, dict) else None,
-            "error_class": job.error_class,
-            "error_text": job.error_text,
-            "created_at": job.created_at,
-            "started_at": job.started_at,
-            "finished_at": job.finished_at,
-            "updated_at": job.updated_at,
-        })
+        result.append(
+            {
+                "job_id": job.job_id,
+                "job_type": job.job_type,
+                "status": job.status,
+                "progress": job.progress,
+                "payload": job.payload_json,
+                "result": parsed_result,
+                "result_raw": job.result_json,
+                "diagnostics": parsed_result if job.status == "failed" and isinstance(parsed_result, dict) else None,
+                "error_class": job.error_class,
+                "error_text": job.error_text,
+                "created_at": job.created_at,
+                "started_at": job.started_at,
+                "finished_at": job.finished_at,
+                "updated_at": job.updated_at,
+            }
+        )
     return result
 
 
@@ -219,9 +226,7 @@ async def suggestions_list(request: Request, status: str = "all"):
     all_items = await queue.get_all()
     items = await _filter_items(all_items, status)
     schemas = [_item_to_schema(i) for i in items]
-    return templates.TemplateResponse(
-        request, "suggestions_table.html", {"items": schemas}
-    )
+    return templates.TemplateResponse(request, "suggestions_table.html", {"items": schemas})
 
 
 @router.get("/suggestions/{approval_id}", response_class=HTMLResponse)
@@ -229,9 +234,7 @@ async def suggestion_detail_page(approval_id: str, request: Request):
     queue = _queue_from_request(request)
     item = await _get_item(queue, approval_id)
     schema = _item_to_schema(item)
-    return templates.TemplateResponse(
-        request, "suggestions_detail.html", {"item": schema}
-    )
+    return templates.TemplateResponse(request, "suggestions_detail.html", {"item": schema})
 
 
 @router.get("/suggestions/{approval_id}/detail", response_class=HTMLResponse)
@@ -289,9 +292,7 @@ async def approve_suggestion(approval_id: str, request: Request):
         raise
     item = await _get_item(queue, approval_id)
     schema = _item_to_schema(item)
-    return templates.TemplateResponse(
-        request, "suggestions_row.html", {"item": schema}
-    )
+    return templates.TemplateResponse(request, "suggestions_row.html", {"item": schema})
 
 
 @router.post("/suggestions/{approval_id}/reject", response_class=HTMLResponse)
@@ -303,9 +304,7 @@ async def reject_suggestion(approval_id: str, request: Request):
         logger.info("AI suggestion reject failed, not found: %s", approval_id)
         raise HTTPException(status_code=404, detail="Suggestion not found")
     schema = _item_to_schema(item)
-    return templates.TemplateResponse(
-        request, "suggestions_row.html", {"item": schema}
-    )
+    return templates.TemplateResponse(request, "suggestions_row.html", {"item": schema})
 
 
 @router.get("/api/suggestions/history")

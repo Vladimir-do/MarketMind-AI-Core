@@ -1,4 +1,3 @@
-
 from app.ai_recommendation.provider import AIResponse
 from app.ai_recommendation.providers.base import BaseAIProvider
 

@@ -579,13 +579,13 @@ class StructuredTask:
     target_url: str | None
     target_urls: list[str]
     query: str | None
-    fields: list[str]        # требуемые поля
-    output: str | None       # формат вывода
+    fields: list[str]  # требуемые поля
+    output: str | None  # формат вывода
     requirements: list[str]  # дополнительные требования
-    parameters: dict         # произвольные параметры
+    parameters: dict  # произвольные параметры
     payload: str | list[str] | None
-    confidence: float        # 0.0–1.0
-    plan: list[str]          # шаги плана
+    confidence: float  # 0.0–1.0
+    plan: list[str]  # шаги плана
 ```
 
 ### 7.3 Task Planner
@@ -695,7 +695,7 @@ stateDiagram-v2
 ### 8.4 Контекстные сессии
 
 ```python
-CHAT_PROFILES: dict[int, str]       # chat_id → имя профиля
+CHAT_PROFILES: dict[int, str]  # chat_id → имя профиля
 CHAT_CONTEXTS: dict[int, ContextSession]  # chat_id → контекст
 ```
 

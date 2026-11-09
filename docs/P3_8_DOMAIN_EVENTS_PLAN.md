@@ -310,8 +310,7 @@ app/timeline/
 
 ```python
 class EventBuilder(Protocol):
-    def build(self, source: object) -> list[DomainEvent]:
-        ...
+    def build(self, source: object) -> list[DomainEvent]: ...
 ```
 
 Практические builder'ы:
@@ -328,11 +327,9 @@ class EventBuilder(Protocol):
 
 ```python
 class EventRepository(Protocol):
-    async def append(self, event: DomainEvent) -> None:
-        ...
+    async def append(self, event: DomainEvent) -> None: ...
 
-    async def append_many(self, events: list[DomainEvent]) -> None:
-        ...
+    async def append_many(self, events: list[DomainEvent]) -> None: ...
 
     async def list_by_aggregate(
         self,
@@ -341,8 +338,7 @@ class EventRepository(Protocol):
         *,
         limit: int,
         offset: int,
-    ) -> list[DomainEvent]:
-        ...
+    ) -> list[DomainEvent]: ...
 ```
 
 На первом этапе repository может быть read-only adapter над существующими таблицами.
@@ -353,11 +349,9 @@ class EventRepository(Protocol):
 
 ```python
 class EventSerializer(Protocol):
-    def dumps(self, event: DomainEvent) -> str:
-        ...
+    def dumps(self, event: DomainEvent) -> str: ...
 
-    def loads(self, raw: str) -> DomainEvent:
-        ...
+    def loads(self, raw: str) -> DomainEvent: ...
 ```
 
 Правила:
@@ -373,11 +367,9 @@ class EventSerializer(Protocol):
 
 ```python
 class EventPublisher(Protocol):
-    async def publish(self, event: DomainEvent) -> None:
-        ...
+    async def publish(self, event: DomainEvent) -> None: ...
 
-    async def publish_many(self, events: list[DomainEvent]) -> None:
-        ...
+    async def publish_many(self, events: list[DomainEvent]) -> None: ...
 ```
 
 MVP-вариант: in-process publisher без очереди.
@@ -397,8 +389,7 @@ class EventReader(Protocol):
         limit: int,
         offset: int,
         event_type: str | None = None,
-    ) -> list[DomainEvent]:
-        ...
+    ) -> list[DomainEvent]: ...
 ```
 
 Для P3.8/P3.9 `EventReader` может читать `Product`, `PriceHistory`, `ApprovalRecord` и строить events on demand.

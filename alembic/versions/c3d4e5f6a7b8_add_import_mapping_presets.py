@@ -21,7 +21,12 @@ def upgrade() -> None:
     op.create_table(
         "import_mapping_presets",
         sa.Column("preset_id", sa.String(length=64), primary_key=True),
-        sa.Column("project_id", sa.String(length=64), sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "project_id",
+            sa.String(length=64),
+            sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("marketplace", sa.String(length=32), nullable=False, server_default="unknown"),
         sa.Column("schema_version", sa.String(length=32), nullable=False, server_default="local-import-v1"),

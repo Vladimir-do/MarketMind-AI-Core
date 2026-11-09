@@ -22,21 +22,24 @@ SCORE_EXCELLENT = 90
 SCORE_GOOD = 75
 SCORE_FAIR = 50
 SCORE_POOR = 25
-KNOWN_SOURCE_TYPES = frozenset({
-    "ozon",
-    "wildberries",
-    "wb",
-    "yandex",
-    "yandex_market",
-    "csv",
-    "manual",
-    "project_file_import",
-    "file_import",
-    "",
-})
+KNOWN_SOURCE_TYPES = frozenset(
+    {
+        "ozon",
+        "wildberries",
+        "wb",
+        "yandex",
+        "yandex_market",
+        "csv",
+        "manual",
+        "project_file_import",
+        "file_import",
+        "",
+    }
+)
 
 
 # ── Tier mapping ────────────────────────────────────────────────────────
+
 
 def _get_tier(score: int) -> str:
     if score >= SCORE_EXCELLENT:
@@ -52,100 +55,121 @@ def _get_tier(score: int) -> str:
 
 # ── Rule implementations ────────────────────────────────────────────────
 
+
 def _check_completeness(product: UnifiedProduct) -> list[Finding]:
     findings: list[Finding] = []
 
     if not product.name or not product.name.strip():
-        findings.append(Finding(
-            rule="completeness_name",
-            field="name",
-            message="Product name is missing or empty",
-            severity="critical",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_name",
+                field="name",
+                message="Product name is missing or empty",
+                severity="critical",
+                category="completeness",
+            )
+        )
 
     if product.price is None:
-        findings.append(Finding(
-            rule="completeness_price",
-            field="price",
-            message="Product price is missing",
-            severity="critical",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_price",
+                field="price",
+                message="Product price is missing",
+                severity="critical",
+                category="completeness",
+            )
+        )
 
     if not product.brand:
-        findings.append(Finding(
-            rule="completeness_brand",
-            field="brand",
-            message="Brand is not specified",
-            severity="warning",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_brand",
+                field="brand",
+                message="Brand is not specified",
+                severity="warning",
+                category="completeness",
+            )
+        )
 
     if not product.category:
-        findings.append(Finding(
-            rule="completeness_category",
-            field="category",
-            message="Category is not specified",
-            severity="warning",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_category",
+                field="category",
+                message="Category is not specified",
+                severity="warning",
+                category="completeness",
+            )
+        )
 
     if not product.description:
-        findings.append(Finding(
-            rule="completeness_description",
-            field="description",
-            message="Product description is missing",
-            severity="warning",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_description",
+                field="description",
+                message="Product description is missing",
+                severity="warning",
+                category="completeness",
+            )
+        )
 
     if not product.image_urls:
-        findings.append(Finding(
-            rule="completeness_images",
-            field="image_urls",
-            message="No product images provided",
-            severity="warning",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_images",
+                field="image_urls",
+                message="No product images provided",
+                severity="warning",
+                category="completeness",
+            )
+        )
 
     if not product.sku:
-        findings.append(Finding(
-            rule="completeness_sku",
-            field="sku",
-            message="SKU is not set",
-            severity="info",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_sku",
+                field="sku",
+                message="SKU is not set",
+                severity="info",
+                category="completeness",
+            )
+        )
 
     is_market_analysis = _is_market_analysis_candidate(product)
 
     if product.weight_g is None and not is_market_analysis:
-        findings.append(Finding(
-            rule="completeness_weight",
-            field="weight_g",
-            message="Weight is not specified",
-            severity="info",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_weight",
+                field="weight_g",
+                message="Weight is not specified",
+                severity="info",
+                category="completeness",
+            )
+        )
 
     if product.width_mm is None and product.height_mm is None and product.depth_mm is None and not is_market_analysis:
-        findings.append(Finding(
-            rule="completeness_dimensions",
-            field="dimensions",
-            message="No dimensions specified (width, height, depth)",
-            severity="info",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_dimensions",
+                field="dimensions",
+                message="No dimensions specified (width, height, depth)",
+                severity="info",
+                category="completeness",
+            )
+        )
 
     if not product.source_url:
-        findings.append(Finding(
-            rule="completeness_source_url",
-            field="source_url",
-            message="Source URL is not set",
-            severity="info",
-            category="completeness",
-        ))
+        findings.append(
+            Finding(
+                rule="completeness_source_url",
+                field="source_url",
+                message="Source URL is not set",
+                severity="info",
+                category="completeness",
+            )
+        )
 
     return findings
 
@@ -154,22 +178,26 @@ def _check_consistency(product: UnifiedProduct) -> list[Finding]:
     findings: list[Finding] = []
 
     if product.price is not None and product.price <= 0:
-        findings.append(Finding(
-            rule="consistency_price_positive",
-            field="price",
-            message="Price must be a positive value",
-            severity="critical",
-            category="consistency",
-        ))
+        findings.append(
+            Finding(
+                rule="consistency_price_positive",
+                field="price",
+                message="Price must be a positive value",
+                severity="critical",
+                category="consistency",
+            )
+        )
 
     if product.old_price is not None and product.price is not None and product.old_price <= product.price:
-        findings.append(Finding(
-            rule="consistency_old_price_gt_current",
-            field="old_price",
-            message="Old price should be greater than current price",
-            severity="warning",
-            category="consistency",
-        ))
+        findings.append(
+            Finding(
+                rule="consistency_old_price_gt_current",
+                field="old_price",
+                message="Old price should be greater than current price",
+                severity="warning",
+                category="consistency",
+            )
+        )
 
     if (
         product.discount_pct is not None
@@ -179,40 +207,48 @@ def _check_consistency(product: UnifiedProduct) -> list[Finding]:
     ):
         expected = round((1 - product.price / product.old_price) * 100)
         if abs(product.discount_pct - expected) > 1:
-            findings.append(Finding(
-                rule="consistency_discount_pct",
-                field="discount_pct",
-                message=f"Discount {product.discount_pct}% doesn't match calculated {expected}%",
-                severity="info",
-                category="consistency",
-            ))
+            findings.append(
+                Finding(
+                    rule="consistency_discount_pct",
+                    field="discount_pct",
+                    message=f"Discount {product.discount_pct}% doesn't match calculated {expected}%",
+                    severity="info",
+                    category="consistency",
+                )
+            )
 
     if len(product.name) > 200:
-        findings.append(Finding(
-            rule="consistency_name_length",
-            field="name",
-            message="Product name exceeds 200 characters",
-            severity="info",
-            category="consistency",
-        ))
+        findings.append(
+            Finding(
+                rule="consistency_name_length",
+                field="name",
+                message="Product name exceeds 200 characters",
+                severity="info",
+                category="consistency",
+            )
+        )
 
     if product.description and re.search(r"<[^>]+>", product.description):
-        findings.append(Finding(
-            rule="consistency_description_html",
-            field="description",
-            message="Description contains HTML tags — should be plain text",
-            severity="warning",
-            category="consistency",
-        ))
+        findings.append(
+            Finding(
+                rule="consistency_description_html",
+                field="description",
+                message="Description contains HTML tags — should be plain text",
+                severity="warning",
+                category="consistency",
+            )
+        )
 
     if product.source_type not in KNOWN_SOURCE_TYPES:
-        findings.append(Finding(
-            rule="consistency_source_type",
-            field="source_type",
-            message=f"Unknown source type: {product.source_type}",
-            severity="info",
-            category="consistency",
-        ))
+        findings.append(
+            Finding(
+                rule="consistency_source_type",
+                field="source_type",
+                message=f"Unknown source type: {product.source_type}",
+                severity="info",
+                category="consistency",
+            )
+        )
 
     return findings
 
@@ -226,40 +262,48 @@ def _check_quality(product: UnifiedProduct) -> list[Finding]:
     findings: list[Finding] = []
 
     if product.description and len(product.description) < MIN_DESCRIPTION_LENGTH:
-        findings.append(Finding(
-            rule="quality_description_short",
-            field="description",
-            message=f"Description is only {len(product.description)} chars — aim for {MIN_DESCRIPTION_LENGTH}+",
-            severity="info",
-            category="quality",
-        ))
+        findings.append(
+            Finding(
+                rule="quality_description_short",
+                field="description",
+                message=f"Description is only {len(product.description)} chars — aim for {MIN_DESCRIPTION_LENGTH}+",
+                severity="info",
+                category="quality",
+            )
+        )
 
     if product.brand and product.brand.strip().lower() in GENERIC_BRANDS:
-        findings.append(Finding(
-            rule="quality_generic_brand",
-            field="brand",
-            message=f"Brand '{product.brand}' appears to be a placeholder",
-            severity="info",
-            category="quality",
-        ))
+        findings.append(
+            Finding(
+                rule="quality_generic_brand",
+                field="brand",
+                message=f"Brand '{product.brand}' appears to be a placeholder",
+                severity="info",
+                category="quality",
+            )
+        )
 
     if product.category and product.category.strip().lower() in GENERIC_CATEGORIES:
-        findings.append(Finding(
-            rule="quality_generic_category",
-            field="category",
-            message=f"Category '{product.category}' is too generic to be useful",
-            severity="info",
-            category="quality",
-        ))
+        findings.append(
+            Finding(
+                rule="quality_generic_category",
+                field="category",
+                message=f"Category '{product.category}' is too generic to be useful",
+                severity="info",
+                category="quality",
+            )
+        )
 
     if not product.attributes:
-        findings.append(Finding(
-            rule="quality_no_attributes",
-            field="attributes",
-            message="No product attributes defined",
-            severity="info",
-            category="quality",
-        ))
+        findings.append(
+            Finding(
+                rule="quality_no_attributes",
+                field="attributes",
+                message="No product attributes defined",
+                severity="info",
+                category="quality",
+            )
+        )
 
     return findings
 
@@ -296,12 +340,14 @@ def _build_recommendations(findings: list[Finding]) -> list[Recommendation]:
     recs: list[Recommendation] = []
     for f in findings:
         action = _ACTION_MAP.get(f.rule, f"Review: {f.rule}")
-        recs.append(Recommendation(
-            finding=f,
-            action=action,
-            priority=_SEVERITY_PRIORITY.get(f.severity, 3),
-            description=f.message,
-        ))
+        recs.append(
+            Recommendation(
+                finding=f,
+                action=action,
+                priority=_SEVERITY_PRIORITY.get(f.severity, 3),
+                description=f.message,
+            )
+        )
     return sorted(recs, key=lambda r: r.priority)
 
 
@@ -343,6 +389,7 @@ def calculate_quality_score(product: UnifiedProduct) -> int:
 
 
 # ── Main analyzer ───────────────────────────────────────────────────────
+
 
 class ProductAnalyzer:
     """Rule-based product quality analyzer."""
@@ -399,9 +446,7 @@ class ProductAnalyzer:
                     all_recs[rule] = rec
         top_recs = sorted(all_recs.values(), key=lambda x: x.priority)[:10]
 
-        below = [
-            r.product.name for r in results if r.score < SCORE_FAIR
-        ]
+        below = [r.product.name for r in results if r.score < SCORE_FAIR]
 
         return BatchAnalysisResult(
             total=total,

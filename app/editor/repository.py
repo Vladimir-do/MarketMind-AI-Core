@@ -97,7 +97,9 @@ class ProductEditorRepository:
             stmt = stmt.where(ProductCardVersion.project_id.is_(None))
         if project_product_id is not None:
             stmt = stmt.where(ProductCardVersion.project_product_id == project_product_id)
-        result = await self._session.execute(stmt.order_by(desc(ProductCardVersion.version_number)).limit(limit).offset(offset))
+        result = await self._session.execute(
+            stmt.order_by(desc(ProductCardVersion.version_number)).limit(limit).offset(offset)
+        )
         return list(result.scalars().all())
 
     async def next_version_number(

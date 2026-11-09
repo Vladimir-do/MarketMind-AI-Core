@@ -89,8 +89,12 @@ class ReportsUITests(unittest.IsolatedAsyncioTestCase):
 
         def make_result(product_id, **kwargs):
             defaults = {
-                "field": "title", "suggestion_type": "improve", "before": "Old",
-                "after": "New", "reason": "Better SEO", "confidence": 0.9,
+                "field": "title",
+                "suggestion_type": "improve",
+                "before": "Old",
+                "after": "New",
+                "reason": "Better SEO",
+                "confidence": 0.9,
             }
             defaults.update(kwargs)
             return AIRecommendationResult(product_id=product_id, suggestions=[AISuggestion(**defaults)])
@@ -111,9 +115,9 @@ class ReportsUITests(unittest.IsolatedAsyncioTestCase):
         from app.database import ApprovalRecord
 
         async with self.db.session() as s:
-            record = (await s.execute(
-                select(ApprovalRecord).where(ApprovalRecord.approval_id == rolled_back.approval_id)
-            )).scalar_one()
+            record = (
+                await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == rolled_back.approval_id))
+            ).scalar_one()
             record.status = "rolled_back"
             await s.commit()
 

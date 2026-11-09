@@ -15,15 +15,17 @@ class FakeDB:
                 status="failed",
                 progress=10,
                 payload_json="{}",
-                result_json=json.dumps({
-                    "provider": "gemini",
-                    "model": "gemini-2.5-flash",
-                    "stage": "read_timeout",
-                    "status_code": None,
-                    "latency_ms": 60001.0,
-                    "error_type": "TimeoutError",
-                    "error_message": "request timed out",
-                }),
+                result_json=json.dumps(
+                    {
+                        "provider": "gemini",
+                        "model": "gemini-2.5-flash",
+                        "stage": "read_timeout",
+                        "status_code": None,
+                        "latency_ms": 60001.0,
+                        "error_type": "TimeoutError",
+                        "error_message": "request timed out",
+                    }
+                ),
                 error_class="AIJobFailure",
                 error_text="AI request failed",
                 created_at=None,

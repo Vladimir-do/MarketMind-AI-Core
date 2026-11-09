@@ -31,7 +31,9 @@ _STRATEGY = ContentStrategy(
     tone_of_voice="уверенный",
 )
 
-_SEMANTIC_PLAN = SemanticPlan(title_terms=["термокружка", "stanley"], benefits_terms=["сталь"], description_terms=["500мл"])
+_SEMANTIC_PLAN = SemanticPlan(
+    title_terms=["термокружка", "stanley"], benefits_terms=["сталь"], description_terms=["500мл"]
+)
 
 
 class StrategyBuilderTests(unittest.IsolatedAsyncioTestCase):
@@ -63,7 +65,10 @@ class StrategyBuilderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_markdown_fenced_response_is_stripped(self):
         payload = {
-            "target_audience": "A", "key_need": "B", "key_selling_proposition": "C", "tone_of_voice": "D",
+            "target_audience": "A",
+            "key_need": "B",
+            "key_selling_proposition": "C",
+            "tone_of_voice": "D",
         }
         fenced = "```json\n" + json.dumps(payload) + "\n```"
         provider = ScriptedAIProvider([fenced])

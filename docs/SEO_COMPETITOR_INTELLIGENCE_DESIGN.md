@@ -32,23 +32,26 @@
 @dataclass(frozen=True)
 class CompetitorProfile:
     """Профиль одного конкурента."""
+
     name: str
-    title_words: list[str]          # токены из названия
-    attribute_keys: list[str]       # ключи атрибутов/характеристик
-    price_range: str                # "budget" | "mid" | "premium" | "unknown"
+    title_words: list[str]  # токены из названия
+    attribute_keys: list[str]  # ключи атрибутов/характеристик
+    price_range: str  # "budget" | "mid" | "premium" | "unknown"
     image_count: int
     has_brand: bool
     has_category: bool
 
+
 @dataclass(frozen=True)
 class CompetitorAnalysis:
     """Агрегированный анализ всех конкурентов."""
+
     profiles: list[CompetitorProfile]
-    top_words: list[tuple[str, int]]          # (слово, частота)
-    common_attributes: list[str]              # атрибуты, которые есть у 2+ конкурентов
-    price_distribution: dict[str, int]        # {"budget": 3, "mid": 5, "premium": 2}
-    unique_terms: list[str]                   # термины, уникальные для одного конкурента
-    shared_terms: list[str]                   # термины, которые есть у 2+ конкурентов
+    top_words: list[tuple[str, int]]  # (слово, частота)
+    common_attributes: list[str]  # атрибуты, которые есть у 2+ конкурентов
+    price_distribution: dict[str, int]  # {"budget": 3, "mid": 5, "premium": 2}
+    unique_terms: list[str]  # термины, уникальные для одного конкурента
+    shared_terms: list[str]  # термины, которые есть у 2+ конкурентов
     average_title_length: float
     median_price: int | None
 ```
@@ -63,6 +66,7 @@ def analyze_competitors(competitors: list[dict]) -> CompetitorAnalysis:
     Вход: список словарей с ключами name, price, url, attributes (опционально)
     Выход: CompetitorAnalysis с агрегированными метриками
     """
+
 
 def compare_with_competitors(
     product: UnifiedProduct,
@@ -227,12 +231,21 @@ product = UnifiedProduct(
 Вход:
 ```python
 competitors = [
-    {"name": "Наушники TWS Bluetooth 5.3", "price": 1990,
-     "attributes": {"Материал": "Пластик", "Вес": "45 г", "Время работы": "6 ч"}},
-    {"name": "Наушники беспроводные TWS", "price": 1490,
-     "attributes": {"Цвет": "чёрный", "Вес": "50 г", "Зарядный кейс": "есть"}},
-    {"name": "TWS Наушники Bluetooth", "price": 2490,
-     "attributes": {"Материал": "Пластик", "Водозащита": "IPX4", "Вес": "42 г"}},
+    {
+        "name": "Наушники TWS Bluetooth 5.3",
+        "price": 1990,
+        "attributes": {"Материал": "Пластик", "Вес": "45 г", "Время работы": "6 ч"},
+    },
+    {
+        "name": "Наушники беспроводные TWS",
+        "price": 1490,
+        "attributes": {"Цвет": "чёрный", "Вес": "50 г", "Зарядный кейс": "есть"},
+    },
+    {
+        "name": "TWS Наушники Bluetooth",
+        "price": 2490,
+        "attributes": {"Материал": "Пластик", "Водозащита": "IPX4", "Вес": "42 г"},
+    },
 ]
 product = UnifiedProduct(
     name="Наушники TWS Bluetooth",

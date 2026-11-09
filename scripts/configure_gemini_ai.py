@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Securely configure the free Gemini API for MarketMind."""
+
 from __future__ import annotations
 
 import getpass

@@ -41,8 +41,20 @@ _MAX_OZON_REVIEW_FETCHED = 2
 # the two into one shared utility is a separate, broader change, not part of
 # this fix.
 _COMPETITOR_STOP_WORDS = {
-    "для", "или", "без", "при", "под", "над", "товар", "шт", "набор",
-    "ozon", "wb", "wildberries", "черный", "белый",
+    "для",
+    "или",
+    "без",
+    "при",
+    "под",
+    "над",
+    "товар",
+    "шт",
+    "набор",
+    "ozon",
+    "wb",
+    "wildberries",
+    "черный",
+    "белый",
 }
 
 
@@ -73,9 +85,7 @@ class CompetitorAnalysisService:
         self._db = db
         self._store = CompetitorSnapshotStore(db)
 
-    async def refresh_competitors(
-        self, project_id: str, product_id: int
-    ) -> tuple[str, list[CompetitorSnapshot]]:
+    async def refresh_competitors(self, project_id: str, product_id: int) -> tuple[str, list[CompetitorSnapshot]]:
         card = await EffectiveProductCardService(self._db).get_effective_card(project_id, product_id)
         passport = build_passport(card)
         query = " ".join(passport.title.split())
@@ -151,7 +161,8 @@ class CompetitorAnalysisService:
             products[index] = replace(
                 product,
                 rating=data.get("rating") if data.get("rating") is not None else product.rating,
-                reviews_count=(data.get("reviews_count") if data.get("reviews_count") is not None
-                               else product.reviews_count),
+                reviews_count=(
+                    data.get("reviews_count") if data.get("reviews_count") is not None else product.reviews_count
+                ),
                 reviews=data.get("reviews") or product.reviews,
             )

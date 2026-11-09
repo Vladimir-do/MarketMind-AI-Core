@@ -2,6 +2,7 @@
 ai_analyzer.py — глубокий AI анализ с прогнозом цен.
 Использует статистику + Claude для умных выводов.
 """
+
 import html
 from datetime import UTC, datetime, timedelta
 
@@ -11,6 +12,7 @@ from app.ai_client import AIClientError, ai_is_available, ai_missing_message, as
 from app.database import Database, PriceHistory, Product
 
 # ── Статистический анализ (без AI, мгновенно) ─────────────────────────────────
+
 
 def calc_price_stats(prices: list[int]) -> dict:
     """Базовая статистика по списку цен."""
@@ -78,15 +80,16 @@ def detect_pattern(prices: list[int]) -> str:
 
 
 PATTERN_ADVICE = {
-    "rising":   ("📈 Цена растёт", "Если нужен товар — лучше брать сейчас"),
-    "falling":  ("📉 Цена падает", "Стоит подождать ещё немного"),
-    "stable":   ("➡️ Цена стабильна", "Хорошее время для покупки"),
+    "rising": ("📈 Цена растёт", "Если нужен товар — лучше брать сейчас"),
+    "falling": ("📉 Цена падает", "Стоит подождать ещё немного"),
+    "stable": ("➡️ Цена стабильна", "Хорошее время для покупки"),
     "volatile": ("🎢 Цена нестабильна", "Следите за уведомлениями об изменениях"),
     "insufficient_data": ("❓ Мало данных", "Нужно больше наблюдений"),
 }
 
 
 # ── Глубокий AI анализатор ────────────────────────────────────────────────────
+
 
 class DeepAnalyzer:
     """Объединяет статистику + Claude для максимально умного анализа."""
@@ -101,10 +104,7 @@ class DeepAnalyzer:
             return await ask_ai(
                 prompt,
                 max_tokens=max_tokens,
-                system=(
-                    "Ты эксперт по анализу цен на маркетплейсах. "
-                    "Отвечай кратко, по делу, на русском."
-                ),
+                system=("Ты эксперт по анализу цен на маркетплейсах. Отвечай кратко, по делу, на русском."),
             )
         except AIClientError:
             return "AI-анализ временно недоступен."
@@ -112,13 +112,19 @@ class DeepAnalyzer:
     async def _get_prices(self, product_id: int, days: int = 30) -> list[int]:
         since = datetime.now(UTC) - timedelta(days=days)
         async with self.db.session() as s:
-            rows = (await s.execute(
-                select(PriceHistory)
-                .where(PriceHistory.product_id == product_id)
-                .where(PriceHistory.recorded_at >= since)
-                .where(PriceHistory.price.isnot(None))
-                .order_by(PriceHistory.recorded_at)
-            )).scalars().all()
+            rows = (
+                (
+                    await s.execute(
+                        select(PriceHistory)
+                        .where(PriceHistory.product_id == product_id)
+                        .where(PriceHistory.recorded_at >= since)
+                        .where(PriceHistory.price.isnot(None))
+                        .order_by(PriceHistory.recorded_at)
+                    )
+                )
+                .scalars()
+                .all()
+            )
         return [r.price for r in rows]
 
     async def full_product_analysis(self, product: Product) -> str:
@@ -149,10 +155,10 @@ class DeepAnalyzer:
         ai_prompt = f"""Товар: {product.name}
 Маркетплейс: {"Озон" if "ozon" in product.url else "Wildberries"}
 
-Статистика цен за {stats['count']} наблюдений:
+Статистика цен за {stats["count"]} наблюдений:
 - Текущая: {current} ₽
-- Минимум: {min_p} ₽  Максимум: {stats['max']} ₽  Среднее: {avg_p} ₽
-- Тренд: {stats['trend_pct']:+.1f}%  Волатильность: {stats['volatility_pct']}%
+- Минимум: {min_p} ₽  Максимум: {stats["max"]} ₽  Среднее: {avg_p} ₽
+- Тренд: {stats["trend_pct"]:+.1f}%  Волатильность: {stats["volatility_pct"]}%
 - Паттерн: {pattern}
 - Прогноз на 7 дней: {forecast_7} ₽
 - Прогноз на 30 дней: {forecast_30} ₽
@@ -198,8 +204,12 @@ class DeepAnalyzer:
             stats = calc_price_stats(prices)
             pattern = detect_pattern(prices)
 
-            item = {"name": product.name[:40], "price": stats["current"],
-                    "trend": stats["trend_pct"], "url": product.url}
+            item = {
+                "name": product.name[:40],
+                "price": stats["current"],
+                "trend": stats["trend_pct"],
+                "url": product.url,
+            }
 
             if pattern == "falling":
                 falling.append(item)
@@ -211,8 +221,7 @@ class DeepAnalyzer:
             # Лучшие сделки
             if stats["current"] <= stats["min"] * 1.03 and stats["max"] > stats["min"]:
                 saving = stats["max"] - stats["current"]
-                deals.append({**item, "saving": saving,
-                              "saving_pct": round(saving / stats["max"] * 100)})
+                deals.append({**item, "saving": saving, "saving_pct": round(saving / stats["max"] * 100)})
 
         deals.sort(key=lambda x: x.get("saving_pct", 0), reverse=True)
         falling.sort(key=lambda x: x["trend"])
@@ -269,39 +278,44 @@ class DeepAnalyzer:
             # last price row is the last element of `prices` but we also need availability_status.
             # We fetch it once more from DB to avoid relying on parallel list ordering.
             async with self.db.session() as s:
-                last_row = (await s.execute(
-                    select(PriceHistory)
-                    .where(PriceHistory.product_id == product.id)
-                    .where(PriceHistory.recorded_at >= since)
-                    .order_by(desc(PriceHistory.recorded_at))
-                    .limit(1)
-                )).scalar_one_or_none()
+                last_row = (
+                    await s.execute(
+                        select(PriceHistory)
+                        .where(PriceHistory.product_id == product.id)
+                        .where(PriceHistory.recorded_at >= since)
+                        .order_by(desc(PriceHistory.recorded_at))
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
 
             availability = (last_row.availability_status if last_row else None) or "unknown"
             is_sellable = availability == "in_stock"
 
             # Алерт: новый минимум (только если товар доступен)
             if is_sellable and current == min_30d and current < previous:
-                alerts.append({
-                    "type": "new_min",
-                    "icon": "🎯",
-                    "name": product.name[:50],
-                    "price": current,
-                    "url": product.url,
-                    "message": "Новый минимум цены за 30 дней (товар в наличии)!"
-                })
+                alerts.append(
+                    {
+                        "type": "new_min",
+                        "icon": "🎯",
+                        "name": product.name[:50],
+                        "price": current,
+                        "url": product.url,
+                        "message": "Новый минимум цены за 30 дней (товар в наличии)!",
+                    }
+                )
 
             # Алерт: резкий рост (только если товар доступен)
             elif is_sellable and current > previous * 1.2:
                 pct = round((current - previous) / previous * 100)
-                alerts.append({
-                    "type": "spike",
-                    "icon": "⚠️",
-                    "name": product.name[:50],
-                    "price": current,
-                    "url": product.url,
-                    "message": f"Цена резко выросла на {pct}% (товар в наличии)!"
-                })
-
+                alerts.append(
+                    {
+                        "type": "spike",
+                        "icon": "⚠️",
+                        "name": product.name[:50],
+                        "price": current,
+                        "url": product.url,
+                        "message": f"Цена резко выросла на {pct}% (товар в наличии)!",
+                    }
+                )
 
         return alerts

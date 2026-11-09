@@ -81,7 +81,6 @@ Return task_type page_structure confidence
         self.assertEqual(stage_label_ru(AgentLoopStage.CLASSIFY_PAGE), "определить тип страницы")
         self.assertEqual(stage_label_ru(AgentLoopStage.SAVE_EXPERIENCE), "сохранить опыт")
 
-
     def test_repair_loop_is_regression_first(self):
         task = detect_task_intent(
             "\u043f\u043e\u0447\u0438\u043d\u0438 \u043e\u0448\u0438\u0431\u043a\u0443: "

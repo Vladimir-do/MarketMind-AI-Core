@@ -93,9 +93,7 @@ async def get_latest_competitors(project_id: str, product_id: int, request: Requ
         raise _competitor_error(exc) from exc
 
     store = CompetitorSnapshotStore(request.app.state.db)
-    records = await store.get_latest_batch(
-        project_id=project_id, project_product_id=project_product.project_product_id
-    )
+    records = await store.get_latest_batch(project_id=project_id, project_product_id=project_product.project_product_id)
     if not records:
         raise HTTPException(status_code=404, detail="Конкурентный анализ ещё не запускался для этого товара")
     return {

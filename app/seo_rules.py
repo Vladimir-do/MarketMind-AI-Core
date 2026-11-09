@@ -16,12 +16,30 @@ class SEOMarketplaceRule:
     min_keywords: int = 6
     min_attributes: int = 4
     min_images: int = 3
-    forbidden_words: frozenset[str] = field(default_factory=lambda: frozenset({
-        "лучший", "топ", "скидка", "акция", "купить", "дешево", "недорого", "гарантируем",
-    }))
-    required_fields: frozenset[str] = field(default_factory=lambda: frozenset({
-        "name", "description", "price", "images",
-    }))
+    forbidden_words: frozenset[str] = field(
+        default_factory=lambda: frozenset(
+            {
+                "лучший",
+                "топ",
+                "скидка",
+                "акция",
+                "купить",
+                "дешево",
+                "недорого",
+                "гарантируем",
+            }
+        )
+    )
+    required_fields: frozenset[str] = field(
+        default_factory=lambda: frozenset(
+            {
+                "name",
+                "description",
+                "price",
+                "images",
+            }
+        )
+    )
 
 
 MARKETPLACE_RULES: dict[str, SEOMarketplaceRule] = {

@@ -45,7 +45,11 @@ def format_recent_scrape_attempts(rows: Iterable) -> str:
         source = html.escape(str(item.source or "-"))
         http_status = item.http_status if item.http_status is not None else "-"
         latency = item.latency_ms if item.latency_ms is not None else "-"
-        error = f" | {html.escape(clip(item.error_class or item.error_text, 70))}" if (item.error_class or item.error_text) else ""
+        error = (
+            f" | {html.escape(clip(item.error_class or item.error_text, 70))}"
+            if (item.error_class or item.error_text)
+            else ""
+        )
         lines.append(
             f"<code>{html.escape(format_dt(item.recorded_at))}</code> "
             f"{marketplace}/{source} {status} http={http_status} latency={latency}ms{error}"

@@ -2,6 +2,7 @@
 searcher.py — поиск товаров на Озоне по названию через Playwright.
 Возвращает список найденных товаров с ценами.
 """
+
 import asyncio
 import contextlib
 import os
@@ -170,12 +171,14 @@ def _parse_search_results(html: str, max_results: int) -> list[dict]:
                     image_url = src
 
             if url and name:
-                results.append({
-                    "name": name[:100],
-                    "price": price,
-                    "url": url,
-                    "image_url": image_url,
-                })
+                results.append(
+                    {
+                        "name": name[:100],
+                        "price": price,
+                        "url": url,
+                        "image_url": image_url,
+                    }
+                )
         except Exception:
             continue
 

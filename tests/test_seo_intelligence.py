@@ -96,24 +96,28 @@ class ТестыSEO(unittest.TestCase):
 
     def test_уровень_strong_при_балле_85_и_выше(self):
         from app.seo_intelligence import _tier
+
         self.assertEqual(_tier(100), "strong")
         self.assertEqual(_tier(85), "strong")
         self.assertEqual(_tier(84), "usable")
 
     def test_уровень_usable_при_балле_70_до_84(self):
         from app.seo_intelligence import _tier
+
         self.assertEqual(_tier(84), "usable")
         self.assertEqual(_tier(70), "usable")
         self.assertEqual(_tier(69), "needs_work")
 
     def test_уровень_needs_work_при_балле_50_до_69(self):
         from app.seo_intelligence import _tier
+
         self.assertEqual(_tier(69), "needs_work")
         self.assertEqual(_tier(50), "needs_work")
         self.assertEqual(_tier(49), "weak")
 
     def test_уровень_weak_при_балле_ниже_50(self):
         from app.seo_intelligence import _tier
+
         self.assertEqual(_tier(49), "weak")
         self.assertEqual(_tier(0), "weak")
 
@@ -121,45 +125,59 @@ class ТестыSEO(unittest.TestCase):
 
     def test_балл_начинается_с_100_и_уменьшается_за_находки(self):
         from app.seo_intelligence import _score
+
         без_находок = []
         self.assertEqual(_score(без_находок), 100)
 
     def test_критичная_находка_вычитает_25(self):
         from app.seo_intelligence import _score
+
         находка = SEOFinding("правило", "поле", "critical", "сообщение")
         self.assertEqual(_score([находка]), 75)
 
     def test_предупреждение_вычитает_10(self):
         from app.seo_intelligence import _score
+
         находка = SEOFinding("правило", "поле", "warning", "сообщение")
         self.assertEqual(_score([находка]), 90)
 
     def test_информация_вычитает_4(self):
         from app.seo_intelligence import _score
+
         находка = SEOFinding("правило", "поле", "info", "сообщение")
         self.assertEqual(_score([находка]), 96)
 
     def test_балл_ограничен_снизу_нулем(self):
         from app.seo_intelligence import _score
+
         много = [SEOFinding(f"р{i}", "п", "critical", "с") for i in range(20)]
         self.assertEqual(_score(много), 0)
 
     def test_балл_ограничен_сверху_ста(self):
         from app.seo_intelligence import _score
+
         self.assertEqual(_score([]), 100)
 
     # ── Свойство ready ─────────────────────────────────────────────────
 
     def test_ready_требует_балл_75_и_нет_критичных(self):
-        результат = SEOAuditResult(score=80, tier="usable", findings=[
-            SEOFinding("р", "п", "warning", "с"),
-        ])
+        результат = SEOAuditResult(
+            score=80,
+            tier="usable",
+            findings=[
+                SEOFinding("р", "п", "warning", "с"),
+            ],
+        )
         self.assertTrue(результат.ready)
 
     def test_ready_ложь_при_критичной_находке(self):
-        результат = SEOAuditResult(score=90, tier="strong", findings=[
-            SEOFinding("р", "п", "critical", "с"),
-        ])
+        результат = SEOAuditResult(
+            score=90,
+            tier="strong",
+            findings=[
+                SEOFinding("р", "п", "critical", "с"),
+            ],
+        )
         self.assertFalse(результат.ready)
 
     def test_ready_ложь_при_балле_ниже_75(self):
@@ -196,9 +214,7 @@ class ТестыSEO(unittest.TestCase):
         self.assertIn("seo_title_forbidden_words", правила)
 
     def test_хорошее_название_без_ошибок(self):
-        продукт = _насыщенный_продукт(
-            name="Кабель USB-C для зарядки и передачи данных 1 м черный"
-        )
+        продукт = _насыщенный_продукт(name="Кабель USB-C для зарядки и передачи данных 1 м черный")
         результат = audit_unified_product_seo(продукт)
         правила_названия = {н.rule for н in результат.findings if н.field == "name"}
         self.assertNotIn("seo_title_short", правила_названия)
@@ -214,9 +230,7 @@ class ТестыSEO(unittest.TestCase):
         self.assertIn("seo_description_short", правила)
 
     def test_описание_без_блока_преимуществ(self):
-        продукт = _насыщенный_продукт(
-            description="Длинное описание товара " * 30
-        )
+        продукт = _насыщенный_продукт(description="Длинное описание товара " * 30)
         результат = audit_unified_product_seo(продукт)
         правила = {н.rule for н in результат.findings}
         self.assertIn("seo_description_benefits", правила)
@@ -240,7 +254,8 @@ class ТестыSEO(unittest.TestCase):
                 "Лучший выбор для вашего дома. "
                 "Акция только сегодня. Гарантируем качество. "
                 "Преимущества: долговечность, удобная ручка, безопасный материал, легко мыть."
-            ) * 2
+            )
+            * 2
         )
         результат = audit_unified_product_seo(продукт)
         правила = {н.rule for н in результат.findings}
@@ -255,9 +270,7 @@ class ТестыSEO(unittest.TestCase):
         self.assertIn("seo_keywords_few", правила)
 
     def test_достаточно_ключевых_слов_без_ошибки(self):
-        продукт = _насыщенный_продукт(
-            tags=["набор", "кухня", "сталь", "инструменты", "принадлежности", "повар"]
-        )
+        продукт = _насыщенный_продукт(tags=["набор", "кухня", "сталь", "инструменты", "принадлежности", "повар"])
         результат = audit_unified_product_seo(продукт)
         правила = {н.rule for н in результат.findings if н.field == "keywords"}
         self.assertNotIn("seo_keywords_few", правила)
@@ -269,9 +282,7 @@ class ТестыSEO(unittest.TestCase):
             {"name": "Стальной кухонный набор инструментов"},
         ]
         термины = extract_competitor_terms(конкуренты)
-        продукт = _насыщенный_продукт(
-            tags=["набор", "кухня", "сталь", "инструменты", "принадлежности", "повар"]
-        )
+        продукт = _насыщенный_продукт(tags=["набор", "кухня", "сталь", "инструменты", "принадлежности", "повар"])
         результат = audit_unified_product_seo(продукт, competitor_terms=термины)
         правила = {н.rule for н in результат.findings}
         self.assertIn("seo_keywords_competitor_gap", правила)
@@ -283,7 +294,17 @@ class ТестыSEO(unittest.TestCase):
         ]
         термины = extract_competitor_terms(конкуренты)
         продукт = _насыщенный_продукт(
-            tags=["набор", "кухня", "сталь", "нержавеющая", "нержавеющей", "кухонный", "инструменты", "принадлежности", "повар"]
+            tags=[
+                "набор",
+                "кухня",
+                "сталь",
+                "нержавеющая",
+                "нержавеющей",
+                "кухонный",
+                "инструменты",
+                "принадлежности",
+                "повар",
+            ]
         )
         результат = audit_unified_product_seo(продукт, competitor_terms=термины)
         правила = {н.rule for н in результат.findings if н.field == "keywords"}
@@ -310,9 +331,7 @@ class ТестыSEO(unittest.TestCase):
         self.assertIn("seo_images_few", правила)
 
     def test_достаточно_изображений_без_ошибки(self):
-        продукт = _насыщенный_продукт(
-            image_urls=["https://e.com/1.jpg", "https://e.com/2.jpg", "https://e.com/3.jpg"]
-        )
+        продукт = _насыщенный_продукт(image_urls=["https://e.com/1.jpg", "https://e.com/2.jpg", "https://e.com/3.jpg"])
         результат = audit_unified_product_seo(продукт)
         правила = {н.rule for н in результат.findings if н.field == "images"}
         self.assertNotIn("seo_images_few", правила)
@@ -355,10 +374,7 @@ class ТестыSEO(unittest.TestCase):
         self.assertNotIn("товар", термины)
 
     def test_ограничение_количества_терминов(self):
-        конкуренты = [
-            {"name": f"Слово{i} большой набор слов для теста"}
-            for i in range(30)
-        ]
+        конкуренты = [{"name": f"Слово{i} большой набор слов для теста"} for i in range(30)]
         термины = extract_competitor_terms(конкуренты, limit=5)
         self.assertLessEqual(len(термины), 5)
 
@@ -424,7 +440,6 @@ class ТестыSEO(unittest.TestCase):
         self.assertEqual(находка.severity, "warning")
         self.assertEqual(находка.message, "сообщение")
 
-
     # ── Граничные случаи UnifiedProduct (None-поля) ─────────────────────
 
     def test_продукт_name_none_не_падает(self):
@@ -479,6 +494,7 @@ class ТестыSEO(unittest.TestCase):
 
     def test_score_все_типы_находок_одновременно(self):
         from app.seo_intelligence import _score
+
         находки = [
             SEOFinding("crit1", "п", "critical", "критическая"),
             SEOFinding("warn1", "п", "warning", "предупреждение"),
@@ -489,10 +505,12 @@ class ТестыSEO(unittest.TestCase):
 
     def test_score_ровно_ноль_находок(self):
         from app.seo_intelligence import _score
+
         self.assertEqual(_score([]), 100)
 
     def test_score_ровно_по_одной_находке_каждого_типа(self):
         from app.seo_intelligence import _score
+
         критическая = [SEOFinding("р", "п", "critical", "с")]
         предупреждение = [SEOFinding("р", "п", "warning", "с")]
         информация = [SEOFinding("р", "п", "info", "с")]
@@ -519,10 +537,7 @@ class ТестыSEO(unittest.TestCase):
         self.assertEqual(термины, [])
 
     def test_100_конкурентов_с_limit_3(self):
-        конкуренты = [
-            {"name": "Кухонный набор инструмент"}
-            for _ in range(100)
-        ]
+        конкуренты = [{"name": "Кухонный набор инструмент"} for _ in range(100)]
         термины = extract_competitor_terms(конкуренты, limit=3)
         self.assertLessEqual(len(термины), 3)
 
@@ -530,6 +545,7 @@ class ТестыSEO(unittest.TestCase):
 
     def test_каждая_находка_порождает_одну_рекомендацию(self):
         from app.seo_intelligence import _recommend
+
         находки = [
             SEOFinding("rule1", "name", "critical", "сообщение1"),
             SEOFinding("rule2", "description", "warning", "сообщение2"),
@@ -540,6 +556,7 @@ class ТестыSEO(unittest.TestCase):
 
     def test_количество_рекомендаций_равно_количеству_находок(self):
         from app.seo_intelligence import _recommend
+
         находки = [
             SEOFinding("r1", "f1", "critical", "m1"),
             SEOFinding("r2", "f2", "warning", "m2"),
@@ -551,12 +568,14 @@ class ТестыSEO(unittest.TestCase):
 
     def test_без_находок_нет_рекомендаций(self):
         from app.seo_intelligence import _recommend
+
         self.assertEqual(_recommend([]), [])
 
     # ── tier(score) все граничные значения ──────────────────────────────
 
     def test_tier_все_граничные_значения(self):
         from app.seo_intelligence import _tier
+
         self.assertEqual(_tier(0), "weak")
         self.assertEqual(_tier(49), "weak")
         self.assertEqual(_tier(50), "needs_work")

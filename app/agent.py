@@ -3,6 +3,7 @@ agent.py — 🤖 Claude AI агент внутри парсера.
 Умеет: анализировать цены, читать отзывы, давать советы,
 искать товары по названию на Озоне.
 """
+
 import html
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
@@ -15,16 +16,23 @@ from app.database import Database, PriceHistory, Product
 
 # ── Получение истории цен для анализа ─────────────────────────────────────────
 
+
 async def get_price_history_text(db: Database, product: Product, days: int = 30) -> str:
     """Формирует текстовое описание истории цен товара для передачи в Claude."""
     since = datetime.now(UTC) - timedelta(days=days)
     async with db.session() as s:
-        rows = (await s.execute(
-            select(PriceHistory)
-            .where(PriceHistory.product_id == product.id)
-            .where(PriceHistory.recorded_at >= since)
-            .order_by(PriceHistory.recorded_at)
-        )).scalars().all()
+        rows = (
+            (
+                await s.execute(
+                    select(PriceHistory)
+                    .where(PriceHistory.product_id == product.id)
+                    .where(PriceHistory.recorded_at >= since)
+                    .order_by(PriceHistory.recorded_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     if not rows:
         return "Нет данных об истории цен."
@@ -49,12 +57,14 @@ async def get_all_stats(db: Database) -> dict:
 
         # Товары с изменением цены за последние 24ч
         since = datetime.now(UTC) - timedelta(hours=24)
-        changed = (await s.execute(
-            select(PriceHistory, Product)
-            .join(Product)
-            .where(PriceHistory.recorded_at >= since)
-            .order_by(desc(PriceHistory.recorded_at))
-        )).all()
+        changed = (
+            await s.execute(
+                select(PriceHistory, Product)
+                .join(Product)
+                .where(PriceHistory.recorded_at >= since)
+                .order_by(desc(PriceHistory.recorded_at))
+            )
+        ).all()
 
     return {
         "total_products": n_products,
@@ -66,11 +76,12 @@ async def get_all_stats(db: Database) -> dict:
                 "time": ph.recorded_at.strftime("%H:%M"),
             }
             for ph, p in changed[:10]
-        ]
+        ],
     }
 
 
 # ── Claude AI клиент ──────────────────────────────────────────────────────────
+
 
 class PriceAgent:
     """Агент на базе Claude для анализа цен и товаров."""
@@ -144,7 +155,7 @@ URL: {product.url}
         else:
             changes_text = "Изменений за последние 24 часа не было"
 
-        prompt = f"""У меня отслеживается {stats['total_products']} товаров на Озоне.
+        prompt = f"""У меня отслеживается {stats["total_products"]} товаров на Озоне.
 
 Изменения цен за последние 24 часа:
 {changes_text}
@@ -183,12 +194,18 @@ URL: {product.url}
             return []
         product_ids = [product.id for product in products]
         async with self.db.session() as s:
-            all_rows = (await s.execute(
-                select(PriceHistory)
-                .where(PriceHistory.product_id.in_(product_ids))
-                .where(PriceHistory.price.isnot(None))
-                .order_by(PriceHistory.product_id, desc(PriceHistory.recorded_at))
-            )).scalars().all()
+            all_rows = (
+                (
+                    await s.execute(
+                        select(PriceHistory)
+                        .where(PriceHistory.product_id.in_(product_ids))
+                        .where(PriceHistory.price.isnot(None))
+                        .order_by(PriceHistory.product_id, desc(PriceHistory.recorded_at))
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
         recent_by_product: dict[int, list[PriceHistory]] = defaultdict(list)
         for row in all_rows:
@@ -206,14 +223,16 @@ URL: {product.url}
                 if previous > 0:
                     change_pct = abs(latest - previous) / previous * 100
                     if change_pct >= 20:
-                        anomalies.append({
-                            "name": product.name,
-                            "url": product.url,
-                            "old_price": previous,
-                            "new_price": latest,
-                            "change_pct": round(change_pct, 1),
-                            "direction": "📉" if latest < previous else "📈",
-                        })
+                        anomalies.append(
+                            {
+                                "name": product.name,
+                                "url": product.url,
+                                "old_price": previous,
+                                "new_price": latest,
+                                "change_pct": round(change_pct, 1),
+                                "direction": "📉" if latest < previous else "📈",
+                            }
+                        )
 
         return anomalies
 
@@ -228,13 +247,19 @@ URL: {product.url}
             return []
         product_ids = [product.id for product in products]
         async with self.db.session() as s:
-            all_rows = (await s.execute(
-                select(PriceHistory)
-                .where(PriceHistory.product_id.in_(product_ids))
-                .where(PriceHistory.recorded_at >= since)
-                .where(PriceHistory.price.isnot(None))
-                .order_by(PriceHistory.product_id, PriceHistory.recorded_at)
-            )).scalars().all()
+            all_rows = (
+                (
+                    await s.execute(
+                        select(PriceHistory)
+                        .where(PriceHistory.product_id.in_(product_ids))
+                        .where(PriceHistory.recorded_at >= since)
+                        .where(PriceHistory.price.isnot(None))
+                        .order_by(PriceHistory.product_id, PriceHistory.recorded_at)
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
         history_by_product: dict[int, list[PriceHistory]] = defaultdict(list)
         for row in all_rows:
@@ -254,21 +279,22 @@ URL: {product.url}
             if current == min_price and max_price > min_price:
                 savings = max_price - min_price
                 savings_pct = round(savings / max_price * 100, 1)
-                deals.append({
-                    "name": product.name,
-                    "url": product.url,
-                    "current_price": current,
-                    "max_price": max_price,
-                    "savings": savings,
-                    "savings_pct": savings_pct,
-                })
+                deals.append(
+                    {
+                        "name": product.name,
+                        "url": product.url,
+                        "current_price": current,
+                        "max_price": max_price,
+                        "savings": savings,
+                        "savings_pct": savings_pct,
+                    }
+                )
 
         # Сортируем по % выгоды
         deals.sort(key=lambda x: x["savings_pct"], reverse=True)
         return deals[:5]
 
-
-# ── Анализ отзывов (позитив/негатив/фейк) ────────────────────────────────────
+    # ── Анализ отзывов (позитив/негатив/фейк) ────────────────────────────────────
 
     async def analyze_reviews(self, reviews: list[str], product_name: str) -> str:
         """Анализирует отзывы через Claude — тональность, фейки, резюме."""
@@ -310,7 +336,7 @@ URL: {product.url}
             diff = f"\n{cheaper} дешевле на {diff_rub} ₽ ({diff_pct}%)"
 
         prompt = f"""Товар: {product_name}
-Цены: {', '.join(prices_info)}{diff}
+Цены: {", ".join(prices_info)}{diff}
 
 Дай краткий совет где лучше купить.
 Учти: на Озоне часто лучше доставка, на WB бывают дополнительные скидки по картам.

@@ -97,15 +97,14 @@ def _env_bool(key: str, default: str = "0") -> bool:
 
 
 BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
-ADMIN_IDS: list[int] = [
-    int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()
-]
+ADMIN_IDS: list[int] = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 TELEGRAM_DROP_PENDING_UPDATES: bool = _env_bool("TELEGRAM_DROP_PENDING_UPDATES", "0")
 TELEGRAM_FORCE_DIRECT: bool = _env_bool("TELEGRAM_FORCE_DIRECT", "0")
 
 
 def require_bot_token() -> str:
     return _require("BOT_TOKEN")
+
 
 # ── Claude AI ─────────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")  # legacy
@@ -123,9 +122,7 @@ DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
 MIMO_API_KEY: str = os.getenv("MIMO_API_KEY", "")
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "")
-AI_FALLBACK_PROVIDERS: list[str] = [
-    p.strip() for p in os.getenv("AI_FALLBACK_PROVIDERS", "").split(",") if p.strip()
-]
+AI_FALLBACK_PROVIDERS: list[str] = [p.strip() for p in os.getenv("AI_FALLBACK_PROVIDERS", "").split(",") if p.strip()]
 
 # ── Runtime paths ─────────────────────────────────────────────────────────────
 RUNTIME_DATA_DIR: Path = _runtime_data_dir()
@@ -133,8 +130,12 @@ REPORTS_DIR: Path = _path_from_env("REPORTS_DIR", RUNTIME_DATA_DIR / "reports")
 PARSER_DEBUG_DIR: Path = _path_from_env("PARSER_DEBUG_DIR", RUNTIME_DATA_DIR / "debug")
 OZON_PROFILE_DIR: Path = _path_from_env("OZON_PROFILE_DIR", RUNTIME_DATA_DIR / "ozon_profile")
 MARKETMIND_WORKSPACE_DIR: Path = _path_from_env("MARKETMIND_WORKSPACE_DIR", RUNTIME_DATA_DIR / "projects")
-SCRAPE_ATTEMPTS_JSONL: Path = _path_from_env("SCRAPE_ATTEMPTS_JSONL", RUNTIME_DATA_DIR / "logs" / "scrape_attempts.jsonl")
-BLOCK_PATTERNS_JSONL: Path = _path_from_env("BLOCK_PATTERNS_JSONL", RUNTIME_DATA_DIR / "logs" / "blocked_patterns.jsonl")
+SCRAPE_ATTEMPTS_JSONL: Path = _path_from_env(
+    "SCRAPE_ATTEMPTS_JSONL", RUNTIME_DATA_DIR / "logs" / "scrape_attempts.jsonl"
+)
+BLOCK_PATTERNS_JSONL: Path = _path_from_env(
+    "BLOCK_PATTERNS_JSONL", RUNTIME_DATA_DIR / "logs" / "blocked_patterns.jsonl"
+)
 
 # ── Local client workflow limits ─────────────────────────────────────────────
 IMPORT_SCHEMA_VERSION: str = os.getenv("IMPORT_SCHEMA_VERSION", "local-import-v1")
@@ -146,6 +147,7 @@ IMPORT_MAX_CELL_CHARS: int = int(os.getenv("IMPORT_MAX_CELL_CHARS", "20000"))
 IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES: int = int(os.getenv("IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES", str(100 * 1024 * 1024)))
 IMPORT_MAX_ZIP_COMPRESSION_RATIO: int = int(os.getenv("IMPORT_MAX_ZIP_COMPRESSION_RATIO", "100"))
 IMPORT_PREVIEW_ROWS: int = int(os.getenv("IMPORT_PREVIEW_ROWS", "5"))
+
 
 # ── База данных ───────────────────────────────────────────────────────────────
 def _default_database_url() -> str:
@@ -172,7 +174,9 @@ if DATABASE_URL.startswith("sqlite+aiosqlite:///"):
 
 # ── Прокси ────────────────────────────────────────────────────────────────────
 COMMON_PROXY: str = _normalize_proxy(os.getenv("COMMON_PROXY", ""))
-PARSER_PROXY: str = _normalize_proxy(os.getenv("PARSER_PROXY", "")) or _normalize_proxy(os.getenv("PROXY", "")) or COMMON_PROXY
+PARSER_PROXY: str = (
+    _normalize_proxy(os.getenv("PARSER_PROXY", "")) or _normalize_proxy(os.getenv("PROXY", "")) or COMMON_PROXY
+)
 TELEGRAM_PROXY: str = (
     _normalize_proxy(os.getenv("TELEGRAM_API_PROXY", ""))
     or _normalize_proxy(os.getenv("TELEGRAM_PROXY", ""))
@@ -210,7 +214,11 @@ RATE_LIMIT_OZON_MIN_SEC: float = float(os.getenv("RATE_LIMIT_OZON_MIN_SEC", "5.2
 RATE_LIMIT_OZON_MAX_SEC: float = float(os.getenv("RATE_LIMIT_OZON_MAX_SEC", "12.8"))
 CIRCUIT_BLOCK_THRESHOLD: int = int(os.getenv("CIRCUIT_BLOCK_THRESHOLD", "3"))
 _cooldown_raw = os.getenv("COOLDOWN_STEPS_MINUTES", "10,20,40")
-COOLDOWN_STEPS_MINUTES: list[int] = [int(x.strip()) for x in _cooldown_raw.split(",") if x.strip().isdigit()] or [10, 20, 40]
+COOLDOWN_STEPS_MINUTES: list[int] = [int(x.strip()) for x in _cooldown_raw.split(",") if x.strip().isdigit()] or [
+    10,
+    20,
+    40,
+]
 
 # При полном провале парсинга — сохранить файл с поисковыми ссылками / сниппетами (см. app/utils/error_research.py)
 RESEARCH_ON_PARSE_FAILURE: bool = os.getenv("RESEARCH_ON_PARSE_FAILURE", "").strip().lower() in (

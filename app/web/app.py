@@ -44,6 +44,7 @@ if TYPE_CHECKING:
 
 def create_app() -> FastAPI:
     import warnings
+
     warnings.filterwarnings("ignore", message=".*TLS in TLS.*")
     from app.runtime_paths import runtime_banner
 
@@ -154,9 +155,7 @@ def create_app() -> FastAPI:
         affect HTTPException handling: Starlette dispatches HTTPException to
         FastAPI's own registered handler for that exact type before this
         catch-all Exception handler is ever considered."""
-        logger.error(
-            "Unhandled exception in %s %s: %r", request.method, request.url.path, exc, exc_info=exc
-        )
+        logger.error("Unhandled exception in %s %s: %r", request.method, request.url.path, exc, exc_info=exc)
         http_exc = _editor_error(exc)
         return JSONResponse(status_code=http_exc.status_code, content={"detail": http_exc.detail})
 

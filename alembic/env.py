@@ -90,6 +90,7 @@ def run_async_migrations_sync() -> None:
         # We're inside an already running event loop (e.g. from app.main)
         # Use nest_asyncio or create a task
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, run_async_migrations())
             future.result()

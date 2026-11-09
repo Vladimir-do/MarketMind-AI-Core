@@ -48,10 +48,10 @@ PipelineResult
 class EnrichedProduct:
     product: UnifiedProduct
     draft: OzonCardDraft | None = None
-    quality_score: int = 0          # от enricher (legacy)
+    quality_score: int = 0  # от enricher (legacy)
     needs_review: list[str] = []
     warnings: list[str] = []
-    analysis: AnalysisResult | None = None   # NEW: Intelligence
+    analysis: AnalysisResult | None = None  # NEW: Intelligence
 ```
 
 **PipelineResult:**
@@ -62,8 +62,8 @@ class PipelineResult:
     errors: list[...] = []
     import_metadata: dict = {}
     enrichment_metadata: dict = {}
-    batch_analysis: BatchAnalysisResult | None = None   # NEW
-    analysis_metadata: dict[str, Any] = {}              # NEW
+    batch_analysis: BatchAnalysisResult | None = None  # NEW
+    analysis_metadata: dict[str, Any] = {}  # NEW
 ```
 
 ### Порядок выполнения
@@ -82,7 +82,7 @@ class PipelineResult:
     "average_score": 72.5,
     "below_threshold": 3,
     "tier_distribution": {"excellent": 5, "good": 6, "fair": 1, "poor": 2, "critical": 1},
-    "top_issues": [{"rule": "missing_brand", "action": "add_brand", "priority": 2}]
+    "top_issues": [{"rule": "missing_brand", "action": "add_brand", "priority": 2}],
 }
 ```
 

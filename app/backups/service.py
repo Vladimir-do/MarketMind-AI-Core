@@ -24,7 +24,9 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def create_database_backup(*, reason: str = "manual", db_path: Path | None = None, backups_dir: Path | None = None) -> dict:
+def create_database_backup(
+    *, reason: str = "manual", db_path: Path | None = None, backups_dir: Path | None = None
+) -> dict:
     source = db_path or sqlite_database_path()
     if source is None:
         raise BackupError("Поддерживается только SQLite backup")
@@ -60,7 +62,9 @@ def backup_record(path: Path) -> dict:
     }
 
 
-def restore_database_backup(backup_name: str, *, confirmation: str, db_path: Path | None = None, backups_dir: Path | None = None) -> dict:
+def restore_database_backup(
+    backup_name: str, *, confirmation: str, db_path: Path | None = None, backups_dir: Path | None = None
+) -> dict:
     if confirmation != "ВОССТАНОВИТЬ":
         raise BackupError("Для восстановления введите ВОССТАНОВИТЬ")
     target_db = db_path or sqlite_database_path()

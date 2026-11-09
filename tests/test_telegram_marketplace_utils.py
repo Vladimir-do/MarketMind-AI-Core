@@ -47,9 +47,7 @@ class TelegramMarketplaceUtilsTests(unittest.IsolatedAsyncioTestCase):
         ):
             competitors = await _search_competitors_with_fallback("query", max_per_site=8)
 
-        search.assert_awaited_once_with(
-            "query", max_per_site=8, exclude_marketplaces=("ozon",)
-        )
+        search.assert_awaited_once_with("query", max_per_site=8, exclude_marketplaces=("ozon",))
         self.assertEqual([item["marketplace"] for item in competitors], ["wildberries", "yandex_market"])
         self.assertEqual([item["name"] for item in competitors], ["WB product", "YM product"])
 

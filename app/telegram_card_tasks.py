@@ -34,7 +34,7 @@ def extract_ozon_product_identity(url: str) -> tuple[str | None, str | None]:
     id_match = re.search(r"-(\d{6,})$", slug)
     product_id = id_match.group(1) if id_match else None
     if id_match:
-        slug = slug[:id_match.start()]
+        slug = slug[: id_match.start()]
     title = re.sub(r"\s+", " ", re.sub(r"[-_]+", " ", slug)).strip()
     if title:
         title = title[:1].upper() + title[1:]

@@ -197,12 +197,7 @@ CSV
         self.assertEqual(second.type, TaskType.UNKNOWN)
 
     def test_russian_requirements_do_not_become_fields(self):
-        task = detect_task_intent(
-            "спарси https://books.toscrape.com/\n"
-            "- title\n"
-            "- логирование\n"
-            "- retry"
-        )
+        task = detect_task_intent("спарси https://books.toscrape.com/\n- title\n- логирование\n- retry")
 
         self.assertEqual(task.fields, ["title"])
         self.assertIn("logging", task.requirements)
@@ -397,7 +392,9 @@ https://books.toscrape.com/
             error_type="ScrapingError",
         )
 
-        task = detect_task_intent("\u0430\u0433\u0435\u043d\u0442 \u043e\u0448\u0438\u0431\u0441\u044f", context=context)
+        task = detect_task_intent(
+            "\u0430\u0433\u0435\u043d\u0442 \u043e\u0448\u0438\u0431\u0441\u044f", context=context
+        )
 
         self.assertEqual(task.type, TaskType.REPAIR)
         self.assertEqual(

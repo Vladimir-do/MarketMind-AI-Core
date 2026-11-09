@@ -59,7 +59,10 @@ class ProjectArchiveService:
                     archive.write(path, f"project/{rel}")
             manifest["checksums"] = checksums
             archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True))
-            archive.writestr("history/project_history.json", json.dumps(manifest["history"], ensure_ascii=False, indent=2, sort_keys=True))
+            archive.writestr(
+                "history/project_history.json",
+                json.dumps(manifest["history"], ensure_ascii=False, indent=2, sort_keys=True),
+            )
         return {
             "project_id": project_id,
             "relative_path": relative_path,
@@ -73,25 +76,39 @@ class ProjectArchiveService:
         async with self._db.session() as session:
             project = await session.get(ClientProject, project_id)
             files = (
-                await session.execute(select(ClientProjectFile).where(ClientProjectFile.project_id == project_id))
-            ).scalars().all()
+                (await session.execute(select(ClientProjectFile).where(ClientProjectFile.project_id == project_id)))
+                .scalars()
+                .all()
+            )
             products = (
-                await session.execute(select(ProjectProduct).where(ProjectProduct.project_id == project_id))
-            ).scalars().all()
+                (await session.execute(select(ProjectProduct).where(ProjectProduct.project_id == project_id)))
+                .scalars()
+                .all()
+            )
             exports = (
-                await session.execute(select(ProjectExport).where(ProjectExport.project_id == project_id))
-            ).scalars().all()
+                (await session.execute(select(ProjectExport).where(ProjectExport.project_id == project_id)))
+                .scalars()
+                .all()
+            )
             reports = (
-                await session.execute(select(ProjectReport).where(ProjectReport.project_id == project_id))
-            ).scalars().all()
+                (await session.execute(select(ProjectReport).where(ProjectReport.project_id == project_id)))
+                .scalars()
+                .all()
+            )
             versions = (
-                await session.execute(select(ProductCardVersion).where(ProductCardVersion.project_id == project_id))
-            ).scalars().all()
+                (await session.execute(select(ProductCardVersion).where(ProductCardVersion.project_id == project_id)))
+                .scalars()
+                .all()
+            )
             events = (
-                await session.execute(
-                    select(DomainEventRecord).where(DomainEventRecord.metadata_json.like(f"%{project_id}%"))
+                (
+                    await session.execute(
+                        select(DomainEventRecord).where(DomainEventRecord.metadata_json.like(f"%{project_id}%"))
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         if project is None:
             raise ProjectNotFoundError("Проект не найден")
         return {

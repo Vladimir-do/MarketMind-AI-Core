@@ -113,17 +113,28 @@ class LocalizationTests(unittest.TestCase):
         locale_file = TEMPLATES_DIR.parent / "locales" / "ru.json"
         self.assertTrue(locale_file.exists(), f"Locale file not found: {locale_file}")
         import json
+
         with open(locale_file, encoding="utf-8") as f:
             data = json.load(f)
         self.assertGreater(len(data), 50, "Locale file should have 50+ keys")
         # Check key categories exist
-        for category in ["nav_", "dashboard_", "products_", "quality_", "findings_", "suggestions_", "import_", "analytics_"]:
+        for category in [
+            "nav_",
+            "dashboard_",
+            "products_",
+            "quality_",
+            "findings_",
+            "suggestions_",
+            "import_",
+            "analytics_",
+        ]:
             matching = [k for k in data if k.startswith(category)]
             self.assertGreater(len(matching), 0, f"Missing keys for category: {category}")
 
     def test_locale_load_function(self):
         """Verify locale loading works."""
         from app.web.locales import load_locale, t
+
         locale = load_locale("ru")
         self.assertIn("app_name", locale)
         self.assertEqual(t("app_name"), "MarketMind AI")

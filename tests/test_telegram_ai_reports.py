@@ -14,9 +14,7 @@ class TelegramAiReportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("База", message)
 
     async def test_forecast_includes_product_with_enough_prices(self):
-        db = SimpleNamespace(
-            get_all_products=AsyncMock(return_value=[SimpleNamespace(id=1, name="Товар")])
-        )
+        db = SimpleNamespace(get_all_products=AsyncMock(return_value=[SimpleNamespace(id=1, name="Товар")]))
         analyzer = Mock()
         analyzer._get_prices = AsyncMock(return_value=[100, 110, 120])
 

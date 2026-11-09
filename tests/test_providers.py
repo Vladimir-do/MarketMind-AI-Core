@@ -265,9 +265,9 @@ class TestFactory(unittest.TestCase):
 
         source = inspect.getsource(config_module)
         self.assertIn(
-            'os.getenv("AI_PROVIDER", "grok")', source,
-            "app.config.AI_PROVIDER's own default changed -- update this test "
-            "and factory.py's default together",
+            'os.getenv("AI_PROVIDER", "grok")',
+            source,
+            "app.config.AI_PROVIDER's own default changed -- update this test and factory.py's default together",
         )
 
         original = os.environ.pop("AI_PROVIDER", None)
@@ -305,10 +305,12 @@ class TestFallbackProvider(unittest.TestCase):
         bad = OpenAICompatibleProvider(api_key="sk-bad", provider_label="openai")
         good = OpenAICompatibleProvider(api_key="sk-good", provider_label="deepseek")
 
-        mock_aiohttp = _build_fallback_mock([
-            (500, {"error": {"message": "Server error"}}),
-            (200, _mock_openai_response("fallback works")),
-        ])
+        mock_aiohttp = _build_fallback_mock(
+            [
+                (500, {"error": {"message": "Server error"}}),
+                (200, _mock_openai_response("fallback works")),
+            ]
+        )
 
         with patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp):
             fb = FallbackAIProvider([bad, good])
@@ -320,9 +322,11 @@ class TestFallbackProvider(unittest.TestCase):
         fast = OpenAICompatibleProvider(api_key="sk-fast", provider_label="openai")
         slow = OpenAICompatibleProvider(api_key="sk-slow", provider_label="deepseek")
 
-        mock_aiohttp = _build_fallback_mock([
-            (200, _mock_openai_response("first wins")),
-        ])
+        mock_aiohttp = _build_fallback_mock(
+            [
+                (200, _mock_openai_response("first wins")),
+            ]
+        )
 
         with patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp):
             fb = FallbackAIProvider([fast, slow])
@@ -334,10 +338,12 @@ class TestFallbackProvider(unittest.TestCase):
         bad1 = OpenAICompatibleProvider(api_key="sk-1", provider_label="openai")
         bad2 = OpenAICompatibleProvider(api_key="sk-2", provider_label="deepseek")
 
-        mock_aiohttp = _build_fallback_mock([
-            (500, {"error": {"message": "fail"}}),
-            (500, {"error": {"message": "fail"}}),
-        ])
+        mock_aiohttp = _build_fallback_mock(
+            [
+                (500, {"error": {"message": "fail"}}),
+                (500, {"error": {"message": "fail"}}),
+            ]
+        )
 
         with patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp):
             fb = FallbackAIProvider([bad1, bad2])
@@ -382,10 +388,12 @@ class TestFallbackProvider(unittest.TestCase):
         p1 = OpenAICompatibleProvider(api_key="sk-1", provider_label="openai")
         p2 = OllamaProvider()
 
-        mock_aiohttp = _build_fallback_mock([
-            (200, _mock_openai_response("")),
-            (200, _mock_ollama_response("second")),
-        ])
+        mock_aiohttp = _build_fallback_mock(
+            [
+                (200, _mock_openai_response("")),
+                (200, _mock_ollama_response("second")),
+            ]
+        )
 
         with (
             patch("app.ai_recommendation.providers.openai_compatible.aiohttp", mock_aiohttp),

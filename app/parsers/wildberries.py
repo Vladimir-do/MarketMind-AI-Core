@@ -2,6 +2,7 @@
 wildberries.py — парсер Wildberries через API.
 Поддерживает несколько версий API с автофоллбэком.
 """
+
 import asyncio
 import re
 from collections.abc import Awaitable, Callable
@@ -122,13 +123,14 @@ def _build_wb_headers() -> dict[str, str]:
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
         "Origin": "https://www.wildberries.ru",
         "Referer": "https://www.wildberries.ru/",
-        "Sec-Ch-Ua": "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Google Chrome\";v=\"122\"",
+        "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
         "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": "\"Windows\"",
+        "Sec-Ch-Ua-Platform": '"Windows"',
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "cross-site",
     }
+
 
 # Несколько версий API — пробуем по очереди
 API_URLS = [
@@ -326,11 +328,14 @@ class WildberriesParser(BaseParser):
     async def _fetch_via_cloud_function(self, url: str, nm_id: int) -> ProductData | None:
         t0 = perf_counter()
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                WB_CLOUD_FUNCTION_URL,
-                json={"product_id": nm_id},
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    WB_CLOUD_FUNCTION_URL,
+                    json={"product_id": nm_id},
+                    timeout=aiohttp.ClientTimeout(total=20),
+                ) as resp,
+            ):
                 latency_ms = int((perf_counter() - t0) * 1000)
                 if resp.status != 200:
                     await self._record_attempt(
@@ -404,11 +409,7 @@ class WildberriesParser(BaseParser):
         if price and old_price and old_price > price:
             discount_pct = round((old_price - price) / old_price * 100)
 
-        has_stock_rows = any(
-            bool(size.get("stocks"))
-            for size in sizes
-            if isinstance(size, dict)
-        )
+        has_stock_rows = any(bool(size.get("stocks")) for size in sizes if isinstance(size, dict))
         in_stock = any(
             stock.get("qty", 0) > 0
             for size in sizes
@@ -416,11 +417,7 @@ class WildberriesParser(BaseParser):
             for stock in (size.get("stocks") or [])
             if isinstance(stock, dict)
         )
-        availability = (
-            "unknown"
-            if not has_stock_rows
-            else ("in_stock" if in_stock else "out_of_stock")
-        )
+        availability = "unknown" if not has_stock_rows else ("in_stock" if in_stock else "out_of_stock")
 
         image_url = _build_wb_image_url(nm_id)
 
@@ -603,7 +600,7 @@ class WildberriesParser(BaseParser):
             old_price = None
             sizes = data.get("sizes") or []
             if sizes:
-                p = (sizes[0].get("price") or {})
+                p = sizes[0].get("price") or {}
                 total = p.get("total")
                 if isinstance(total, (int, float)):
                     price = int(total) // 100
@@ -660,6 +657,7 @@ class WildberriesParser(BaseParser):
         try:
             import json
             import urllib.parse
+
             query_variants = self._search_query_variants(query)
             url_templates = [
                 "https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=1&curr=rub&dest=-1257786&lang=ru&locale=ru&query={query}&resultset=catalog&sort=popular&spp=30",
@@ -679,7 +677,9 @@ class WildberriesParser(BaseParser):
                                     continue
                                 data = json.loads(await resp.text())
                         except Exception as exc:
-                            logger.debug(f"WB search endpoint failed for query={variant!r}: {type(exc).__name__}: {exc}")
+                            logger.debug(
+                                f"WB search endpoint failed for query={variant!r}: {type(exc).__name__}: {exc}"
+                            )
                             continue
                         products = self._extract_search_products(data)
                         if products:
@@ -710,25 +710,23 @@ class WildberriesParser(BaseParser):
                 if price and old_price and old_price > price:
                     discount_pct = round((old_price - price) / old_price * 100)
                 has_stock_rows = any(size.get("stocks") for size in sizes)
-                in_stock = any(
-                    stock.get("qty", 0) > 0
-                    for size in sizes
-                    for stock in size.get("stocks", [])
-                )
+                in_stock = any(stock.get("qty", 0) > 0 for size in sizes for stock in size.get("stocks", []))
                 availability = "unknown" if not has_stock_rows else ("in_stock" if in_stock else "out_of_stock")
-                results.append(ProductData(
-                    name=p.get("name", ""),
-                    price=price,
-                    old_price=old_price,
-                    discount_pct=discount_pct,
-                    availability=availability,
-                    url=f"https://www.wildberries.ru/catalog/{nm_id}/detail.aspx",
-                    image_url=_build_wb_image_url(int(nm_id)),
-                    rating=p.get("reviewRating"),
-                    reviews_count=p.get("feedbacks"),
-                    brand=p.get("brand"),
-                    marketplace="wildberries",
-                ))
+                results.append(
+                    ProductData(
+                        name=p.get("name", ""),
+                        price=price,
+                        old_price=old_price,
+                        discount_pct=discount_pct,
+                        availability=availability,
+                        url=f"https://www.wildberries.ru/catalog/{nm_id}/detail.aspx",
+                        image_url=_build_wb_image_url(int(nm_id)),
+                        rating=p.get("reviewRating"),
+                        reviews_count=p.get("feedbacks"),
+                        brand=p.get("brand"),
+                        marketplace="wildberries",
+                    )
+                )
             return results
         except Exception as e:
             logger.error(f"WB поиск ошибка: {e}")

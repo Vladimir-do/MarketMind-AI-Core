@@ -6,7 +6,8 @@ import aiohttp
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
 
-async def smoke_wb_card_json():
+
+async def smoke_wb_card_json() -> bool:
     item_id = "311895731"
 
     # Расширенный список корзин на 2026 год
@@ -49,23 +50,26 @@ async def smoke_wb_card_json():
             return "17"
         if 2874000 <= mid <= 3125999:
             return "18"
-        return "19" # и так далее
+        return "19"  # и так далее
 
     # Пробуем вычислить корзину для твоего ID
     short_id = int(item_id) // 100
     basket = get_basket_extended(short_id)
     vol = int(item_id) // 100000
     part = int(item_id) // 1000
+    baskets = list(dict.fromkeys([basket, "17", "18", "19", "20", "21"]))
 
     async with aiohttp.ClientSession() as session:
         print(f"--- Тестируем товар {item_id} ---")
         # Сначала пробуем расчетную корзину
         # А потом еще пару соседних на всякий случай
-        for b in [basket, "17", "18", "19", "20", "21"]:
+        for b in baskets:
             url = f"https://basket-{b}.wbbasket.ru/vol{vol}/part{part}/{item_id}/info/ru/card.json"
             print(f"Пробую: {url}")
             try:
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
                 async with session.get(url, headers=headers, timeout=5) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -78,11 +82,18 @@ async def smoke_wb_card_json():
                             if total:
                                 price = total / 100
                         print(f"Цена: {price if price is not None else 'нет в card.json'} руб.")
-                        return
+                        return True
                     else:
                         print(f"FAIL {b}: Код {resp.status}")
             except Exception as e:
                 print(f"WARN Ошибка на {b}: {e}")
+    print("FAIL: карточка не найдена ни в одной из проверенных корзин.")
+    return False
+
+
+def main() -> int:
+    return 0 if asyncio.run(smoke_wb_card_json()) else 1
+
 
 if __name__ == "__main__":
-    asyncio.run(smoke_wb_card_json())
+    raise SystemExit(main())

@@ -130,8 +130,12 @@ class BotHelperTests(unittest.TestCase):
 
         class FakeMessage:
             chat = SimpleNamespace(id=123)
-            def __init__(self): self.answers = []
-            async def answer(self, text, **kwargs): self.answers.append(text)
+
+            def __init__(self):
+                self.answers = []
+
+            async def answer(self, text, **kwargs):
+                self.answers.append(text)
 
         async def run():
             url = "https://www.ozon.ru/product/test-product-123456789/"
@@ -260,11 +264,7 @@ class BotHelperTests(unittest.TestCase):
 
     def test_product_card_spec_is_kept_as_one_task(self):
         prompt = (
-            "товар: Беспроводные наушники\n"
-            "бренд: Baseus\n"
-            "категория: Наушники\n"
-            "цвет: черный\n"
-            "подключение: Bluetooth"
+            "товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники\nцвет: черный\nподключение: Bluetooth"
         )
         self.assertEqual(split_natural_tasks(prompt), [prompt])
         intent, payload = parse_natural_request(prompt)
@@ -282,11 +282,14 @@ class BotHelperTests(unittest.TestCase):
             "Проанализируй конкурентов для ковриков для йоги.\n"
             "Собери карточку для кусачки маникюрные цена 499."
         )
-        self.assertEqual(tasks, [
-            "составь карточку для коврика для йоги цена 1200",
-            "Проанализируй конкурентов для ковриков для йоги",
-            "Собери карточку для кусачки маникюрные цена 499",
-        ])
+        self.assertEqual(
+            tasks,
+            [
+                "составь карточку для коврика для йоги цена 1200",
+                "Проанализируй конкурентов для ковриков для йоги",
+                "Собери карточку для кусачки маникюрные цена 499",
+            ],
+        )
 
         intents = [parse_natural_request(task)[0] for task in tasks]
         self.assertEqual(intents, ["ozon_card", "card_research", "ozon_card"])
@@ -415,11 +418,7 @@ https://books.toscrape.com/
         async def run():
             context = ContextSession()
             training_task = detect_task_intent(
-                "Открой страницу и НЕ парси сразу.\n\n"
-                "Сначала определи:\n"
-                "- task_type\n"
-                "- page_structure\n"
-                "- confidence"
+                "Открой страницу и НЕ парси сразу.\n\nСначала определи:\n- task_type\n- page_structure\n- confidence"
             )
             context.remember(training_task)
             bot_module.CHAT_CONTEXTS[FakeChat.id] = context
@@ -427,7 +426,9 @@ https://books.toscrape.com/
             state = AsyncMock()
             with (
                 patch.object(bot_module, "ADMIN_IDS", [956343475]),
-                patch.object(bot_module, "classify_page_before_parsing", AsyncMock(return_value="classified")) as classify,
+                patch.object(
+                    bot_module, "classify_page_before_parsing", AsyncMock(return_value="classified")
+                ) as classify,
                 patch.object(bot_module, "handle_scraping_task", AsyncMock()) as scraping,
                 patch.object(bot_module, "handle_natural_add_urls", AsyncMock()) as add_urls,
                 patch.object(bot_module, "handle_natural_search", AsyncMock()) as search,
@@ -483,7 +484,9 @@ https://books.toscrape.com/
             state = AsyncMock()
             with (
                 patch.object(bot_module, "ADMIN_IDS", [956343475]),
-                patch.object(bot_module, "classify_page_before_parsing", AsyncMock(return_value="classified")) as classify,
+                patch.object(
+                    bot_module, "classify_page_before_parsing", AsyncMock(return_value="classified")
+                ) as classify,
                 patch.object(bot_module, "handle_scraping_task", AsyncMock()) as scraping,
             ):
                 await bot_module.handle_unhandled_message(message, state)
@@ -714,7 +717,9 @@ https://books.toscrape.com/
             message = FakeMessage()
             with (
                 patch.object(bot_module, "fetch_html", AsyncMock(return_value=(200, loading_html))),
-                patch("app.generic_scraper.run_scraping_task", AsyncMock(side_effect=fake_run_scraping_task)) as scraper,
+                patch(
+                    "app.generic_scraper.run_scraping_task", AsyncMock(side_effect=fake_run_scraping_task)
+                ) as scraper,
             ):
                 await bot_module.handle_scraping_task(message, task)
             return message, scraper
@@ -854,8 +859,7 @@ https://books.toscrape.com/
 
     def test_repair_diagnostic_report_suggests_parser_tests(self):
         task = detect_task_intent(
-            "\u0430\u0433\u0435\u043d\u0442 \u043e\u0448\u0438\u0431\u0441\u044f\n"
-            "No product records were extracted."
+            "\u0430\u0433\u0435\u043d\u0442 \u043e\u0448\u0438\u0431\u0441\u044f\nNo product records were extracted."
         )
 
         report = build_repair_diagnostic_report(task)
@@ -893,24 +897,31 @@ https://books.toscrape.com/
         self.assertEqual(sources[-1], "товар 99 цена 199")
 
     def test_does_not_batch_mixed_task_types(self):
-        sources = _collect_batch_card_sources_from_tasks([
-            "составь карточку для коврик для йоги цена 1200",
-            "проанализируй конкурентов для ковриков для йоги",
-        ])
+        sources = _collect_batch_card_sources_from_tasks(
+            [
+                "составь карточку для коврик для йоги цена 1200",
+                "проанализируй конкурентов для ковриков для йоги",
+            ]
+        )
 
         self.assertIsNone(sources)
 
     def test_splits_mixed_tasks_into_card_batch_and_other_tasks(self):
-        card_sources, other_tasks = _split_card_and_other_tasks([
-            "составь карточку для коврика для йоги цена 1200",
-            "Проанализируй конкурентов для ковриков для йоги",
-            "Собери карточку для кусачки маникюрные цена 499",
-        ])
+        card_sources, other_tasks = _split_card_and_other_tasks(
+            [
+                "составь карточку для коврика для йоги цена 1200",
+                "Проанализируй конкурентов для ковриков для йоги",
+                "Собери карточку для кусачки маникюрные цена 499",
+            ]
+        )
 
-        self.assertEqual(card_sources, [
-            "коврика для йоги цена 1200",
-            "кусачки маникюрные цена 499",
-        ])
+        self.assertEqual(
+            card_sources,
+            [
+                "коврика для йоги цена 1200",
+                "кусачки маникюрные цена 499",
+            ],
+        )
         self.assertEqual(other_tasks, ["Проанализируй конкурентов для ковриков для йоги"])
 
     def test_build_card_task_from_ozon_url_uses_slug_as_title(self):
@@ -1031,8 +1042,7 @@ https://books.toscrape.com/
 
     def test_natural_request_routes_multiple_card_urls_to_batch(self):
         intent, payload = parse_natural_request(
-            "составь карточки на это: https://www.ozon.ru/product/one/, "
-            "https://www.ozon.ru/product/two/"
+            "составь карточки на это: https://www.ozon.ru/product/one/, https://www.ozon.ru/product/two/"
         )
         self.assertEqual(intent, "ozon_batch_cards")
         self.assertIn("https://www.ozon.ru/product/one/", payload)
@@ -1101,21 +1111,25 @@ class AllowedAccessTests(unittest.TestCase):
 
     def test_empty_admin_ids_denies_access(self):
         import app.bot as bot_module
+
         with patch.object(bot_module, "ADMIN_IDS", []):
             self.assertFalse(allowed(12345))
 
     def test_user_in_admin_ids_allows_access(self):
         import app.bot as bot_module
+
         with patch.object(bot_module, "ADMIN_IDS", [100, 200, 300]):
             self.assertTrue(allowed(200))
 
     def test_user_not_in_admin_ids_denies_access(self):
         import app.bot as bot_module
+
         with patch.object(bot_module, "ADMIN_IDS", [100, 200, 300]):
             self.assertFalse(allowed(999))
 
     def test_allowed_does_not_leak_admin_ids(self):
         import app.bot as bot_module
+
         with patch.object(bot_module, "ADMIN_IDS", [42]):
             result = allowed(42)
             self.assertTrue(result)
@@ -1151,11 +1165,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
 
         async def run():
             message = self.FakeMessage()
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_products_with_prices",
-                new=AsyncMock(return_value=([fake_product], {1: fake_price})),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_products_with_prices",
+                    new=AsyncMock(return_value=([fake_product], {1: fake_price})),
+                ) as mocked,
+            ):
                 await bot_module.cmd_list(message)
             return message, mocked
 
@@ -1171,10 +1188,13 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
 
         async def run():
             message = self.FakeMessage()
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_products_with_prices",
-                new=AsyncMock(return_value=([], {})),
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_products_with_prices",
+                    new=AsyncMock(return_value=([], {})),
+                ),
             ):
                 await bot_module.cmd_list(message)
             return message
@@ -1189,11 +1209,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
 
         async def run():
             message = self.FakeMessage()
-            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_products_with_prices",
-                new=AsyncMock(),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [999]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_products_with_prices",
+                    new=AsyncMock(),
+                ) as mocked,
+            ):
                 await bot_module.cmd_list(message)
             return message, mocked
 
@@ -1207,11 +1230,15 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
 
         async def run():
             message = self.FakeMessage()
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_status_counts",
-                new=AsyncMock(return_value=(5, 12, 3)),
-            ) as mocked, patch.object(bot_module.agent, "_is_available", return_value=True):
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_status_counts",
+                    new=AsyncMock(return_value=(5, 12, 3)),
+                ) as mocked,
+                patch.object(bot_module.agent, "_is_available", return_value=True),
+            ):
                 await bot_module.cmd_status(message)
             return message, mocked
 
@@ -1236,15 +1263,19 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
                 sent.append((uid, text))
 
         async def run():
-            with patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_price_changes",
-                new=AsyncMock(return_value=[(fake_price, fake_product)]),
-            ), patch.object(
-                bot_module.telegram_read_service,
-                "get_subscriber_ids",
-                new=AsyncMock(return_value=[111, 222]),
-            ), patch.object(bot_module, "bot", FakeBot()):
+            with (
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_price_changes",
+                    new=AsyncMock(return_value=[(fake_price, fake_product)]),
+                ),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_subscriber_ids",
+                    new=AsyncMock(return_value=[111, 222]),
+                ),
+                patch.object(bot_module, "bot", FakeBot()),
+            ):
                 await bot_module._broadcast_changes()
 
         asyncio.run(run())
@@ -1258,15 +1289,18 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
         import app.bot as bot_module
 
         async def run():
-            with patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_price_changes",
-                new=AsyncMock(return_value=[]),
-            ), patch.object(
-                bot_module.telegram_read_service,
-                "get_subscriber_ids",
-                new=AsyncMock(),
-            ) as subs_mock:
+            with (
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_price_changes",
+                    new=AsyncMock(return_value=[]),
+                ),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_subscriber_ids",
+                    new=AsyncMock(),
+                ) as subs_mock,
+            ):
                 await bot_module._broadcast_changes()
             return subs_mock
 
@@ -1279,13 +1313,15 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
 
         async def run():
             message = self.FakeMessage()
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_product_count",
-                new=AsyncMock(return_value=0),
-            ) as mocked, patch.object(
-                bot_module, "worker_update_all", new=AsyncMock()
-            ) as worker_mock:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_product_count",
+                    new=AsyncMock(return_value=0),
+                ) as mocked,
+                patch.object(bot_module, "worker_update_all", new=AsyncMock()) as worker_mock,
+            ):
                 await bot_module.cmd_update(message)
             return message, mocked, worker_mock
 
@@ -1301,11 +1337,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
 
         async def run():
             message = self.FakeMessage()
-            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
-                bot_module.telegram_read_service,
-                "get_product_count",
-                new=AsyncMock(),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [999]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_product_count",
+                    new=AsyncMock(),
+                ) as mocked,
+            ):
                 await bot_module.cmd_update(message)
             return message, mocked
 
@@ -1322,11 +1361,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
         async def run():
             message = self.FakeMessage()
             state = AsyncMock()
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_wildberries_products",
-                new=AsyncMock(return_value=[fake_product]),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_wildberries_products",
+                    new=AsyncMock(return_value=[fake_product]),
+                ) as mocked,
+            ):
                 await bot_module.cmd_reviews(message, state)
             return message, mocked, state
 
@@ -1343,10 +1385,13 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
         async def run():
             message = self.FakeMessage()
             state = AsyncMock()
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_wildberries_products",
-                new=AsyncMock(return_value=[]),
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_wildberries_products",
+                    new=AsyncMock(return_value=[]),
+                ),
             ):
                 await bot_module.cmd_reviews(message, state)
             return message, state
@@ -1363,11 +1408,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
         async def run():
             message = self.FakeMessage()
             state = AsyncMock()
-            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
-                bot_module.telegram_read_service,
-                "get_recent_wildberries_products",
-                new=AsyncMock(),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [999]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_wildberries_products",
+                    new=AsyncMock(),
+                ) as mocked,
+            ):
                 await bot_module.cmd_reviews(message, state)
             return message, mocked
 
@@ -1388,16 +1436,16 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
             message.text = "1"
             state = AsyncMock()
             state.get_data = AsyncMock(return_value={"review_product_ids": [7]})
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_product_by_id",
-                new=AsyncMock(return_value=fake_product),
-            ) as mocked, patch(
-                "app.parsers.wildberries.WildberriesParser"
-            ) as parser_cls, patch(
-                "app.parsers.wildberries._extract_wb_id", return_value="7"
-            ), patch.object(
-                bot_module.agent, "analyze_reviews", new=AsyncMock(return_value="разбор отзывов")
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_product_by_id",
+                    new=AsyncMock(return_value=fake_product),
+                ) as mocked,
+                patch("app.parsers.wildberries.WildberriesParser") as parser_cls,
+                patch("app.parsers.wildberries._extract_wb_id", return_value="7"),
+                patch.object(bot_module.agent, "analyze_reviews", new=AsyncMock(return_value="разбор отзывов")),
             ):
                 parser_instance = parser_cls.return_value
                 parser_instance._fetch_reviews = AsyncMock(return_value=[])
@@ -1418,11 +1466,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
             message.text = "1"
             state = AsyncMock()
             state.get_data = AsyncMock(return_value={"review_product_ids": [999]})
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_product_by_id",
-                new=AsyncMock(return_value=None),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_product_by_id",
+                    new=AsyncMock(return_value=None),
+                ) as mocked,
+            ):
                 await bot_module.handle_reviews_choice(message, state)
             return message, mocked
 
@@ -1440,11 +1491,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
             message.text = "5"
             state = AsyncMock()
             state.get_data = AsyncMock(return_value={"review_product_ids": [7]})
-            with patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]), patch.object(
-                bot_module.telegram_read_service,
-                "get_product_by_id",
-                new=AsyncMock(),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [self.ADMIN_ID]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_product_by_id",
+                    new=AsyncMock(),
+                ) as mocked,
+            ):
                 await bot_module.handle_reviews_choice(message, state)
             return message, mocked
 
@@ -1461,11 +1515,14 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
             message = self.FakeMessage()
             message.text = "1"
             state = AsyncMock()
-            with patch.object(bot_module, "ADMIN_IDS", [999]), patch.object(
-                bot_module.telegram_read_service,
-                "get_product_by_id",
-                new=AsyncMock(),
-            ) as mocked:
+            with (
+                patch.object(bot_module, "ADMIN_IDS", [999]),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_product_by_id",
+                    new=AsyncMock(),
+                ) as mocked,
+            ):
                 await bot_module.handle_reviews_choice(message, state)
             return message, mocked, state
 

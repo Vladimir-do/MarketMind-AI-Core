@@ -22,10 +22,12 @@ def main():
     parser = argparse.ArgumentParser(description="Агент мониторинга цен маркетплейсов")
     parser.add_argument("--telegram", action="store_true", help="Запустить Telegram-бота")
     parser.add_argument(
-        "--add", nargs="+", metavar="URL",
+        "--add",
+        nargs="+",
+        metavar="URL",
         help="Добавить товар(ы) по ссылке, обновить цены всех товаров и сгенерировать отчёт одной командой",
     )
-    parser.add_argument("--update",   action="store_true", help="Обновить цены всех товаров")
+    parser.add_argument("--update", action="store_true", help="Обновить цены всех товаров")
     parser.add_argument("--migrate", action="store_true", help="Применить Alembic миграции (alembic upgrade head)")
     parser.add_argument("--metrics", type=int, metavar="N", help="Показать последние N попыток парсинга")
     parser.add_argument("--blocks", type=int, metavar="N", help="Показать последние N блокировок/сетевых сбоев")
@@ -43,7 +45,9 @@ def main():
     parser.add_argument("--online", action="store_true", help="For --mode brd, research rows on the web")
     parser.add_argument("--img-dir", help="Directory for downloaded BRD images")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between online BRD rows, seconds")
-    parser.add_argument("--ai-test", action="store_true", help="Test AI recommendation layer end-to-end with sample data")
+    parser.add_argument(
+        "--ai-test", action="store_true", help="Test AI recommendation layer end-to-end with sample data"
+    )
     parser.add_argument("--web", action="store_true", help="Запустить веб-интерфейс (FastAPI)")
     parser.add_argument("--port", type=int, default=None, help="Порт для --web (по умолчанию 8000)")
     parser.add_argument("--host", default="0.0.0.0", help="Хост для --web (по умолчанию 0.0.0.0)")
@@ -51,17 +55,32 @@ def main():
 
     # Run Alembic migrations if requested
     if args.migrate:
+
         async def _run_migrations():
             from alembic.config import Config
 
             from alembic import command
+
             alembic_cfg = Config("alembic.ini")
             command.upgrade(alembic_cfg, "head")
             print("Alembic миграции применены успешно")
 
         asyncio.run(_run_migrations())
-        if not any([args.telegram, args.add, args.update, args.metrics, args.blocks,
-                    args.ozon_login, args.report, args.deploy_wb, args.enrich, args.ai_test, args.web]):
+        if not any(
+            [
+                args.telegram,
+                args.add,
+                args.update,
+                args.metrics,
+                args.blocks,
+                args.ozon_login,
+                args.report,
+                args.deploy_wb,
+                args.enrich,
+                args.ai_test,
+                args.web,
+            ]
+        ):
             return
 
     if args.telegram:
@@ -72,13 +91,15 @@ def main():
         asyncio.set_event_loop(_loop)
 
         signal.signal(signal.SIGINT, _shutdown_handler)
-        if hasattr(signal, 'SIGTERM'):
+        if hasattr(signal, "SIGTERM"):
             signal.signal(signal.SIGTERM, _shutdown_handler)
 
         try:
             ok = _loop.run_until_complete(start_bot())
             if not ok:
-                print("Telegram bot was not started. See the log message above and fix the configuration, then try again.")
+                print(
+                    "Telegram bot was not started. See the log message above and fix the configuration, then try again."
+                )
                 return
         finally:
             if _db_ref is not None:
@@ -88,6 +109,7 @@ def main():
             _loop = None
 
     elif args.add:
+
         async def _add_and_report():
             from datetime import datetime
 
@@ -119,10 +141,12 @@ def main():
         asyncio.run(_add_and_report())
 
     elif args.update:
+
         async def _update():
             from app.config import PROXY
             from app.database import Database
             from app.worker import worker_update_all
+
             db = Database()
             await db.init()
             proxy = PROXY if PROXY else None
@@ -135,8 +159,10 @@ def main():
         asyncio.run(_update())
 
     elif args.metrics:
+
         async def _metrics():
             from app.database import Database
+
             db = Database()
             await db.init()
             attempts = await db.get_recent_scrape_attempts(limit=args.metrics)
@@ -148,16 +174,15 @@ def main():
             for a in attempts:
                 ts = a.recorded_at.strftime("%Y-%m-%d %H:%M:%S") if a.recorded_at else ""
                 http = a.http_status if a.http_status is not None else "-"
-                print(
-                    f"{ts} | {a.marketplace} | {a.source} | {a.status} | "
-                    f"{http} | {a.latency_ms} | {a.url}"
-                )
+                print(f"{ts} | {a.marketplace} | {a.source} | {a.status} | {http} | {a.latency_ms} | {a.url}")
 
         asyncio.run(_metrics())
 
     elif args.blocks:
+
         async def _blocks():
             from app.database import Database
+
             db = Database()
             await db.init()
             rows = await db.get_recent_blocked_patterns(limit=args.blocks)
@@ -178,6 +203,7 @@ def main():
         asyncio.run(_blocks())
 
     elif args.ozon_login:
+
         async def _ozon_login():
             from playwright.async_api import async_playwright
 
@@ -228,6 +254,7 @@ def main():
         asyncio.run(_ozon_login())
 
     elif args.report:
+
         async def _report():
             from datetime import datetime
 
@@ -253,6 +280,7 @@ def main():
         asyncio.run(_report())
 
     elif args.ai_test:
+
         async def _ai_test():
             import csv
             import tempfile
@@ -265,7 +293,9 @@ def main():
             with open(sample_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(["название", "бренд", "цена", "описание", "категория"])
-                writer.writerow(["Крутые наушники", "Sony", "4999", "Беспроводные наушники с шумоподавлением", "Электроника"])
+                writer.writerow(
+                    ["Крутые наушники", "Sony", "4999", "Беспроводные наушники с шумоподавлением", "Электроника"]
+                )
                 writer.writerow(["X", "", "", "", ""])
             print(f"Sample CSV: {sample_path}")
 
@@ -354,8 +384,10 @@ def main():
         print("  python -m app.main --ozon-login # open Ozon browser profile")
         print("  python -m app.main --report --embed-images # save self-contained HTML report")
         print("  python -m app.main --enrich input.xlsx --out output.xlsx --limit 50")
-        print("  python -m app.main --enrich \"Таблица BRD.xlsx\" --out \"Таблица BRD ИИ.xlsx\" --mode brd --limit 50")
-        print("  python -m app.main --enrich \"Таблица BRD.xlsx\" --out \"Таблица BRD ИИ.xlsx\" --mode brd --online --limit 5")
+        print('  python -m app.main --enrich "Таблица BRD.xlsx" --out "Таблица BRD ИИ.xlsx" --mode brd --limit 50')
+        print(
+            '  python -m app.main --enrich "Таблица BRD.xlsx" --out "Таблица BRD ИИ.xlsx" --mode brd --online --limit 5'
+        )
         print("  python -m app.main --deploy-wb # deploy WB Yandex Cloud Function")
         print("  python -m app.main --ai-test   # test AI recommendation layer end-to-end")
         print("  python -m app.main --migrate    # применить Alembic миграции")

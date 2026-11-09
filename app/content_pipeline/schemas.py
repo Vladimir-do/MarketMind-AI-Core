@@ -156,9 +156,7 @@ class DescriptionGenerationResult(_StrictModel):
 
 class Claim(_StrictModel):
     text: str
-    claim_type: Literal[
-        "weight", "dimension", "percent", "quantity", "warranty", "material", "color", "other"
-    ]
+    claim_type: Literal["weight", "dimension", "percent", "quantity", "warranty", "material", "color", "other"]
     value: str
     unit: str | None = None
 

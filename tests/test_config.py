@@ -182,19 +182,26 @@ class RuntimePathConfigTests(unittest.TestCase):
     def test_marketmind_home_is_preferred_runtime_root(self):
         import app.config as config
 
-        with tempfile.TemporaryDirectory() as tmp, patch.dict(
-            "os.environ",
-            {"MARKETMIND_HOME": tmp, "MARKETMIND_DATA_DIR": ""},
-            clear=False,
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.dict(
+                "os.environ",
+                {"MARKETMIND_HOME": tmp, "MARKETMIND_DATA_DIR": ""},
+                clear=False,
+            ),
         ):
             self.assertEqual(config._runtime_data_dir(), Path(tmp))
 
     def test_legacy_data_dir_overrides_marketmind_home(self):
         import app.config as config
 
-        with tempfile.TemporaryDirectory() as tmp_home, tempfile.TemporaryDirectory() as tmp_data, patch.dict(
-            "os.environ",
-            {"MARKETMIND_HOME": tmp_home, "MARKETMIND_DATA_DIR": tmp_data},
-            clear=False,
+        with (
+            tempfile.TemporaryDirectory() as tmp_home,
+            tempfile.TemporaryDirectory() as tmp_data,
+            patch.dict(
+                "os.environ",
+                {"MARKETMIND_HOME": tmp_home, "MARKETMIND_DATA_DIR": tmp_data},
+                clear=False,
+            ),
         ):
             self.assertEqual(config._runtime_data_dir(), Path(tmp_data))

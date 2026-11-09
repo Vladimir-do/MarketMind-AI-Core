@@ -18,10 +18,7 @@ from app.config import (
     logger,
 )
 
-DEFAULT_SYSTEM_PROMPT = (
-    "Ты эксперт по анализу цен на маркетплейсах. "
-    "Отвечай кратко, по делу, на русском языке."
-)
+DEFAULT_SYSTEM_PROMPT = "Ты эксперт по анализу цен на маркетплейсах. Отвечай кратко, по делу, на русском языке."
 
 _aiohttp_session: aiohttp.ClientSession | None = None
 _anthropic_client: Any = None
@@ -287,10 +284,7 @@ async def _ask_gemini(prompt: str, *, system: str, max_tokens: int) -> str:
             },
         }
         headers["x-goog-api-key"] = GEMINI_API_KEY
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/"
-            f"models/{GEMINI_MODEL}:generateContent"
-        )
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
         proxy_url = _resolve_ai_proxy()
         session = await _get_aiohttp_session()
         async with session.post(

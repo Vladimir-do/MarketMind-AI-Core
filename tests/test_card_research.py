@@ -10,7 +10,11 @@ class CardResearchTests(unittest.IsolatedAsyncioTestCase):
             report = await build_card_research_report(
                 "держатель телефона",
                 [
-                    {"name": "Держатель телефона автомобильный магнитный", "price": 500, "url": "https://example.com/1"},
+                    {
+                        "name": "Держатель телефона автомобильный магнитный",
+                        "price": 500,
+                        "url": "https://example.com/1",
+                    },
                     {"name": "Держатель телефона в машину на панель", "price": 700, "url": "https://example.com/2"},
                     {"name": "Автомобильный держатель смартфона", "price": 900, "url": "https://example.com/3"},
                 ],

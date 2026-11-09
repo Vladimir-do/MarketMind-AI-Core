@@ -33,4 +33,3 @@ def proxy_is_reachable(proxy_url: str, timeout_s: float = 0.8) -> bool:
             return True
     except Exception:
         return False
-

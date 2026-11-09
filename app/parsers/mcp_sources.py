@@ -5,6 +5,7 @@ This module is opt-in via environment variables. It lets MarketMind call an
 external MCP stdio server for marketplace product snapshots without making MCP
 a hard runtime dependency for the normal parser pipeline.
 """
+
 from __future__ import annotations
 
 import asyncio

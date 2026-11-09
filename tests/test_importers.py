@@ -95,8 +95,7 @@ class TestCsvImporter:
     def test_import_csv_english_headers(self, tmp_path: Path) -> None:
         csv_file = tmp_path / "products.csv"
         csv_file.write_text(
-            "name,brand,price,description\n"
-            "Widget X,WX Corp,999,A useful widget\n",
+            "name,brand,price,description\nWidget X,WX Corp,999,A useful widget\n",
             encoding="utf-8",
         )
         result = import_file(csv_file)
@@ -109,8 +108,7 @@ class TestCsvImporter:
     def test_import_csv_uses_source_page_image(self, tmp_path: Path) -> None:
         csv_file = tmp_path / "with_source_url.csv"
         csv_file.write_text(
-            "название,ссылка,цена\n"
-            "Кроссовки RunMax Pro,https://shop.example/product/1,4590\n",
+            "название,ссылка,цена\nКроссовки RunMax Pro,https://shop.example/product/1,4590\n",
             encoding="utf-8",
         )
 
@@ -125,8 +123,7 @@ class TestCsvImporter:
     def test_to_card_task_after_import(self, tmp_path: Path) -> None:
         csv_file = tmp_path / "items.csv"
         csv_file.write_text(
-            "название,бренд,цена\n"
-            "Набор ножей,SteelPro,3500\n",
+            "название,бренд,цена\nНабор ножей,SteelPro,3500\n",
             encoding="utf-8",
         )
         result = import_file(csv_file)

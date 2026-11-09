@@ -34,9 +34,7 @@ def build_passport(card: EffectiveProductCard) -> ProductPassport:
         marketplace=str(snapshot.get("marketplace") or "unknown"),
         price=snapshot.get("price"),
         attributes={
-            str(k): str(v)
-            for k, v in (snapshot.get("attributes") or {}).items()
-            if not str(k).startswith("source:")
+            str(k): str(v) for k, v in (snapshot.get("attributes") or {}).items() if not str(k).startswith("source:")
         },
         tags=[str(t) for t in tags],
         image_urls=list(snapshot.get("image_urls") or []),

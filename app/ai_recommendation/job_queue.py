@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class AIJobFailureError(RuntimeError):
     """AI job error carrying structured diagnostics for persistence and UI."""
 
@@ -28,7 +29,9 @@ class AIJobFailureError(RuntimeError):
         self.details = details or {}
 
 
-def _response_failure_details(provider, response, *, job_id: str, product_id: int, project_id: str | None = None) -> dict[str, Any]:
+def _response_failure_details(
+    provider, response, *, job_id: str, product_id: int, project_id: str | None = None
+) -> dict[str, Any]:
     return {
         "job_id": job_id,
         "project_id": project_id,
@@ -43,7 +46,6 @@ def _response_failure_details(provider, response, *, job_id: str, product_id: in
         "input_tokens": response.input_tokens,
         "output_tokens": response.output_tokens,
     }
-
 
 
 def _detect_marketplace(url: str | None) -> str:
@@ -149,14 +151,10 @@ def _build_project_seo_prompt(
         lines.append("")
         lines.append("Рекомендации:")
         for recommendation in audit.recommendations:
-            lines.append(
-                f"- {recommendation.action} | приоритет {recommendation.priority}: {recommendation.reason}"
-            )
+            lines.append(f"- {recommendation.action} | приоритет {recommendation.priority}: {recommendation.reason}")
 
     lines.append("")
-    lines.append(
-        "Сделай предложения практичными, без воды, и не возвращай markdown, пояснения или code fences."
-    )
+    lines.append("Сделай предложения практичными, без воды, и не возвращай markdown, пояснения или code fences.")
     return "\n".join(lines)
 
 

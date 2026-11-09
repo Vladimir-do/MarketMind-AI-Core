@@ -47,8 +47,11 @@ def main() -> int:
 
 def ensure_function() -> None:
     result = run_yc(
-        "serverless", "function", "get",
-        "--name", FUNCTION_NAME,
+        "serverless",
+        "function",
+        "get",
+        "--name",
+        FUNCTION_NAME,
         check=False,
     )
     if result.returncode == 0:
@@ -70,29 +73,44 @@ def build_archive() -> Path:
 def create_version(archive_path: Path) -> None:
     print("Uploading function version")
     run_yc(
-        "serverless", "function", "version", "create",
-        "--function-name", FUNCTION_NAME,
-        "--runtime", RUNTIME,
-        "--entrypoint", ENTRYPOINT,
-        "--memory", "128m",
-        "--execution-timeout", "30s",
-        "--source-path", str(archive_path),
+        "serverless",
+        "function",
+        "version",
+        "create",
+        "--function-name",
+        FUNCTION_NAME,
+        "--runtime",
+        RUNTIME,
+        "--entrypoint",
+        ENTRYPOINT,
+        "--memory",
+        "128m",
+        "--execution-timeout",
+        "30s",
+        "--source-path",
+        str(archive_path),
     )
 
 
 def allow_public_invoke() -> None:
     print("Making function public")
     run_yc(
-        "serverless", "function", "allow-unauthenticated-invoke",
+        "serverless",
+        "function",
+        "allow-unauthenticated-invoke",
         FUNCTION_NAME,
     )
 
 
 def get_function_id() -> str:
     result = run_yc(
-        "serverless", "function", "get",
-        "--name", FUNCTION_NAME,
-        "--format", "json",
+        "serverless",
+        "function",
+        "get",
+        "--name",
+        FUNCTION_NAME,
+        "--format",
+        "json",
     )
     payload = json.loads(result.stdout)
     function_id = payload.get("id")

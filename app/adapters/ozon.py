@@ -51,4 +51,3 @@ async def fetch_ozon_snapshot(updater: OzonUpdater, url: str) -> tuple[ProductSn
         raw=None,
     )
     return snap, None, latency_ms
-

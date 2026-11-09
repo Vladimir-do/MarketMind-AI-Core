@@ -61,24 +61,26 @@ def enrich_row(row: dict[str, Any]) -> dict[str, Any]:
     draft = build_ozon_card_draft(task)
     payload = build_ozon_import_payload(draft)
     enriched = dict(row)
-    enriched.update({
-        "agent_offer_id": draft.offer_id,
-        "agent_name": draft.name,
-        "agent_description": draft.description,
-        "agent_category_hint": draft.category_hint or "",
-        "agent_brand": draft.brand,
-        "agent_price": draft.price or "",
-        "agent_old_price": draft.old_price or "",
-        "agent_weight_g": draft.weight_g or "",
-        "agent_width_mm": draft.width_mm or "",
-        "agent_height_mm": draft.height_mm or "",
-        "agent_depth_mm": draft.depth_mm or "",
-        "agent_images": "\n".join(draft.images),
-        "agent_keywords": ", ".join(draft.keywords),
-        "agent_attributes_json": json.dumps(draft.attributes, ensure_ascii=False, sort_keys=True),
-        "agent_ozon_payload_json": json.dumps(payload["items"][0], ensure_ascii=False, sort_keys=True),
-        "agent_needs_review": _needs_review(draft),
-    })
+    enriched.update(
+        {
+            "agent_offer_id": draft.offer_id,
+            "agent_name": draft.name,
+            "agent_description": draft.description,
+            "agent_category_hint": draft.category_hint or "",
+            "agent_brand": draft.brand,
+            "agent_price": draft.price or "",
+            "agent_old_price": draft.old_price or "",
+            "agent_weight_g": draft.weight_g or "",
+            "agent_width_mm": draft.width_mm or "",
+            "agent_height_mm": draft.height_mm or "",
+            "agent_depth_mm": draft.depth_mm or "",
+            "agent_images": "\n".join(draft.images),
+            "agent_keywords": ", ".join(draft.keywords),
+            "agent_attributes_json": json.dumps(draft.attributes, ensure_ascii=False, sort_keys=True),
+            "agent_ozon_payload_json": json.dumps(payload["items"][0], ensure_ascii=False, sort_keys=True),
+            "agent_needs_review": _needs_review(draft),
+        }
+    )
     return enriched
 
 
@@ -143,8 +145,19 @@ def _collect_headers(rows: list[dict[str, Any]]) -> list[str]:
 
 def _row_to_task(row: dict[str, Any]) -> str:
     priority = [
-        "товар", "название", "name", "title", "product", "описание", "description",
-        "бренд", "brand", "категория", "category", "цена", "price",
+        "товар",
+        "название",
+        "name",
+        "title",
+        "product",
+        "описание",
+        "description",
+        "бренд",
+        "brand",
+        "категория",
+        "category",
+        "цена",
+        "price",
     ]
     lines = []
     used = set()

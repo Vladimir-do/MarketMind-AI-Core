@@ -51,11 +51,7 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
 
     def test_wireless_headphones_are_not_misclassified_as_cable(self):
         draft = build_ozon_card_draft(
-            "товар: Беспроводные наушники\n"
-            "бренд: Baseus\n"
-            "категория: Наушники\n"
-            "цвет: черный\n"
-            "подключение: Bluetooth"
+            "товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники\nцвет: черный\nподключение: Bluetooth"
         )
 
         self.assertIn("Беспроводные наушники", draft.name)
@@ -66,11 +62,7 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
 
     def test_competitor_search_query_uses_core_product_and_brand_not_color(self):
         draft = build_ozon_card_draft(
-            "товар: Беспроводные наушники\n"
-            "бренд: Baseus\n"
-            "категория: Наушники\n"
-            "цвет: черный\n"
-            "подключение: Bluetooth"
+            "товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники\nцвет: черный\nподключение: Bluetooth"
         )
         query = build_ozon_card_search_query(draft)
         self.assertEqual(query, "Беспроводные наушники")
@@ -162,16 +154,18 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("категория", preview)
 
     async def test_enhanced_card_uses_ai_json_when_available(self):
-        ai_response = json.dumps({
-            "name": "Кабель USB-C для зарядки и передачи данных",
-            "description": "Надежный кабель USB-C для ежедневной зарядки устройств и передачи данных.",
-            "category_hint": "Кабели",
-            "brand": "Нет бренда",
-            "attributes": {"Назначение": "зарядка и передача данных"},
-            "keywords": ["кабель usb-c", "кабель для зарядки"],
-            "checklist": ["Проверить длину кабеля"],
-            "notes": "AI улучшил название и описание без добавления неподтвержденных фактов.",
-        })
+        ai_response = json.dumps(
+            {
+                "name": "Кабель USB-C для зарядки и передачи данных",
+                "description": "Надежный кабель USB-C для ежедневной зарядки устройств и передачи данных.",
+                "category_hint": "Кабели",
+                "brand": "Нет бренда",
+                "attributes": {"Назначение": "зарядка и передача данных"},
+                "keywords": ["кабель usb-c", "кабель для зарядки"],
+                "checklist": ["Проверить длину кабеля"],
+                "notes": "AI улучшил название и описание без добавления неподтвержденных фактов.",
+            }
+        )
         with (
             patch("app.card_filler.ai_is_available", return_value=True),
             patch("app.card_filler.ask_ai", new=AsyncMock(return_value=ai_response)),
@@ -193,17 +187,19 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("сверьте полный состав", draft.description.lower())
 
     async def test_enhanced_supplement_drops_unverified_manufacturer_and_usage_claims(self):
-        ai_response = json.dumps({
-            "name": "Комплекс витаминов группы B и магний",
-            "description": "Комплекс витаминов группы B и магний поставляется напрямую от производителя. Подходит для регулярного приёма дома и в поездке. Сверьте состав и дозировку на упаковке.",
-            "category_hint": "Красота и здоровье/Витамины и БАДы/Минералы",
-            "brand": "Нет бренда",
-            "attributes": {},
-            "keywords": ["витамины группы B", "магний"],
-            "selling_points": ["Поставка напрямую от производителя", "Удобно принимать каждый день"],
-            "checklist": ["Уточнить дозировку и количество капсул"],
-            "notes": "Удалены неподтверждённые утверждения.",
-        })
+        ai_response = json.dumps(
+            {
+                "name": "Комплекс витаминов группы B и магний",
+                "description": "Комплекс витаминов группы B и магний поставляется напрямую от производителя. Подходит для регулярного приёма дома и в поездке. Сверьте состав и дозировку на упаковке.",
+                "category_hint": "Красота и здоровье/Витамины и БАДы/Минералы",
+                "brand": "Нет бренда",
+                "attributes": {},
+                "keywords": ["витамины группы B", "магний"],
+                "selling_points": ["Поставка напрямую от производителя", "Удобно принимать каждый день"],
+                "checklist": ["Уточнить дозировку и количество капсул"],
+                "notes": "Удалены неподтверждённые утверждения.",
+            }
+        )
         with (
             patch("app.card_filler.ai_is_available", return_value=True),
             patch("app.card_filler.ask_ai", new=AsyncMock(return_value=ai_response)),
@@ -219,6 +215,7 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
 
     def test_supplement_filter_removes_unverified_manufacturer_course_and_dose_claims(self):
         from app.card_filler import _remove_unverified_supplement_claims
+
         text = (
             "Преимущества: форма выпуска и дозировка указаны прямо в карточке. "
             "Упаковка рассчитана на курс — не нужно пересчитывать дозы самостоятельно. "
@@ -282,8 +279,14 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
             await build_enhanced_ozon_card_draft(
                 "товар: Капсулы Клиар для иммунитета, 20 шт\nбренд: Клиар",
                 competitors=[
-                    {"marketplace": "yandex_market", "name": "Витамины для иммунитета в капсулах с магнием", "price": 550,
-                     "rating": 4.8, "reviews_count": 42, "availability": "in_stock"},
+                    {
+                        "marketplace": "yandex_market",
+                        "name": "Витамины для иммунитета в капсулах с магнием",
+                        "price": 550,
+                        "rating": 4.8,
+                        "reviews_count": 42,
+                        "availability": "in_stock",
+                    },
                 ],
             )
 
@@ -422,16 +425,16 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("в6", draft.description.lower())
 
     def test_competitor_references_are_exported_separately_not_as_own_images(self):
-        draft = build_ozon_card_draft(
-            "товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники"
-        )
-        draft.competitors = [{
-            "marketplace": "wildberries",
-            "name": "Беспроводные наушники Baseus конкурент",
-            "price": 1990,
-            "url": "https://example.com/product",
-            "image_url": "https://example.com/competitor.jpg",
-        }]
+        draft = build_ozon_card_draft("товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники")
+        draft.competitors = [
+            {
+                "marketplace": "wildberries",
+                "name": "Беспроводные наушники Baseus конкурент",
+                "price": 1990,
+                "url": "https://example.com/product",
+                "image_url": "https://example.com/competitor.jpg",
+            }
+        ]
         exported = export_ozon_card_xlsx(draft)
         workbook = openpyxl.load_workbook(exported)
         self.assertIn("Конкуренты", workbook.sheetnames)
@@ -442,16 +445,30 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("фото", build_ozon_card_quality_report(draft).missing)
 
     async def test_competitor_summary_has_per_marketplace_price_context_and_metadata(self):
-        draft = build_ozon_card_draft(
-            "товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники"
+        draft = build_ozon_card_draft("товар: Беспроводные наушники\nбренд: Baseus\nкатегория: Наушники")
+        draft = await build_enhanced_ozon_card_draft(
+            draft.source_text,
+            competitors=[
+                {
+                    "marketplace": "yandex_market",
+                    "name": "Наушники Baseus One",
+                    "price": 2000,
+                    "rating": 4.8,
+                    "reviews_count": 25,
+                    "availability": "in_stock",
+                    "url": "https://market.yandex.ru/card/one/1",
+                    "image_url": "https://img.example/one.jpg",
+                },
+                {
+                    "marketplace": "wildberries",
+                    "name": "Наушники Baseus Two",
+                    "price": 3000,
+                    "old_price": 3500,
+                    "discount_pct": 14,
+                    "url": "https://www.wildberries.ru/catalog/2/detail.aspx",
+                },
+            ],
         )
-        draft = await build_enhanced_ozon_card_draft(draft.source_text, competitors=[
-            {"marketplace": "yandex_market", "name": "Наушники Baseus One", "price": 2000,
-             "rating": 4.8, "reviews_count": 25, "availability": "in_stock",
-             "url": "https://market.yandex.ru/card/one/1", "image_url": "https://img.example/one.jpg"},
-            {"marketplace": "wildberries", "name": "Наушники Baseus Two", "price": 3000,
-             "old_price": 3500, "discount_pct": 14, "url": "https://www.wildberries.ru/catalog/2/detail.aspx"},
-        ])
         self.assertIn("Найдено конкурентов: 2", draft.competitor_summary)
         self.assertIn("Wildberries — 1", draft.competitor_summary)
         self.assertIn("Яндекс Маркет — 1", draft.competitor_summary)

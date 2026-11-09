@@ -59,7 +59,13 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
 
         content = f"Название,Цена,Ссылка\n{title},100,https://example.test/{title}\n".encode()
         stored = store_source_file(project_id, filename, content)
-        preview = analyze_import_file(path=stored.absolute_path, original_filename=stored.original_filename, sha256=stored.sha256, size_bytes=stored.size_bytes, file_format=stored.file_format)
+        preview = analyze_import_file(
+            path=stored.absolute_path,
+            original_filename=stored.original_filename,
+            sha256=stored.sha256,
+            size_bytes=stored.size_bytes,
+            file_format=stored.file_format,
+        )
         products, errors = build_products_from_preview(preview, mapping=preview.suggested_mapping)
         self.assertFalse(errors)
         file_record, _ = await ProjectService(self.db).record_source_file(
@@ -74,7 +80,9 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
                 product.source_url or f"https://example.test/{title}/{index}",
                 product.to_dict(),
             )
-            await ProjectService(self.db).link_imported_product(project_id, saved, product, source_file_id=file_record.file_id, source_row_index=index)
+            await ProjectService(self.db).link_imported_product(
+                project_id, saved, product, source_file_id=file_record.file_id, source_row_index=index
+            )
 
     async def test_repeated_work_start_preserves_projects(self):
         project_id = await self._create_project("Persistent")
@@ -215,10 +223,14 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
         archive = await ProjectArchiveService(self.db).create_project_archive(project_a)
         with zipfile.ZipFile(archive["absolute_path"]) as zip_file:
             names = zip_file.namelist()
-            payload = "\n".join(names) + "\n" + "\n".join(
-                zip_file.read(name).decode("utf-8", errors="ignore")
-                for name in names
-                if name.endswith(".json") or name.endswith(".csv") or name.endswith(".html")
+            payload = (
+                "\n".join(names)
+                + "\n"
+                + "\n".join(
+                    zip_file.read(name).decode("utf-8", errors="ignore")
+                    for name in names
+                    if name.endswith(".json") or name.endswith(".csv") or name.endswith(".html")
+                )
             )
         self.assertIn("manifest.json", names)
         self.assertIn(project_a, payload)

@@ -45,7 +45,8 @@ def _make_analysis(product=None, findings=None, recommendations=None) -> Analysi
     return AnalysisResult(
         product=product or _make_product(),
         score=65,
-        findings=findings or [
+        findings=findings
+        or [
             Finding(
                 rule="name_length",
                 field="name",
@@ -54,7 +55,8 @@ def _make_analysis(product=None, findings=None, recommendations=None) -> Analysi
                 category="quality",
             )
         ],
-        recommendations=recommendations or [
+        recommendations=recommendations
+        or [
             Recommendation(
                 finding=Finding(
                     rule="name_length",
@@ -92,9 +94,7 @@ class TestEnginePrompt(unittest.TestCase):
     def test_builds_prompt(self):
         engine = AIRecommendationEngine(MockAIProvider())
         analysis = _make_analysis()
-        prompt = engine._build_prompt(
-            analysis.product, analysis.findings, analysis.recommendations
-        )
+        prompt = engine._build_prompt(analysis.product, analysis.findings, analysis.recommendations)
         self.assertIn("Тестовый товар", prompt)
         self.assertIn("Название слишком короткое", prompt)
         self.assertIn("Увеличить название", prompt)
@@ -134,12 +134,16 @@ class TestEngineParsing(unittest.TestCase):
         self.assertEqual(result, [])
 
     def test_clamps_confidence(self):
-        suggestions = [{"field": "x", "suggestion_type": "fix", "before": "", "after": "", "reason": "", "confidence": 2.0}]
+        suggestions = [
+            {"field": "x", "suggestion_type": "fix", "before": "", "after": "", "reason": "", "confidence": 2.0}
+        ]
         result = AIRecommendationEngine._parse_suggestions(json.dumps(suggestions))
         self.assertEqual(result[0].confidence, 1.0)
 
     def test_confidence_string_coercion(self):
-        suggestions = [{"field": "x", "suggestion_type": "fix", "before": "", "after": "", "reason": "", "confidence": "0.65"}]
+        suggestions = [
+            {"field": "x", "suggestion_type": "fix", "before": "", "after": "", "reason": "", "confidence": "0.65"}
+        ]
         result = AIRecommendationEngine._parse_suggestions(json.dumps(suggestions))
         self.assertAlmostEqual(result[0].confidence, 0.65)
 
@@ -171,8 +175,10 @@ class TestEngineRecommend(unittest.TestCase):
         class UnavailableProvider:
             def is_available(self):
                 return False
+
             def name(self):
                 return "unavail"
+
             async def complete(self, *a, **kw):
                 return AIResponse(text="[]", model="unavail")
 
@@ -198,7 +204,9 @@ class TestApprovalQueue(unittest.TestCase):
         result = AIRecommendationResult(
             product_id="p1",
             suggestions=[
-                AISuggestion(field="name", suggestion_type="improve", before="old", after="new", reason="r", confidence=0.9)
+                AISuggestion(
+                    field="name", suggestion_type="improve", before="old", after="new", reason="r", confidence=0.9
+                )
             ],
         )
         added = queue.add(result)
@@ -214,7 +222,9 @@ class TestApprovalQueue(unittest.TestCase):
         result = AIRecommendationResult(
             product_id="p1",
             suggestions=[
-                AISuggestion(field="name", suggestion_type="improve", before="old", after="new", reason="r", confidence=0.9)
+                AISuggestion(
+                    field="name", suggestion_type="improve", before="old", after="new", reason="r", confidence=0.9
+                )
             ],
         )
         added = queue.add(result)
@@ -243,8 +253,22 @@ class TestApprovalQueue(unittest.TestCase):
         result = AIRecommendationResult(
             product_id="12345",
             suggestions=[
-                AISuggestion(field="name", suggestion_type="improve", before="Старое", after="Новое название", reason="r", confidence=0.9),
-                AISuggestion(field="description", suggestion_type="expand", before="", after="Новое описание", reason="r", confidence=0.8),
+                AISuggestion(
+                    field="name",
+                    suggestion_type="improve",
+                    before="Старое",
+                    after="Новое название",
+                    reason="r",
+                    confidence=0.9,
+                ),
+                AISuggestion(
+                    field="description",
+                    suggestion_type="expand",
+                    before="",
+                    after="Новое описание",
+                    reason="r",
+                    confidence=0.8,
+                ),
             ],
         )
         added = queue.add(result)

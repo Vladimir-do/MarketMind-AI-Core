@@ -180,7 +180,9 @@ class SkillGraph:
             visiting.remove(manifest.skill_id)
 
             seen.add(manifest.skill_id)
-            ordered.append(ResolvedSkill(manifest, selected_for=selected_for if manifest.skill_id != skill_id else None))
+            ordered.append(
+                ResolvedSkill(manifest, selected_for=selected_for if manifest.skill_id != skill_id else None)
+            )
             if not manifest.available:
                 missing.append(manifest.skill_id)
 
@@ -205,9 +207,13 @@ class SkillGraph:
         )[0]
 
     def to_mermaid(self, root_ids: list[str] | None = None) -> str:
-        selected = [self.get(skill_id) for skill_id in root_ids] if root_ids else sorted(
-            self._manifests.values(),
-            key=lambda item: item.skill_id,
+        selected = (
+            [self.get(skill_id) for skill_id in root_ids]
+            if root_ids
+            else sorted(
+                self._manifests.values(),
+                key=lambda item: item.skill_id,
+            )
         )
         selected_ids = {manifest.skill_id for manifest in selected}
         if root_ids:

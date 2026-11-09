@@ -66,23 +66,17 @@ class SEOHistoryService:
             self._store[key] = self._store[key][-_MAX_SNAPSHOTS_PER_PRODUCT:]
         return snapshot
 
-    async def get_history(
-        self, project_id: str, product_id: int, limit: int = 50
-    ) -> list[SEOAuditSnapshot]:
+    async def get_history(self, project_id: str, product_id: int, limit: int = 50) -> list[SEOAuditSnapshot]:
         key = self._key(project_id, product_id)
         items = self._store.get(key, [])
         return list(reversed(items[-limit:]))
 
-    async def get_latest(
-        self, project_id: str, product_id: int
-    ) -> SEOAuditSnapshot | None:
+    async def get_latest(self, project_id: str, product_id: int) -> SEOAuditSnapshot | None:
         key = self._key(project_id, product_id)
         items = self._store.get(key, [])
         return items[-1] if items else None
 
-    async def get_score_trend(
-        self, project_id: str, product_id: int
-    ) -> list[dict[str, Any]]:
+    async def get_score_trend(self, project_id: str, product_id: int) -> list[dict[str, Any]]:
         key = self._key(project_id, product_id)
         items = self._store.get(key, [])
         return [

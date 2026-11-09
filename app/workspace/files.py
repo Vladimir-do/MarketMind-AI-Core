@@ -70,7 +70,9 @@ def store_source_file(project_id: str, filename: str, content: bytes) -> StoredP
     )
 
 
-def stored_source_file(project_id: str, relative_path: str, *, original_filename: str, sha256: str, size_bytes: int, file_format: str) -> StoredProjectFile:
+def stored_source_file(
+    project_id: str, relative_path: str, *, original_filename: str, sha256: str, size_bytes: int, file_format: str
+) -> StoredProjectFile:
     root = project_root(project_id)
     target = root / relative_path
     _ensure_inside(root, target)

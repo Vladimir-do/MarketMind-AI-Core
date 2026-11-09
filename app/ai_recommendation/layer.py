@@ -80,9 +80,7 @@ class AIRecommendationLayer:
     def _build_batch_result(self, results: list) -> AIBatchRecommendationResult:
         """Build a batch result from individual product results."""
         total_suggestions = sum(len(r.suggestions) for r in results)
-        high_confidence = sum(
-            1 for r in results for s in r.suggestions if s.confidence >= 0.8
-        )
+        high_confidence = sum(1 for r in results for s in r.suggestions if s.confidence >= 0.8)
         return AIBatchRecommendationResult(
             results=results,
             total_suggestions=total_suggestions,

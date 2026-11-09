@@ -173,10 +173,13 @@ class GenericScraperTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual([page.url for page in pages], [
-            "https://books.toscrape.com/",
-            "https://books.toscrape.com/catalogue/page-2.html",
-        ])
+        self.assertEqual(
+            [page.url for page in pages],
+            [
+                "https://books.toscrape.com/",
+                "https://books.toscrape.com/catalogue/page-2.html",
+            ],
+        )
 
     def test_adaptive_extraction_falls_back_to_price_entities(self):
         html = """
@@ -252,7 +255,6 @@ class GenericScraperTests(unittest.TestCase):
         self.assertEqual(records[0]["title"], "Шашлык из баранины")
         self.assertEqual(records[0]["price"], "450")
         self.assertEqual(records[1]["title"], "Люля-кебаб")
-
 
     def test_run_scraping_task_uses_browser_fetcher_when_requested(self):
         import app.generic_scraper as scraper_module

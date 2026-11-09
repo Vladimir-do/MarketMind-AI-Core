@@ -104,9 +104,7 @@ class SuggestionsUITests(unittest.IsolatedAsyncioTestCase):
         empty_queue = DatabaseApprovalQueue(db)
         app = create_app()
         app.state.ai_queue = empty_queue
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://testserver"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
             resp = await c.get("/api/suggestions")
             self.assertEqual(resp.status_code, 200)
             self.assertEqual(resp.json(), [])

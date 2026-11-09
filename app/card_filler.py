@@ -76,7 +76,9 @@ def build_ozon_card_draft(task: str) -> OzonCardDraft:
     attributes = _extract_attributes(text)
     keywords = _build_keywords(title, category, attributes, brand)
     selling_points = _build_selling_points(title)
-    description = _build_description(text, title, brand=brand, category=category, attributes=attributes, selling_points=selling_points)
+    description = _build_description(
+        text, title, brand=brand, category=category, attributes=attributes, selling_points=selling_points
+    )
 
     draft = OzonCardDraft(
         offer_id=_build_offer_id(title),
@@ -111,20 +113,23 @@ def finalize_ozon_card_draft(draft: OzonCardDraft) -> OzonCardDraft:
         brand=draft.brand,
         limit=30,
     )
-    draft.selling_points = [
-        _normalize_b6_notation(_remove_service_noise(point))
-        for point in draft.selling_points
-    ]
+    draft.selling_points = [_normalize_b6_notation(_remove_service_noise(point)) for point in draft.selling_points]
     draft.selling_points = [point for point in draft.selling_points if point]
     draft.attributes = {
-        _normalize_b6_notation(_clean(key)).capitalize()[:80]: _normalize_b6_notation(_remove_service_noise(_clean(value)))[:300]
+        _normalize_b6_notation(_clean(key)).capitalize()[:80]: _normalize_b6_notation(
+            _remove_service_noise(_clean(value))
+        )[:300]
         for key, value in draft.attributes.items()
         if _clean(key) and _clean(value)
     }
     if draft.category_hint:
         draft.category_hint = _map_to_ozon_category_path(draft.category_hint)
-        draft.category_hint = _specialize_category_path(f"{draft.source_text} {draft.name}", draft.name, draft.category_hint)
-    draft.old_price = draft.old_price if not draft.price or not draft.old_price or draft.old_price > draft.price else None
+        draft.category_hint = _specialize_category_path(
+            f"{draft.source_text} {draft.name}", draft.name, draft.category_hint
+        )
+    draft.old_price = (
+        draft.old_price if not draft.price or not draft.old_price or draft.old_price > draft.price else None
+    )
     if draft.old_price is None and draft.price:
         draft.old_price = round(draft.price * 1.25)
     return draft
@@ -143,8 +148,13 @@ def build_ozon_card_quality_report(draft: OzonCardDraft) -> OzonCardQualityRepor
         warnings.append("В описании есть рискованные обещания")
     if not draft.images:
         warnings.append("Нет фото товара")
-    if draft.category_hint and "витамин" in draft.category_hint.lower() and not any(
-        token in (draft.description or "").lower() for token in ("состав", "дозировка", "форма выпуска", "капсул", "таблет")
+    if (
+        draft.category_hint
+        and "витамин" in draft.category_hint.lower()
+        and not any(
+            token in (draft.description or "").lower()
+            for token in ("состав", "дозировка", "форма выпуска", "капсул", "таблет")
+        )
     ):
         warnings.append("Для БАДов стоит явно указать состав, дозировку и форму выпуска")
 
@@ -256,10 +266,7 @@ def build_ozon_import_payload(draft: OzonCardDraft) -> dict:
         "height": draft.height_mm,
         "depth": draft.depth_mm,
         "dimension_unit": "mm",
-        "attributes": [
-            {"name": key, "value": value}
-            for key, value in sorted(draft.attributes.items())
-        ],
+        "attributes": [{"name": key, "value": value} for key, value in sorted(draft.attributes.items())],
     }
     return {
         "endpoint_note": "Черновик под Ozon Seller API. Перед отправкой нужны category_id/type_id и обязательные attribute_id из Ozon.",
@@ -350,8 +357,17 @@ def export_ozon_card_xlsx(draft: OzonCardDraft) -> io.BytesIO:
     # Keep competitor offers and their image URLs as research references, not product assets.
     ws_comp = wb.create_sheet("Конкуренты")
     competitor_headers = [
-        "Площадка", "Название конкурента", "Цена, ₽", "Старая цена, ₽", "Скидка, %",
-        "Рейтинг", "Отзывы", "Наличие", "Продавец", "Ссылка на товар", "Фото конкурента (справочно)",
+        "Площадка",
+        "Название конкурента",
+        "Цена, ₽",
+        "Старая цена, ₽",
+        "Скидка, %",
+        "Рейтинг",
+        "Отзывы",
+        "Наличие",
+        "Продавец",
+        "Ссылка на товар",
+        "Фото конкурента (справочно)",
     ]
     for col, header in enumerate(competitor_headers, 1):
         cell = ws_comp.cell(1, col, header)
@@ -383,7 +399,9 @@ def export_ozon_card_xlsx(draft: OzonCardDraft) -> io.BytesIO:
     ws_comp.freeze_panes = "A2"
     for col, width in {1: 18, 2: 52, 3: 14, 4: 14, 5: 12, 6: 12, 7: 12, 8: 18, 9: 24, 10: 65, 11: 65}.items():
         ws_comp.column_dimensions[get_column_letter(col)].width = width
-    ws_comp["M1"] = "Важно: фото на этом листе принадлежат карточкам конкурентов и приведены только для анализа. Не загружайте их как фотографии своего товара. Наличие может быть неизвестно, если площадка не отдала этот параметр."
+    ws_comp["M1"] = (
+        "Важно: фото на этом листе принадлежат карточкам конкурентов и приведены только для анализа. Не загружайте их как фотографии своего товара. Наличие может быть неизвестно, если площадка не отдала этот параметр."
+    )
     ws_comp["M1"].alignment = Alignment(wrap_text=True, vertical="top")
     ws_comp.column_dimensions["M"].width = 55
 
@@ -443,21 +461,43 @@ def export_ozon_cards_batch_xlsx(items: list[OzonCardBatchItem]) -> io.BytesIO:
     ws_summary["A1"] = "Пакет карточек Ozon"
     ws_summary["A1"].font = Font(size=16, bold=True, color="1F2937")
     ws_summary["A2"] = f"Сгенерировано: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-    ws_summary["A3"] = f"Всего: {counts['total']} | готово к проверке: {counts['ready']} | нужна доработка: {counts['needs_review']} | ошибки: {counts['error']}"
+    ws_summary["A3"] = (
+        f"Всего: {counts['total']} | готово к проверке: {counts['ready']} | нужна доработка: {counts['needs_review']} | ошибки: {counts['error']}"
+    )
     ws_summary["A5"] = "Как работать с файлом"
     ws_summary["A5"].font = Font(bold=True)
     ws_summary["A6"] = "1. Начните с листа «Карточки» и отфильтруйте статус «Нужна доработка»."
     ws_summary["A7"] = "2. Заполните пропуски: категорию, фото, вес и габариты."
     ws_summary["A8"] = "3. Лист «Характеристики» используйте как подсказку для обязательных полей Ozon."
-    ws_summary["A9"] = "4. Лист «Конкуренты» содержит реальные ссылки и цены найденных предложений; фото конкурентов — только для анализа."
+    ws_summary["A9"] = (
+        "4. Лист «Конкуренты» содержит реальные ссылки и цены найденных предложений; фото конкурентов — только для анализа."
+    )
 
     for col, width in {1: 28, 2: 28, 3: 80}.items():
         ws_summary.column_dimensions[get_column_letter(col)].width = width
 
     card_headers = [
-        "№", "Статус", "Что проверить", "Артикул", "Название", "Категория", "Бренд",
-        "Цена", "Старая цена", "НДС", "Вес, г", "Ширина, мм", "Высота, мм", "Глубина, мм",
-        "Фото", "Ключевые слова", "Описание", "Конкуренты", "AI-заметки", "Источник", "Ошибка",
+        "№",
+        "Статус",
+        "Что проверить",
+        "Артикул",
+        "Название",
+        "Категория",
+        "Бренд",
+        "Цена",
+        "Старая цена",
+        "НДС",
+        "Вес, г",
+        "Ширина, мм",
+        "Высота, мм",
+        "Глубина, мм",
+        "Фото",
+        "Ключевые слова",
+        "Описание",
+        "Конкуренты",
+        "AI-заметки",
+        "Источник",
+        "Ошибка",
     ]
     _write_header_row(ws_cards, card_headers)
     for idx, item in enumerate(items, 1):
@@ -497,36 +537,63 @@ def export_ozon_cards_batch_xlsx(items: list[OzonCardBatchItem]) -> io.BytesIO:
             ws_attrs.append([idx, item.draft.offer_id, item.draft.name, key, value])
 
     competitor_headers = [
-        "№ карточки", "Артикул", "Площадка", "Название конкурента", "Цена, ₽", "Старая цена, ₽",
-        "Скидка, %", "Рейтинг", "Отзывы", "Наличие", "Продавец", "Ссылка на товар", "Фото конкурента (справочно)",
+        "№ карточки",
+        "Артикул",
+        "Площадка",
+        "Название конкурента",
+        "Цена, ₽",
+        "Старая цена, ₽",
+        "Скидка, %",
+        "Рейтинг",
+        "Отзывы",
+        "Наличие",
+        "Продавец",
+        "Ссылка на товар",
+        "Фото конкурента (справочно)",
     ]
     _write_header_row(ws_competitors, competitor_headers)
     for card_idx, item in enumerate(items, 1):
         if not item.draft:
             continue
         for competitor in item.draft.competitors:
-            ws_competitors.append([
-                card_idx,
-                item.draft.offer_id,
-                competitor.get("marketplace") or "unknown",
-                competitor.get("name") or "",
-                competitor.get("price") or "",
-                competitor.get("old_price") or "",
-                competitor.get("discount_pct") if competitor.get("discount_pct") is not None else "",
-                competitor.get("rating") if competitor.get("rating") is not None else "",
-                competitor.get("reviews_count") if competitor.get("reviews_count") is not None else "",
-                competitor.get("availability") or "unknown",
-                competitor.get("seller_name") or "",
-                competitor.get("url") or "",
-                competitor.get("image_url") or "",
-            ])
+            ws_competitors.append(
+                [
+                    card_idx,
+                    item.draft.offer_id,
+                    competitor.get("marketplace") or "unknown",
+                    competitor.get("name") or "",
+                    competitor.get("price") or "",
+                    competitor.get("old_price") or "",
+                    competitor.get("discount_pct") if competitor.get("discount_pct") is not None else "",
+                    competitor.get("rating") if competitor.get("rating") is not None else "",
+                    competitor.get("reviews_count") if competitor.get("reviews_count") is not None else "",
+                    competitor.get("availability") or "unknown",
+                    competitor.get("seller_name") or "",
+                    competitor.get("url") or "",
+                    competitor.get("image_url") or "",
+                ]
+            )
             row_idx = ws_competitors.max_row
             for col, key in ((12, "url"), (13, "image_url")):
                 link = competitor.get(key) or ""
                 if link.startswith(("https://", "http://")):
                     ws_competitors.cell(row_idx, col).hyperlink = link
                     ws_competitors.cell(row_idx, col).style = "Hyperlink"
-    for col, width in {1: 12, 2: 24, 3: 18, 4: 52, 5: 14, 6: 14, 7: 12, 8: 12, 9: 12, 10: 18, 11: 24, 12: 65, 13: 65}.items():
+    for col, width in {
+        1: 12,
+        2: 24,
+        3: 18,
+        4: 52,
+        5: 14,
+        6: 14,
+        7: 12,
+        8: 12,
+        9: 12,
+        10: 18,
+        11: 24,
+        12: 65,
+        13: 65,
+    }.items():
         ws_competitors.column_dimensions[get_column_letter(col)].width = width
     _style_batch_sheet(ws_cards)
     _style_batch_sheet(ws_attrs)
@@ -718,7 +785,9 @@ def _extract_key_features(text: str) -> list[str]:
     low = text.lower()
 
     # Connector types (for electronics)
-    connector_match = re.search(r"(usb[- ]?[a-c]|lightning|type[- ]?c|micro[- ]?usb|hdmi|displayport|jack|3\.5|6\.3)", low)
+    connector_match = re.search(
+        r"(usb[- ]?[a-c]|lightning|type[- ]?c|micro[- ]?usb|hdmi|displayport|jack|3\.5|6\.3)", low
+    )
     if connector_match:
         features.append(connector_match.group(1).upper().replace(" ", "-"))
 
@@ -773,13 +842,19 @@ def _build_description(
     if explicit:
         base = _remove_service_noise(_normalize_b6_notation(explicit))
         if len(base) < 80:
-            base = _build_marketing_description(title, brand=brand, category=category, attributes=attributes, selling_points=selling_points)
+            base = _build_marketing_description(
+                title, brand=brand, category=category, attributes=attributes, selling_points=selling_points
+            )
         return _remove_service_noise(base)[:4000]
     else:
-        base = _build_marketing_description(title, brand=brand, category=category, attributes=attributes, selling_points=selling_points)
+        base = _build_marketing_description(
+            title, brand=brand, category=category, attributes=attributes, selling_points=selling_points
+        )
 
     if len(base) < 80:
-        base = _build_marketing_description(title, brand=brand, category=category, attributes=attributes, selling_points=selling_points)
+        base = _build_marketing_description(
+            title, brand=brand, category=category, attributes=attributes, selling_points=selling_points
+        )
     return base[:4000]
 
 
@@ -804,11 +879,19 @@ def _build_marketing_description(
     category_low = (category or "").lower()
 
     # Detect product category for tailored content
-    is_supplement = any(t in category_low or t in product.lower() for t in ("витамин", "бад", "магни", "капсул", "таблет"))
+    is_supplement = any(
+        t in category_low or t in product.lower() for t in ("витамин", "бад", "магни", "капсул", "таблет")
+    )
     is_book = any(t in category_low or t in product.lower() for t in ("книга", "книж", "roman", "учебник"))
-    is_electronics = any(t in category_low or t in product.lower() for t in ("кабел", "наушник", "зарядн", "чехол", "держател"))
-    is_clothing = any(t in category_low or t in product.lower() for t in ("футбол", "рубашк", "джинс", "курт", "штан", "брюк"))
-    is_food = any(t in category_low or t in product.lower() for t in ("чай", "кофе", "сок", "шоколад", "конфет", "печенье"))
+    is_electronics = any(
+        t in category_low or t in product.lower() for t in ("кабел", "наушник", "зарядн", "чехол", "держател")
+    )
+    is_clothing = any(
+        t in category_low or t in product.lower() for t in ("футбол", "рубашк", "джинс", "курт", "штан", "брюк")
+    )
+    is_food = any(
+        t in category_low or t in product.lower() for t in ("чай", "кофе", "сок", "шоколад", "конфет", "печенье")
+    )
     is_home = any(t in category_low or t in product.lower() for t in ("коврик", "кресл", "лампа", "мебел", "йог"))
     is_sports = any(t in category_low or t in product.lower() for t in ("спорт", "фитнес", "йог", "тренаж", "мяч"))
 
@@ -868,9 +951,24 @@ def _build_marketing_description(
 
     # Build specs section — facts from attributes
     specs = []
-    important_keys = ["Объём", "Вес", "Размер", "Цвет", "Материал", "Язык", "Страниц",
-                      "Количество", "Форма", "Дозировка", "Состав", "Комплектация",
-                      "Тип разъёма", "Длина", "Мощность", "Плотность"]
+    important_keys = [
+        "Объём",
+        "Вес",
+        "Размер",
+        "Цвет",
+        "Материал",
+        "Язык",
+        "Страниц",
+        "Количество",
+        "Форма",
+        "Дозировка",
+        "Состав",
+        "Комплектация",
+        "Тип разъёма",
+        "Длина",
+        "Мощность",
+        "Плотность",
+    ]
     for key in important_keys:
         val = attributes.get(key)
         if val and val != "нужно заполнить":
@@ -956,7 +1054,18 @@ def _extract_attributes(text: str) -> dict[str, str]:
             continue
         key = match.group(1).strip().capitalize()
         value = match.group(2).strip()
-        if key.lower() in {"цена", "стоимость", "название", "товар", "описание", "бренд", "категория", "задача", "источник", "старая цена"}:
+        if key.lower() in {
+            "цена",
+            "стоимость",
+            "название",
+            "товар",
+            "описание",
+            "бренд",
+            "категория",
+            "задача",
+            "источник",
+            "старая цена",
+        }:
             continue
         attributes[key] = value
 
@@ -1094,10 +1203,37 @@ def _specialize_category_path(text: str, title: str, category: str | None) -> st
 
 def _build_offer_id(title: str) -> str:
     translit = {
-        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z",
-        "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
-        "с": "s", "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "c", "ч": "ch", "ш": "sh",
-        "щ": "sch", "ы": "y", "э": "e", "ю": "yu", "я": "ya",
+        "а": "a",
+        "б": "b",
+        "в": "v",
+        "г": "g",
+        "д": "d",
+        "е": "e",
+        "ё": "e",
+        "ж": "zh",
+        "з": "z",
+        "и": "i",
+        "й": "y",
+        "к": "k",
+        "л": "l",
+        "м": "m",
+        "н": "n",
+        "о": "o",
+        "п": "p",
+        "р": "r",
+        "с": "s",
+        "т": "t",
+        "у": "u",
+        "ф": "f",
+        "х": "h",
+        "ц": "c",
+        "ч": "ch",
+        "ш": "sh",
+        "щ": "sch",
+        "ы": "y",
+        "э": "e",
+        "ю": "yu",
+        "я": "ya",
     }
     raw = "".join(translit.get(ch, ch) for ch in title.lower())
     slug = re.sub(r"[^a-z0-9]+", "-", raw).strip("-")[:32] or "product"
@@ -1135,13 +1271,17 @@ def _sanitize_supplement_draft(draft: OzonCardDraft) -> None:
         return
     draft.description = _remove_unverified_supplement_claims(draft.description, draft.source_text)
     draft.selling_points = [
-        cleaned for point in draft.selling_points
+        cleaned
+        for point in draft.selling_points
         if (cleaned := _remove_unverified_supplement_claims(point, draft.source_text))
     ]
     if not draft.description:
         draft.description = _build_marketing_description(
-            draft.name, brand=draft.brand, category=draft.category_hint,
-            attributes=draft.attributes, selling_points=draft.selling_points,
+            draft.name,
+            brand=draft.brand,
+            category=draft.category_hint,
+            attributes=draft.attributes,
+            selling_points=draft.selling_points,
         )
 
 
@@ -1225,7 +1365,7 @@ def _extract_json_object(text: str) -> dict | None:
     if start == -1 or end == -1 or end <= start:
         return None
     try:
-        data = json.loads(raw[start:end + 1])
+        data = json.loads(raw[start : end + 1])
     except Exception as e:
         logger.warning(f"AI card JSON parse failed: {e}")
         return None
@@ -1477,9 +1617,12 @@ def _apply_competitor_context(draft: OzonCardDraft, competitors: list[dict]) -> 
     parts = [f"Найдено конкурентов: {len(draft.competitors)}"]
     if by_marketplace:
         market_labels = {"wildberries": "Wildberries", "ozon": "Ozon", "yandex_market": "Яндекс Маркет"}
-        parts.append("по площадкам: " + ", ".join(
-            f"{market_labels.get(market, market)} — {count}" for market, count in sorted(by_marketplace.items())
-        ))
+        parts.append(
+            "по площадкам: "
+            + ", ".join(
+                f"{market_labels.get(market, market)} — {count}" for market, count in sorted(by_marketplace.items())
+            )
+        )
     if prices:
         parts.append(f"цены: {min(prices)}–{max(prices)} ₽, медиана {int(median(prices))} ₽")
         if not draft.price:
@@ -1509,8 +1652,20 @@ def _compact_competitors(competitors: list[dict]) -> list[dict]:
 
 
 _COMPETITOR_STOP_WORDS = {
-    "для", "или", "без", "при", "под", "над", "товар", "шт", "набор",
-    "ozon", "wb", "wildberries", "черный", "белый",
+    "для",
+    "или",
+    "без",
+    "при",
+    "под",
+    "над",
+    "товар",
+    "шт",
+    "набор",
+    "ozon",
+    "wb",
+    "wildberries",
+    "черный",
+    "белый",
 }
 
 
@@ -1568,7 +1723,9 @@ def _filter_relevant_competitors(competitors: list[dict], draft: OzonCardDraft) 
     for item in competitors:
         name = (item.get("name") or "").lower()
         comp_tokens = {word[:5] for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", name)}
-        comp_tokens.update(word[:5] for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", str(item.get("category") or "").lower()))
+        comp_tokens.update(
+            word[:5] for word in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", str(item.get("category") or "").lower())
+        )
         if not (comp_tokens & (type_stems | aliases)):
             continue
         url = (item.get("url") or "").split("?", 1)[0].rstrip("/").lower()
@@ -1581,13 +1738,60 @@ def _filter_relevant_competitors(competitors: list[dict], draft: OzonCardDraft) 
 
 
 TECH_SEO_TERMS = {
-    "https", "http", "www", "webp", "images", "image", "img", "jpg", "jpeg", "png",
-    "catalog", "wildberries", "ozon", "basket", "vol", "ru", "product", "api",
-    "создать", "создай", "сделать", "сделай", "карточку", "карточка", "товара",
-    "максимально", "привлекательную", "привлекательный", "сильным", "сильный",
-    "выгодами", "выгоды", "понятным", "описанием", "описание", "задача",
+    "https",
+    "http",
+    "www",
+    "webp",
+    "images",
+    "image",
+    "img",
+    "jpg",
+    "jpeg",
+    "png",
+    "catalog",
+    "wildberries",
+    "ozon",
+    "basket",
+    "vol",
+    "ru",
+    "product",
+    "api",
+    "создать",
+    "создай",
+    "сделать",
+    "сделай",
+    "карточку",
+    "карточка",
+    "товара",
+    "максимально",
+    "привлекательную",
+    "привлекательный",
+    "сильным",
+    "сильный",
+    "выгодами",
+    "выгоды",
+    "понятным",
+    "описанием",
+    "описание",
+    "задача",
 }
-RU_STOP_WORDS = {"для", "или", "без", "это", "под", "при", "товар", "цена", "руб", "за", "как", "что", "его", "нее", "она"}
+RU_STOP_WORDS = {
+    "для",
+    "или",
+    "без",
+    "это",
+    "под",
+    "при",
+    "товар",
+    "цена",
+    "руб",
+    "за",
+    "как",
+    "что",
+    "его",
+    "нее",
+    "она",
+}
 
 
 def _remove_service_noise(text: str) -> str:
@@ -1703,7 +1907,10 @@ def _build_selling_points(title: str) -> list[str]:
             "Плотность и амортизация — комфорт для суставов",
         ]
     # Clothing
-    elif any(t in low for t in ("футбол", "рубашк", "блуз", "джинс", "брюки", "штаны", "курт", "плащ", "пальто", "платье", "юбка")):
+    elif any(
+        t in low
+        for t in ("футбол", "рубашк", "блуз", "джинс", "брюки", "штаны", "курт", "плащ", "пальто", "платье", "юбка")
+    ):
         points = [
             "Состав ткани и рекомендации по уходу — стирайте и гладьте правильно",
             "Размерная сетка — сверьте свои мерки перед заказом",
@@ -1769,8 +1976,14 @@ def _map_to_ozon_category_path(category: str) -> str:
 def _category_keyword_whitelist(category: str | None) -> list[str]:
     low = (category or "").lower()
     rules: list[tuple[tuple[str, ...], list[str]]] = [
-        (("книга", "книж", "литература", "чтение", "автор", "издатель"), ["книга", "автор", "издатель", "чтение", "литература", "саморазвитие"]),
-        (("витамин", "бад", "магни", "капсул", "таблет", "минерал"), ["магни", "цитрат", "витамин", "капсул", "таблет", "минерал", "бад"]),
+        (
+            ("книга", "книж", "литература", "чтение", "автор", "издатель"),
+            ["книга", "автор", "издатель", "чтение", "литература", "саморазвитие"],
+        ),
+        (
+            ("витамин", "бад", "магни", "капсул", "таблет", "минерал"),
+            ["магни", "цитрат", "витамин", "капсул", "таблет", "минерал", "бад"],
+        ),
         (("коврик", "йога", "фитнес"), ["коврик", "йог", "фитнес", "нескольз", "толщин", "упражнен"]),
         (("кабел", "смартфон", "аксессуар"), ["кабел", "заряд", "usb", "type", "lightning", "micro", "разъем"]),
         (("мебел", "кресл"), ["кресл", "эргоном", "офис", "обивк", "подлокот", "спинк"]),
