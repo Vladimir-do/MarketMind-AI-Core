@@ -10,9 +10,9 @@ from app.parsers.router import MARKETPLACE_EMOJI, detect_marketplace
 from app.parsers.wildberries import WildberriesParser
 from app.parsers.yandex_market import YandexMarketParser
 from app.resilience import resilience
+from app.telegram_card_tasks import build_card_task_from_url, extract_ozon_product_identity
 from app.updater import OzonUpdater, _recommend_strategy
 from app.utils.error_research import research_parse_failure
-from app.telegram_card_tasks import build_card_task_from_url, extract_ozon_product_identity
 
 MAX_CONCURRENT_UPDATES = 3
 
@@ -40,7 +40,7 @@ async def _mark_block_and_alert(marketplace: str, notify) -> None:
 
 
 async def _save_ozon_provisional_url(db: Database, url: str, notify) -> bool:
-    """Persist an Ozon URL-derived draft even when adaptive strategy skips scraping."""
+    """Persist an Ozon URL-derived draft without claiming the marketplace blocked it."""
     try:
         task = build_card_task_from_url(url)
         title_line = next((line for line in task.splitlines() if line.lower().startswith("товар:")), "")
@@ -51,7 +51,7 @@ async def _save_ozon_provisional_url(db: Database, url: str, notify) -> bool:
             "name": provisional_name,
             "price": None,
             "image_url": None,
-            "availability": "blocked",
+            "availability": "draft",
         })
         _, ozon_id = extract_ozon_product_identity(url)
         id_note = f" Артикул Ozon: <code>{ozon_id}</code>." if ozon_id else ""

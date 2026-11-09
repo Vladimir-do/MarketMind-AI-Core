@@ -23,6 +23,20 @@ from app.ai_recommendation.providers.base import BaseAIProvider
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_ai_proxy() -> str | None:
+    configured_proxy = os.environ.get("AI_HTTP_PROXY", "").strip()
+    if configured_proxy:
+        if configured_proxy.lower() in {"direct", "none", "off"}:
+            return None
+        return configured_proxy
+    for key in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+        value = os.environ.get(key, "").strip()
+        if value and value.lower() not in {"direct", "none", "off"}:
+            return value
+    return None
+
+
 _DEFAULT_BASE_URLS: dict[str, str] = {
     "openai": "https://api.openai.com/v1",
     "deepseek": "https://api.deepseek.com/v1",
@@ -94,16 +108,7 @@ class OpenAICompatibleProvider(BaseAIProvider):
             # aiohttp does not read proxy environment variables by default.
             # MarketMind runs behind HAPP on this host, so route provider
             # requests through the explicitly configured AI proxy.
-            configured_proxy = os.environ.get("AI_HTTP_PROXY")
-            proxy_url = (
-                None if configured_proxy and configured_proxy.strip().lower() in {"direct", "none", "off"}
-                else configured_proxy
-                or os.environ.get("HTTPS_PROXY")
-                or os.environ.get("https_proxy")
-                or os.environ.get("HTTP_PROXY")
-                or os.environ.get("http_proxy")
-                or None
-            )
+            proxy_url = _resolve_ai_proxy()
             async with (
                 aiohttp.ClientSession(timeout=timeout_obj) as session,
                 session.post(url, json=payload, headers=headers, proxy=proxy_url) as resp,

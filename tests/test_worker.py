@@ -56,7 +56,7 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Kompleks vitaminov", payload["name"])
         self.assertIsNone(payload["price"])
         self.assertIsNone(payload["image_url"])
-        self.assertEqual(payload["availability"], "blocked")
+        self.assertEqual(payload["availability"], "draft")
         self.assertIn("Ссылок сохранено как черновик", result)
         self.assertTrue(any("не подтверждено" in m.lower() or "черновик" in m.lower() for m in messages))
 
@@ -86,7 +86,7 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         db.save_product.assert_awaited_once()
         saved_url, payload = db.save_product.await_args.args
         self.assertEqual(saved_url, url)
-        self.assertEqual(payload["availability"], "blocked")
+        self.assertEqual(payload["availability"], "draft")
         self.assertIsNone(payload["price"])
         self.assertIn("Ссылок сохранено как черновик: <b>1</b>", result)
         self.assertTrue(any("same URL recently blocked" in m for m in messages))

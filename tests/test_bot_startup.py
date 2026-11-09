@@ -7,6 +7,22 @@ from python_socks import ProxyConnectionError
 
 
 class BotStartupTests(unittest.TestCase):
+    def test_start_bot_closes_ai_clients(self):
+        import app.bot as bot_module
+        import app.ai_client as ai_client
+
+        close_clients = AsyncMock()
+
+        async def run():
+            with (
+                patch.object(bot_module, "run_telegram_polling", AsyncMock(return_value=True)),
+                patch.object(ai_client, "close_ai_clients", close_clients),
+            ):
+                return await bot_module.start_bot()
+
+        self.assertTrue(asyncio.run(run()))
+        close_clients.assert_awaited_once()
+
     def test_start_bot_keeps_pending_updates_by_default(self):
         import app.bot as bot_module
         import app.telegram_runtime as runtime

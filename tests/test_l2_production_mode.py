@@ -106,6 +106,24 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(check["key"] == "database-backend" for check in status["readiness"]))
         self.assertFalse([item for item in status["warnings"] if "/tmp" in item])
 
+    async def test_system_status_masks_database_url_credentials(self):
+        from app.runtime_paths import system_status
+
+        database_url = (
+            "postgresql+asyncpg://db-user:db-password@db.example:5432/market"
+            "?password=query-password&ssl=true"
+        )
+        with (
+            patch("app.runtime_paths.DATABASE_URL", database_url),
+            patch("app.runtime_paths.sqlite_database_path", return_value=None),
+        ):
+            status = await system_status(self.db)
+
+        self.assertIn("db.example", status["database_path"])
+        self.assertNotIn("db-user", status["database_path"])
+        self.assertNotIn("db-password", status["database_path"])
+        self.assertNotIn("query-password", status["database_path"])
+
     async def test_backup_checksum_restore_and_protective_copy(self):
         project_id = await self._create_project("Before restore")
         from app.backups.service import create_database_backup, restore_database_backup, sha256_file

@@ -3,12 +3,13 @@ agent.py — 🤖 Claude AI агент внутри парсера.
 Умеет: анализировать цены, читать отзывы, давать советы,
 искать товары по названию на Озоне.
 """
+import html
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import desc, func, select
 
-from app.ai_client import ai_is_available, ai_missing_message, ask_ai
+from app.ai_client import AIClientError, ai_is_available, ai_missing_message, ask_ai
 from app.config import logger
 from app.database import Database, PriceHistory, Product
 
@@ -96,7 +97,10 @@ class PriceAgent:
         """Отправляет запрос в настроенный AI-провайдер и возвращает ответ."""
         if not self._is_available():
             return ai_missing_message()
-        return await ask_ai(user_message, system=self.SYSTEM_PROMPT, max_tokens=1024)
+        try:
+            return await ask_ai(user_message, system=self.SYSTEM_PROMPT, max_tokens=1024)
+        except AIClientError:
+            return "AI-анализ временно недоступен."
 
     # ── Анализ конкретного товара ─────────────────────────────────────────────
 
@@ -313,12 +317,12 @@ URL: {product.url}
 Ответ максимум 3 предложения."""
 
         ai_comment = await self._ask_claude(prompt)
-        lines = [f"💰 <b>Сравнение цен: {product_name[:40]}</b>"]
+        lines = [f"💰 <b>Сравнение цен: {html.escape(str(product_name)[:40])}</b>"]
         if ozon_price:
             lines.append(f"🔵 Озон: <b>{ozon_price} ₽</b>")
         if wb_price:
             lines.append(f"🟣 WB: <b>{wb_price} ₽</b>")
         if diff:
             lines.append(diff.strip())
-        lines.append(f"\n🤖 {ai_comment}")
+        lines.append(f"\n🤖 {html.escape(str(ai_comment))}")
         return "\n".join(lines)

@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import desc, select
 
-from app.ai_client import ai_is_available, ai_missing_message, ask_ai
+from app.ai_client import AIClientError, ai_is_available, ai_missing_message, ask_ai
 from app.database import Database, PriceHistory, Product
 
 # ── Статистический анализ (без AI, мгновенно) ─────────────────────────────────
@@ -97,14 +97,17 @@ class DeepAnalyzer:
     async def _claude(self, prompt: str, max_tokens: int = 800) -> str:
         if not ai_is_available():
             return ai_missing_message()
-        return await ask_ai(
-            prompt,
-            max_tokens=max_tokens,
-            system=(
-                "Ты эксперт по анализу цен на маркетплейсах. "
-                "Отвечай кратко, по делу, на русском."
-            ),
-        )
+        try:
+            return await ask_ai(
+                prompt,
+                max_tokens=max_tokens,
+                system=(
+                    "Ты эксперт по анализу цен на маркетплейсах. "
+                    "Отвечай кратко, по делу, на русском."
+                ),
+            )
+        except AIClientError:
+            return "AI-анализ временно недоступен."
 
     async def _get_prices(self, product_id: int, days: int = 30) -> list[int]:
         since = datetime.now(UTC) - timedelta(days=days)

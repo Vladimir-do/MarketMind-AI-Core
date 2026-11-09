@@ -309,6 +309,7 @@ async def find_ozon_alternative_candidates(url: str, *, max_results: int = 10) -
     if not identity["title"]:
         return []
     from datetime import UTC, datetime
+
     from app.parsers.yandex_market import YandexMarketParser
 
     products = await YandexMarketParser().search(identity["title"], max_results=max_results)

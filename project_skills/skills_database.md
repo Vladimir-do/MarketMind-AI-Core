@@ -123,6 +123,7 @@
 - Антипаттерны: обновлять только текущую цену без истории.
 - Production рекомендации: добавить source/status качества парсинга, валюту, old_price, discount, external_id.
 - Возможность переиспользования: мониторинг цен, stock tracking, anomaly detection.
+- Provisional-state note: URL-derived records saved without confirmed product-page data use the distinct `draft` availability status, never `blocked` or `unknown`; keep `draft` in import normalization and select it explicitly for card-draft generation. Reserve `blocked` for observed marketplace blocking evidence.
 - Уровень сложности: `middle`
 - Теги: `price-history`, `delta`, `time-series`, `analytics`
 
@@ -210,6 +211,7 @@
 - Pending updates note: avoid hardcoded `drop_pending_updates=True` on startup; make it an explicit config flag so messages queued during network/VPN downtime are not silently discarded.
 - Lock safety note: after `await parser_lock.acquire()`, put every awaited operation inside the `try/finally` that releases the lock, including preflight AI advice and Telegram replies; add a regression test that raises before the main worker call and asserts the lock is released.
 - Local proxy recovery note: if `Test-NetConnection api.telegram.org -Port 443` fails but a local SOCKS port such as `127.0.0.1:10808` is open, set `TELEGRAM_API_PROXY=socks5://127.0.0.1:10808` or `TELEGRAM_PROXY=socks5://127.0.0.1:10808` in `.env` and verify startup reaches `Telegram polling started`.
+- HTML injection regression note: every user-, marketplace-, database-, or AI-derived value inserted into `parse_mode="HTML"` must pass through `html.escape`; for `href`/other quoted attributes use `html.escape(value, quote=True)`. Keep trusted HTML markup authored separately from escaped dynamic content, including names, query text, AI output, error text, and URLs.
 - Telegram polling resilience update: split proxy config into `TELEGRAM_PROXY`/`TELEGRAM_API_PROXY`, `PARSER_PROXY`, and `COMMON_PROXY`; legacy `PROXY` is parser-only and must not silently route Telegram. `start_bot()` should treat `Unauthorized` as fatal, but handle `TelegramNetworkError`, `ConnectionResetError`, `WinError 64`, timeouts and transport `OSError`s with watchdog retry/backoff `1,2,5,10,30,60`. If a configured Telegram proxy fails, log a warning, switch to direct mode, and keep the process alive. Startup/polling logs should include `Telegram connected`, `Telegram network error`, `Retry in X seconds`, `Switched to direct mode`, and `Polling restarted`.
 - Telegram runtime extraction note: keep `app.bot.start_bot()` as the public CLI/import wrapper, but move network session creation, proxy fallback, retry/backoff and active bot lifecycle into a small runtime module such as `app.telegram_runtime`. Pass `db`, `dp`, command list and a `set_active_bot` callback into the runtime so handlers can keep using the module-level active bot while startup behavior remains independently testable.
 - Telegram message extraction note: when reducing `app.bot.py`, prefer moving pure Telegram HTML/message formatting and command payload parsing into a side-effect-free module such as `app.telegram_messages` while leaving aiogram decorators and DB/FSM orchestration in `app.bot.py`. Cover shared parsers like `/command@bot limit` with helper tests before extracting heavier routers.
@@ -463,6 +465,7 @@ async def guarded_fetch(marketplace: str, fetch):
 - Типичные ошибки: placeholder `ip:port` принят за proxy; ValueError на invalid port.
 - Антипаттерны: падать при недоступном proxy вместо fallback direct.
 - Production рекомендации: proxy pool healthcheck, rotation, failure counters.
+- Desktop proxy safety note: never change the session-wide GNOME proxy by default. Any explicit opt-in bypass must serialize all processes with an OS-level lock, persist the original mode before changing it, restore it in `finally`, and retain a recovery marker if restore fails so a later process can recover after a crash.
 - Возможность переиспользования: scrapers, API clients.
 - Уровень сложности: `junior`
 - Теги: `proxy`, `socket`, `network`, `validation`
@@ -542,6 +545,8 @@ async def guarded_fetch(marketplace: str, fetch):
 - Типичные ошибки: provider выбран, но ключ пустой; структура ответа изменилась; нет timeout.
 - Антипаттерны: вызывать API напрямую из каждого business module.
 - Production рекомендации: retry/backoff, token accounting, schema validation, tracing.
+- Lifecycle note: lazily create one reusable `aiohttp.ClientSession` for Grok/Groq/Gemini and one Anthropic SDK client backed by a reusable `httpx.AsyncClient` for Claude; never create sessions during import, and close them from each application entrypoint's shutdown hook.
+- Error-contract note: raise `AIClientError` from the public `ask_ai` boundary; consumers should catch it and use a local fallback rather than inserting provider error strings into card fields or generated content.
 - Возможность переиспользования: любые AI-enabled services.
 - Уровень сложности: `middle`
 - Maturity: `usable`

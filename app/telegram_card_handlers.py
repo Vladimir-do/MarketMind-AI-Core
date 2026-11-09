@@ -1,4 +1,5 @@
 import asyncio
+import html
 import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -26,6 +27,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_BATCH_CARD_SOURCES = 300
+CARD_GENERATION_SEMAPHORE = asyncio.Semaphore(2)
+CARD_GENERATION_TIMEOUT = 45.0
+
+
+async def _run_card_generation_task(func, *args, timeout: float = CARD_GENERATION_TIMEOUT, **kwargs):
+    async with CARD_GENERATION_SEMAPHORE:
+        if asyncio.iscoroutinefunction(func):
+            return await asyncio.wait_for(func(*args, **kwargs), timeout=timeout)
+        return await asyncio.wait_for(asyncio.to_thread(func, *args, **kwargs), timeout=timeout)
 
 
 def _split_batch_card_sources(text: str) -> list[str]:
@@ -98,7 +108,7 @@ async def generate_ozon_card_files(
     )
 
     profile = get_active_profile(message.chat.id)
-    base_draft = build_ozon_card_draft(text)
+    base_draft = await _run_card_generation_task(build_ozon_card_draft, text)
     competitors = []
     if parser_lock.locked():
         await message.answer("⚠️ Парсер занят, сделаю карточку без анализа конкурентов.")
@@ -118,7 +128,7 @@ async def generate_ozon_card_files(
                     by_market[market] = by_market.get(market, 0) + 1
                 market_labels = {"wildberries": "Wildberries", "ozon": "Ozon", "yandex_market": "Яндекс Маркет"}
                 summary = ", ".join(
-                    f"{market_labels.get(market, market)}: {count}" for market, count in sorted(by_market.items())
+                    f"{html.escape(str(market_labels.get(market, market)))}: {count}" for market, count in sorted(by_market.items())
                 )
                 source_note = ozon_search_blocked_message()
                 source_note = f"\n⚠️ {source_note}" if source_note else ""
@@ -139,13 +149,18 @@ async def generate_ozon_card_files(
         finally:
             parser_lock.release()
 
-    draft = await build_enhanced_ozon_card_draft(text, competitors=competitors, profile=profile)
+    draft = await _run_card_generation_task(
+        build_enhanced_ozon_card_draft,
+        text,
+        competitors=competitors,
+        profile=profile,
+    )
     quality = build_ozon_card_quality_report(draft)
     quality_lines = [f"Оценка готовности данных: <b>{quality.score}/100</b>"]
     if quality.missing:
-        quality_lines.append("Не хватает: " + ", ".join(quality.missing))
+        quality_lines.append("Не хватает: " + html.escape(", ".join(quality.missing)))
     if quality.warnings:
-        quality_lines.append("Замечания: " + "; ".join(quality.warnings[:4]))
+        quality_lines.append("Замечания: " + html.escape("; ".join(quality.warnings[:4])))
     await message.answer("\n".join(quality_lines), parse_mode="HTML")
     xlsx = export_ozon_card_xlsx(draft)
     json_buf = export_ozon_card_json(draft)
@@ -225,7 +240,7 @@ async def generate_ozon_batch_card_files(
                         task = _build_card_task_from_product(product, last_price.price if last_price else None)
                         fallback_message = ""
 
-                base_draft = build_ozon_card_draft(task)
+                base_draft = await _run_card_generation_task(build_ozon_card_draft, task)
                 competitors = []
                 try:
                     competitors = await _search_competitors_with_fallback(
@@ -235,7 +250,12 @@ async def generate_ozon_batch_card_files(
                 except Exception as e:
                     logger.warning(f"batch competitor search failed for {base_draft.name[:80]}: {e}")
 
-                draft = await build_enhanced_ozon_card_draft(task, competitors=competitors, profile=profile)
+                draft = await _run_card_generation_task(
+                    build_enhanced_ozon_card_draft,
+                    task,
+                    competitors=competitors,
+                    profile=profile,
+                )
                 missing = []
                 if not draft.category_hint:
                     missing.append("категория")

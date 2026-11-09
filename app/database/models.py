@@ -40,7 +40,7 @@ class PriceHistory(Base):
     id                  = Column(Integer, primary_key=True)
     product_id          = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     price               = Column(Integer)           # рубли, целое; None = недоступен
-    availability_status = Column(String(20), nullable=False)  # in_stock / out_of_stock / deleted / blocked
+    availability_status = Column(String(20), nullable=False)  # in_stock / out_of_stock / deleted / blocked / unknown / draft
     recorded_at         = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
 
     product = relationship("Product", back_populates="history")

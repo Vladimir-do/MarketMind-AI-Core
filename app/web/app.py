@@ -53,13 +53,17 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
         from app.database import Database
+        from app.ai_client import close_ai_clients
 
         db = Database()
         await db.init()
         app.state.db = db
         app.state.ai_queue = DatabaseApprovalQueue(db)
-        yield
-        await db._engine.dispose()
+        try:
+            yield
+        finally:
+            await close_ai_clients()
+            await db._engine.dispose()
 
     app = FastAPI(title="MarketMind AI", version="0.1.0", lifespan=lifespan)
 

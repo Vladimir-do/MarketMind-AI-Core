@@ -154,6 +154,28 @@ class BotHtmlEscapingTests(unittest.TestCase):
         self.assertIn("Tea &amp; Coffee &lt;Set&gt;", result)
         self.assertNotIn("Tea & Coffee <Set>", result)
 
+    def test_format_product_list_escapes_url_attribute(self):
+        product = type(
+            "P", (), {"id": 1, "url": "https://example.com/' onmouseover='alert(1)", "name": "Safe name"}
+        )()
+        result = format_product_list([product], {})
+        self.assertNotIn("onmouseover='alert(1)'", result)
+        self.assertIn("&#x27;", result)
+
+    def test_compare_prices_escapes_product_name_and_ai_response(self):
+        from app.agent import PriceAgent
+
+        agent = PriceAgent.__new__(PriceAgent)
+        agent._ask_claude = AsyncMock(return_value="Buy <here> & now")
+
+        async def run():
+            return await agent.compare_prices("Phone <script>", 100, 120)
+
+        result = asyncio.run(run())
+        self.assertIn("Phone &lt;script&gt;", result)
+        self.assertIn("Buy &lt;here&gt; &amp; now", result)
+        self.assertNotIn("<script>", result)
+
     def test_market_overview_escapes_names_and_ai_comment(self):
         from app.ai_analyzer import DeepAnalyzer
 

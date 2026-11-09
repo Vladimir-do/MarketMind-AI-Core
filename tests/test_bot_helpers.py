@@ -1,4 +1,5 @@
 import asyncio
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -124,6 +125,7 @@ class BotHelperTests(unittest.TestCase):
 
     def test_blocked_ozon_url_automatically_starts_card_generation(self):
         from types import SimpleNamespace
+
         import app.bot as bot_module
 
         class FakeMessage:
@@ -156,8 +158,34 @@ class BotHelperTests(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_auto_card_generation_accepts_provisional_draft_status(self):
+        from types import SimpleNamespace
+
+        import app.bot as bot_module
+
+        async def run():
+            url = "https://www.ozon.ru/product/test-product-123456789/"
+            product = SimpleNamespace(id=7, name="Test product", url=url, image_url=None)
+            last = SimpleNamespace(price=None, availability_status="draft")
+            fake_db = SimpleNamespace(
+                get_product_by_hash=AsyncMock(return_value=product),
+                get_last_price=AsyncMock(return_value=last),
+            )
+            with (
+                patch.object(bot_module, "db", fake_db),
+                patch.object(bot_module, "generate_ozon_card_files", AsyncMock()) as generate,
+            ):
+                count = await bot_module._auto_generate_blocked_ozon_cards(
+                    SimpleNamespace(answer=AsyncMock()), [url]
+                )
+            self.assertEqual(count, 1)
+            generate.assert_awaited_once()
+
+        asyncio.run(run())
+
     def test_auto_card_generation_skips_successfully_parsed_ozon_product(self):
         from types import SimpleNamespace
+
         import app.bot as bot_module
 
         async def run():
@@ -209,6 +237,26 @@ class BotHelperTests(unittest.TestCase):
             "составь карточки: https://www.ozon.ru/product/one/, https://www.ozon.ru/product/two/"
         )
         self.assertEqual(sources, ["https://www.ozon.ru/product/one/", "https://www.ozon.ru/product/two/"])
+
+    def test_card_generation_limits_concurrent_cpu_work(self):
+        import app.telegram_card_handlers as handlers
+
+        async def run():
+            active = 0
+            max_active = 0
+
+            def slow_work(value):
+                nonlocal active, max_active
+                active += 1
+                max_active = max(max_active, active)
+                time.sleep(0.05)
+                active -= 1
+                return value
+
+            await asyncio.gather(*(handlers._run_card_generation_task(slow_work, i) for i in range(8)))
+            self.assertLessEqual(max_active, handlers.CARD_GENERATION_SEMAPHORE._value)
+
+        asyncio.run(run())
 
     def test_product_card_spec_is_kept_as_one_task(self):
         prompt = (

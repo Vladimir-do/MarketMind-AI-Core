@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from app.web.app import templates
 from app.web.image_urls import displayable_image_url
 from app.web.schemas import ImportResult
+from app.config import IMPORT_MAX_FILE_BYTES
 
 router = APIRouter()
 
@@ -70,11 +71,22 @@ def _wants_html(request: Request) -> bool:
     return request.headers.get("HX-Request", "").lower() == "true"
 
 
-def _import_result_response(request: Request, result: ImportResult, *, error: bool = False):
+def _import_result_response(
+    request: Request,
+    result: ImportResult,
+    *,
+    error: bool = False,
+    status_code: int | None = None,
+):
     if _wants_html(request):
-        return templates.TemplateResponse(request, "import_result.html", {"result": result})
+        return templates.TemplateResponse(
+            request,
+            "import_result.html",
+            {"result": result},
+            status_code=status_code or 200,
+        )
     if error:
-        return JSONResponse(status_code=422, content=result.model_dump())
+        return JSONResponse(status_code=status_code or 422, content=result.model_dump())
     return result
 
 
@@ -89,7 +101,15 @@ async def import_file(request: Request, file: UploadFile = File(...)):
     suffix = Path(file.filename or "upload.csv").suffix or ".csv"
     tmp = Path(tempfile.gettempdir()) / f"web_import_{uuid.uuid4().hex}{suffix}"
     try:
-        content = await file.read()
+        content = await file.read(IMPORT_MAX_FILE_BYTES + 1)
+        if len(content) > IMPORT_MAX_FILE_BYTES:
+            return _import_result_response(request, ImportResult(
+                task_id=uuid.uuid4().hex[:12],
+                status="failed",
+                total_products=0,
+                errors=1,
+                message=f"Файл превышает допустимый размер {IMPORT_MAX_FILE_BYTES} байт.",
+            ), error=True, status_code=413)
         tmp.write_bytes(content)
 
         from app.pipeline import ImportPipeline

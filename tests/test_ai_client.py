@@ -48,10 +48,22 @@ class _FakeGeminiSession:
 
 
 class AiClientTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncTearDown(self):
+        await ai_client.close_ai_clients()
+
     async def test_missing_grok_key_reports_configuration_error(self):
         with patch.object(ai_client, "AI_PROVIDER", "grok"), patch.object(ai_client, "GROK_API_KEY", ""):
             self.assertFalse(ai_client.ai_is_available())
             self.assertIn("GROK_API_KEY", ai_client.ai_missing_message())
+
+    async def test_ai_disabled_flag_disables_ai_even_with_keys(self):
+        with (
+            patch.object(ai_client, "AI_ENABLED", False),
+            patch.object(ai_client, "AI_PROVIDER", "gemini"),
+            patch.object(ai_client, "GEMINI_API_KEY", "gemini-test"),
+        ):
+            self.assertFalse(ai_client.ai_is_available())
+            self.assertIn("AI_ENABLED", ai_client.ai_missing_message())
 
     async def test_ask_ai_routes_to_grok(self):
         with (
@@ -73,6 +85,15 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "ok")
         ask_claude.assert_awaited_once()
 
+    async def test_ask_ai_raises_typed_error_for_provider_failure(self):
+        with (
+            patch.object(ai_client, "AI_PROVIDER", "grok"),
+            patch.object(ai_client, "GROK_API_KEY", "xai-test"),
+            patch.object(ai_client, "_ask_grok", new=AsyncMock(return_value="AI error: network failed")),
+        ):
+            with self.assertRaisesRegex(ai_client.AIClientError, "network failed"):
+                await ai_client.ask_ai("hello")
+
     async def test_ask_claude_uses_configured_current_model(self):
         from types import SimpleNamespace
 
@@ -84,8 +105,10 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         fake_sdk_client = MagicMock()
+        fake_sdk_client.messages = fake_client.messages
         fake_sdk_client.__aenter__ = AsyncMock(return_value=fake_client)
         fake_sdk_client.__aexit__ = AsyncMock(return_value=False)
+        fake_sdk_client.close = AsyncMock()
         anthropic_factory = MagicMock(return_value=fake_sdk_client)
         fake_anthropic = SimpleNamespace(AsyncAnthropic=anthropic_factory)
         fake_http_client = MagicMock()
@@ -110,6 +133,44 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
             system="system",
             messages=[{"role": "user", "content": "test prompt"}],
         )
+
+    async def test_grok_reuses_session_and_close_allows_restart(self):
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def json(self, content_type=None):
+                return {"choices": [{"message": {"content": "ok"}}]}
+
+        def make_session():
+            session = MagicMock()
+            session.closed = False
+            session.post = MagicMock(return_value=FakeResponse())
+
+            async def close():
+                session.closed = True
+
+            session.close = AsyncMock(side_effect=close)
+            return session
+
+        sessions = [make_session(), make_session()]
+        factory = MagicMock(side_effect=sessions)
+        with (
+            patch.object(ai_client, "GROK_API_KEY", "xai-test"),
+            patch.object(ai_client.aiohttp, "ClientSession", factory),
+        ):
+            self.assertEqual(await ai_client._ask_grok("one", system="s", max_tokens=10), "ok")
+            self.assertEqual(await ai_client._ask_grok("two", system="s", max_tokens=10), "ok")
+            self.assertEqual(factory.call_count, 1)
+            await ai_client.close_ai_clients()
+            self.assertTrue(sessions[0].closed)
+            self.assertEqual(await ai_client._ask_grok("three", system="s", max_tokens=10), "ok")
+            self.assertEqual(factory.call_count, 2)
 
     async def test_grok_string_error_payload_does_not_crash(self):
         class FakeResponse:
@@ -244,12 +305,12 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
         class CapturingSession(_FakeGeminiSession):
             def __init__(self, *args, **kwargs):
-                captured["headers"] = kwargs.get("headers", {})
-                super().__init__(response=response, *args, **kwargs)
+                super().__init__(*args, response=response, **kwargs)
 
             def post(self, *args, **kwargs):
                 captured["url"] = args[0]
                 captured["kwargs"] = kwargs
+                captured["headers"] = kwargs.get("headers", {})
                 return super().post(*args, **kwargs)
 
         with (
@@ -333,6 +394,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(result.startswith(expected_prefix))
                 self.assertNotIn("TimeoutError", result)
                 self.assertNotIn("gemini-secret", result)
+                await ai_client.close_ai_clients()
 
     async def test_gemini_404_and_500_are_classified_without_timeout(self):
         cases = [
@@ -356,6 +418,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(result.startswith(expected_prefix))
                 self.assertNotIn("TimeoutError", result)
                 self.assertNotIn("gemini-secret", result)
+                await ai_client.close_ai_clients()
 
 
 class AiohttpTimeoutCompatTests(unittest.TestCase):

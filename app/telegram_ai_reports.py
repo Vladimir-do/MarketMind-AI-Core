@@ -58,8 +58,8 @@ async def build_price_alerts_message(db: Database) -> str:
     lines = [f"🚨 <b>Активные алерты ({len(alerts)}):</b>\n"]
     for alert in alerts:
         lines.append(
-            f"{alert['icon']} <b>{html.escape(str(alert['name']))}</b>\n"
-            f"   💰 {alert['price']} ₽ — {html.escape(str(alert['message']))}\n"
-            f"   <a href='{alert['url']}'>Открыть товар</a>"
+            f"{html.escape(str(alert['icon']))} <b>{html.escape(str(alert['name']))}</b>\n"
+            f"   💰 {html.escape(str(alert['price']))} ₽ — {html.escape(str(alert['message']))}\n"
+            f"   <a href='{html.escape(str(alert['url']), quote=True)}'>Открыть товар</a>"
         )
     return "\n".join(lines)

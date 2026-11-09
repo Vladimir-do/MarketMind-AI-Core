@@ -104,7 +104,7 @@ def format_product_list(products: Iterable, latest_by_product: dict) -> str:
         last = latest_by_product.get(product.id)
         price_str = f"{last.price} ₽" if last and last.price else "—"
         icon = "✅" if last and last.availability_status == "in_stock" else "❌"
-        lines.append(f"{icon} <a href='{product.url}'>{html.escape(product.name[:50])}</a> — {price_str}")
+        lines.append(f"{icon} <a href='{html.escape(str(product.url), quote=True)}'>{html.escape(str(product.name or 'товар')[:50])}</a> — {html.escape(str(price_str))}")
     return "\n".join(lines)
 
 

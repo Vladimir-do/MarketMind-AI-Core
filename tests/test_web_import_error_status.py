@@ -108,6 +108,20 @@ class ImportFileErrorStatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["status"], "completed")
         self.assertEqual(data["total_products"], 1)
 
+    async def test_oversized_upload_returns_413_without_reading_into_pipeline(self):
+        with (
+            patch("app.web.routes.import_.IMPORT_MAX_FILE_BYTES", 10),
+            patch("app.pipeline.ImportPipeline.run_file") as run_file,
+        ):
+            response = await self.client.post(
+                "/api/import/file",
+                files={"file": ("large.csv", b"x" * 11, "text/csv")},
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("10 байт", response.json()["message"])
+        run_file.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

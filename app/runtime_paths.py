@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
+
 from app.config import DATABASE_URL, MARKETMIND_WORKSPACE_DIR, PROJECT_ROOT, RUNTIME_DATA_DIR
 from app.stack_status import database_backend, readiness_checks, runtime_stack
 
@@ -95,6 +98,27 @@ def is_tmp_path(path: Path) -> bool:
         return False
 
 
+def _masked_database_url(database_url: str) -> str:
+    if not database_url:
+        return "not configured"
+    try:
+        parsed = make_url(database_url)
+    except (ArgumentError, TypeError):
+        return "configured"
+
+    sensitive_query_keys = {"password", "passwd", "pwd", "token", "access_token", "secret", "api_key"}
+    query = dict(parsed.query)
+    for key in query:
+        if key.lower() in sensitive_query_keys:
+            query[key] = "***"
+    masked = parsed.set(
+        username="***" if parsed.username is not None else None,
+        password="***" if parsed.password is not None else None,
+        query=query,
+    )
+    return masked.render_as_string(hide_password=True)
+
+
 async def system_status(db: Database) -> dict:
     layout = runtime_layout()
     db_path = sqlite_database_path()
@@ -110,7 +134,7 @@ async def system_status(db: Database) -> dict:
     return {
         "mode": runtime_banner(),
         "database_backend": database_backend(),
-        "database_path": str(db_path) if db_path else DATABASE_URL,
+        "database_path": str(db_path) if db_path else _masked_database_url(DATABASE_URL),
         "workspace_path": str(workspace_path),
         "runtime_home": str(layout.home),
         "free_space_bytes": disk.free,

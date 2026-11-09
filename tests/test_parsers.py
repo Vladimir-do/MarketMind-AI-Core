@@ -1,5 +1,7 @@
 import asyncio
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -699,6 +701,39 @@ class ParserTests(unittest.TestCase):
 
 
 class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_dump_debug_rotates_to_50_and_keeps_latest_incident(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            debug_dir = Path(temp_dir)
+            for index in range(51):
+                stem = f"20200101_000000_incident_{index:02}"
+                (debug_dir / f"{stem}.png").write_bytes(b"old png")
+                (debug_dir / f"{stem}.html").write_text("old html", encoding="utf-8")
+            research_dump = debug_dir / "20200101_000000_research.md"
+            research_dump.write_text("keep", encoding="utf-8")
+
+            async def write_screenshot(*, path, full_page):
+                Path(path).write_bytes(b"latest png")
+
+            page = SimpleNamespace(
+                screenshot=AsyncMock(side_effect=write_screenshot),
+                content=AsyncMock(return_value="latest html"),
+            )
+            updater = OzonUpdater.__new__(OzonUpdater)
+            with patch.object(updater, "_debug_dir", return_value=debug_dir):
+                await updater._dump_debug(page, "incident")
+
+            timestamped = {
+                path.stem
+                for path in debug_dir.iterdir()
+                if path.suffix in {".png", ".html"}
+                and path.name != "last_incident.png"
+                and path.name != "last_incident.html"
+            }
+            self.assertEqual(len(timestamped), 50)
+            self.assertEqual((debug_dir / "last_incident.png").read_bytes(), b"latest png")
+            self.assertEqual((debug_dir / "last_incident.html").read_text(encoding="utf-8"), "latest html")
+            self.assertTrue(research_dump.exists())
+
     async def test_alt_sources_uses_mcp_before_cache(self):
         expected = {
             "url": "https://www.ozon.ru/product/test",
@@ -1116,6 +1151,7 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         remaining products instead of letting the whole run silently drop
         to 0 updated."""
         callbacks = []
+        added_history = []
         product_failing = SimpleNamespace(
             id=1,
             name="Crashes during fetch",
@@ -1135,7 +1171,7 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
                 return None
 
             def add(self, row):
-                pass
+                added_history.append(row)
 
             async def commit(self):
                 return None
@@ -1175,3 +1211,6 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(changes), 1)
         self.assertEqual(changes[0]["name"], "Works fine")
         self.assertTrue(any("Works fine" in text for text in callbacks))
+        self.assertEqual(added_history, [])
+        self.assertTrue(any("Ошибка при обновлении" in text for text in callbacks))
+        self.assertFalse(any("Ozon временно заблокировал" in text for text in callbacks))

@@ -274,7 +274,7 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Найдено конкурентов: 1", draft.competitor_summary)
 
     async def test_ai_prompt_offers_relevant_competitor_seo_gap(self):
-        ai_mock = AsyncMock(return_value="AI error: network")  # avoid depending on AI JSON parsing here
+        ai_mock = AsyncMock(return_value="{}")
         with (
             patch("app.card_filler.ai_is_available", return_value=True),
             patch("app.card_filler.ask_ai", new=ai_mock),
@@ -293,16 +293,51 @@ class CardFillerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("reviews_count", prompt)
         self.assertIn("yandex_market", prompt)
 
-    async def test_enhanced_card_handles_ai_error_as_local_draft(self):
+    async def test_enhanced_card_handles_typed_ai_error_as_local_draft(self):
+        from app.ai_client import AIClientError
+
         with (
             patch("app.card_filler.ai_is_available", return_value=True),
-            patch("app.card_filler.ask_ai", new=AsyncMock(return_value="AI error: network")),
+            patch("app.card_filler.ask_ai", new=AsyncMock(side_effect=AIClientError("network"))),
         ):
             draft = await build_enhanced_ozon_card_draft("товар: Кабель USB-C\nцена: 299")
 
         self.assertIn("AI-доработка недоступна", draft.ai_notes)
         self.assertIn("Кабель USB-C", draft.name)
 
+    async def test_empty_ai_json_uses_local_draft_and_reports_fallback(self):
+        with (
+            patch("app.card_filler.ai_is_available", return_value=True),
+            patch("app.card_filler.ask_ai", new=AsyncMock(return_value="{}")),
+        ):
+            draft = await build_enhanced_ozon_card_draft("товар: Кабель USB-C\nцена: 299")
+
+        self.assertIn("без пригодных полей", draft.ai_notes)
+        self.assertIn("Кабель USB-C", draft.name)
+
+    async def test_ai_disabled_is_reported_in_draft_notes(self):
+        with patch("app.card_filler.ai_is_available", return_value=False):
+            draft = await build_enhanced_ozon_card_draft("товар: Кабель USB-C")
+
+        self.assertIn("AI не применялся", draft.ai_notes)
+
+    def test_batch_preview_escapes_item_names_and_errors(self):
+        from app.card_filler import OzonCardBatchItem
+
+        items = [
+            OzonCardBatchItem(draft=None, source="<img src=x>", status="error", message="<script>alert(1)</script>"),
+        ]
+        preview = format_ozon_batch_preview(items)
+        self.assertIn("&lt;script&gt;", preview)
+        self.assertNotIn("<script>", preview)
+
+    def test_card_preview_displays_and_escapes_ai_status(self):
+        draft = build_ozon_card_draft("товар: Кабель USB-C")
+        draft.ai_notes = "AI <успешно> улучшил карточку"
+        preview = format_ozon_card_preview(draft)
+
+        self.assertIn("<b>AI:</b> AI &lt;успешно&gt; улучшил карточку", preview)
+        self.assertNotIn("<успешно>", preview)
 
     def test_keywords_cleanup_drops_technical_tokens(self):
         draft = build_ozon_card_draft(

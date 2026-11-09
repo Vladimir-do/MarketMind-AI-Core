@@ -2,7 +2,7 @@ import html
 import re
 from statistics import median
 
-from app.ai_client import ai_is_available, ask_ai
+from app.ai_client import AIClientError, ai_is_available, ask_ai
 
 
 async def build_card_research_report(query: str, competitors: list[dict]) -> str:
@@ -20,13 +20,16 @@ async def build_card_research_report(query: str, competitors: list[dict]) -> str
     if not ai_is_available():
         return local_report + "\n\n<i>AI недоступен, показан локальный анализ.</i>"
 
-    ai_text = await ask_ai(
-        _build_ai_prompt(query, competitors, prices, words),
-        system=AI_RESEARCH_SYSTEM_PROMPT,
-        max_tokens=1200,
-    )
-    if not ai_text or ai_text.startswith("AI error:") or "AI недоступен" in ai_text:
-        return local_report + f"\n\n<i>{html.escape(ai_text or 'AI не вернул ответ.')}</i>"
+    try:
+        ai_text = await ask_ai(
+            _build_ai_prompt(query, competitors, prices, words),
+            system=AI_RESEARCH_SYSTEM_PROMPT,
+            max_tokens=1200,
+        )
+    except AIClientError:
+        return local_report + "\n\n<i>AI временно недоступен, показан локальный анализ.</i>"
+    if not ai_text:
+        return local_report + "\n\n<i>AI не вернул ответ, показан локальный анализ.</i>"
 
     return local_report + "\n\n<b>AI-рекомендации для карточки:</b>\n" + html.escape(ai_text)
 

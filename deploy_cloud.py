@@ -1,12 +1,10 @@
-import os
 import json
+import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
-
 
 ROOT = Path(__file__).resolve().parent
 FUNCTION_NAME = "wb-parser-function"

@@ -9,6 +9,7 @@ import json
 import os
 import random
 import re
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -456,8 +457,26 @@ class OzonUpdater:
             await page.screenshot(path=str(base) + ".png", full_page=True)
             html = await page.content()
             (Path(str(base) + ".html")).write_text(html, encoding="utf-8")
+            debug_dir = base.parent
+            shutil.copy2(str(base) + ".png", debug_dir / "last_incident.png")
+            shutil.copy2(str(base) + ".html", debug_dir / "last_incident.html")
+            self._rotate_debug_dumps(debug_dir)
         except Exception:
             logger.debug("Non-critical operation failed", exc_info=True)
+
+    @staticmethod
+    def _rotate_debug_dumps(debug_dir: Path, keep: int = 50) -> None:
+        dump_stems = sorted(
+            {
+                path.stem
+                for path in debug_dir.iterdir()
+                if path.suffix in {".png", ".html"}
+                and re.match(r"^\d{8}_\d{6}_", path.stem)
+            }
+        )
+        for stem in dump_stems[:-keep]:
+            (debug_dir / f"{stem}.png").unlink(missing_ok=True)
+            (debug_dir / f"{stem}.html").unlink(missing_ok=True)
 
     async def __aenter__(self):
         from playwright.async_api import async_playwright
@@ -1065,15 +1084,15 @@ class OzonUpdater:
 
         for i, product in enumerate(products, 1):
             logger.info(f"[{i}/{len(products)}] {product.name}")
+            failure = None
             try:
                 data = await self.process_url(product.url, product_id=product.id)
             except Exception as e:
-                # A single product's browser/session failure (e.g. Playwright
-                # crashed) must not abort the rest of the batch -- fall back
-                # to the existing "no data" handling below instead of
-                # letting the exception propagate out of update_all() and
-                # silently drop every remaining product in this run.
+                # A local browser/session failure is not evidence that the
+                # marketplace blocked this product. Keep the batch running,
+                # but do not write a misleading blocked PriceHistory row.
                 logger.error(f"update_all: ошибка на {product.url}: {e}")
+                failure = e
                 data = None
 
             if data:
@@ -1089,6 +1108,15 @@ class OzonUpdater:
                 if callback:
                     icon = "✅" if data["availability"] == "in_stock" else "❌"
                     await callback(f"{icon} {data['name'][:50]}: {data['price']} ₽")
+            elif failure is not None:
+                logger.warning(
+                    f"Не удалось обновить {product.url}: {type(failure).__name__}"
+                )
+                if callback:
+                    await callback(
+                        f"⚠️ Ошибка при обновлении {product.name[:50]}: "
+                        f"{type(failure).__name__}"
+                    )
             else:
                 last = await self.db.get_last_price(product.id)
                 if not last or last.availability_status != "blocked":

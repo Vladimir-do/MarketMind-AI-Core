@@ -13,7 +13,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from app.ai_client import ai_is_available, ask_ai
+from app.ai_client import AIClientError, ai_is_available, ask_ai
 from app.config import logger
 
 
@@ -201,21 +201,24 @@ async def build_enhanced_ozon_card_draft(
     apply_card_profile(draft, profile)
     _apply_competitor_context(draft, competitors)
     if not ai_is_available():
+        draft.ai_notes = "AI не применялся: проверьте AI_PROVIDER и ключ выбранного провайдера."
         _sanitize_supplement_draft(draft)
         return finalize_ozon_card_draft(draft)
 
-    response = await ask_ai(
-        _build_ai_card_prompt(draft, competitors, profile),
-        system=AI_CARD_SYSTEM_PROMPT,
-        max_tokens=3000,
-    )
-    if _is_ai_error(response):
+    try:
+        response = await ask_ai(
+            _build_ai_card_prompt(draft, competitors, profile),
+            system=AI_CARD_SYSTEM_PROMPT,
+            max_tokens=3000,
+        )
+    except AIClientError:
         draft.ai_notes = "AI-доработка недоступна, черновик собран локально с учетом конкурентов."
         _sanitize_supplement_draft(draft)
         return finalize_ozon_card_draft(draft)
     data = _extract_json_object(response)
-    if not data:
-        draft.ai_notes = _shorten(response, 1200)
+    if not data or not _has_usable_ai_card_data(data):
+        logger.warning("AI card response did not contain usable JSON fields")
+        draft.ai_notes = "AI вернул ответ без пригодных полей карточки; использован локальный черновик."
         _sanitize_supplement_draft(draft)
         return finalize_ozon_card_draft(draft)
 
@@ -561,11 +564,12 @@ def format_ozon_card_preview(draft: OzonCardDraft) -> str:
     )
     return (
         "<b>Черновик карточки Ozon готов</b>\n\n"
-        f"<b>Название:</b> {draft.name}\n"
-        f"<b>Категория:</b> {draft.category_hint or 'нужно уточнить'}\n"
-        f"<b>Артикул:</b> <code>{draft.offer_id}</code>\n"
+        f"<b>Название:</b> {html.escape(draft.name)}\n"
+        f"<b>Категория:</b> {html.escape(draft.category_hint or 'нужно уточнить')}\n"
+        f"<b>Артикул:</b> <code>{html.escape(draft.offer_id)}</code>\n"
         f"<b>Цена:</b> {draft.price or 'не указана'} ₽\n"
-        f"<b>Бренд:</b> {draft.brand}\n"
+        f"<b>Бренд:</b> {html.escape(draft.brand)}\n"
+        f"<b>AI:</b> {html.escape(draft.ai_notes or 'Статус не определён')}\n"
         f"<b>Оценка качества данных (готовность):</b> {quality.score}/100\n"
         f"<b>Характеристик:</b> {len(draft.attributes)}\n"
         f"<b>Фото:</b> {len(draft.images)}\n"
@@ -581,11 +585,11 @@ def format_ozon_batch_preview(items: list[OzonCardBatchItem]) -> str:
     problem_lines = []
     for idx, item in enumerate(items, 1):
         if item.status == "error":
-            problem_lines.append(f"{idx}. ошибка: {item.message[:80]}")
+            problem_lines.append(f"{idx}. ошибка: {html.escape(str(item.message)[:80])}")
             continue
         missing = _draft_missing_fields(item.draft)
         if missing:
-            name = item.draft.name[:60] if item.draft else item.source[:60]
+            name = html.escape(str(item.draft.name if item.draft else item.source)[:60])
             problem_lines.append(f"{idx}. {name}: {', '.join(missing)}")
 
     problems_text = "\n".join(problem_lines[:10]) if problem_lines else "критичных пропусков нет"
@@ -1271,11 +1275,23 @@ def _shorten(text: str, limit: int) -> str:
     return _clean(text)[:limit]
 
 
-def _is_ai_error(text: str) -> bool:
-    if not text:
+def _has_usable_ai_card_data(data: dict) -> bool:
+    """Return True only when the model supplied at least one actual card field."""
+    for key in ("name", "description", "category_hint"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return True
+    attributes = data.get("attributes")
+    if isinstance(attributes, dict) and any(
+        isinstance(name, str) and name.strip() and isinstance(item, str) and item.strip()
+        for name, item in attributes.items()
+    ):
         return True
-    low = text.lower()
-    return low.startswith("ai error:") or "ai недоступен" in low or "ai unavailable" in low
+    for key in ("keywords", "selling_points"):
+        value = data.get(key)
+        if isinstance(value, list) and any(isinstance(item, str) and item.strip() for item in value):
+            return True
+    return False
 
 
 def apply_card_profile(draft: OzonCardDraft, profile: dict | None) -> OzonCardDraft:

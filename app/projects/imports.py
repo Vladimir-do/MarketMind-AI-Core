@@ -494,7 +494,7 @@ def _parse_availability(value: str) -> str:
         "отсутствует",
     }:
         return "out_of_stock"
-    if normalized in {"deleted", "blocked", "unknown"}:
+    if normalized in {"deleted", "blocked", "unknown", "draft"}:
         return normalized
     parsed_stock = _parse_int(value)
     if parsed_stock is not None:

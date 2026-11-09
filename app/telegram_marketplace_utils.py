@@ -50,7 +50,7 @@ def _format_cross_marketplace_results(
             url = html.escape(product.url or "")
             price_str = f"{product.price} ₽" if product.price is not None else "цена не определена"
             availability = product.availability or "наличие не определено"
-            lines.append(f"{i}. <a href='{url}'>{name}</a>\n   💰 {price_str} · {html.escape(availability)}")
+            lines.append(f"{i}. <a href='{url}'>{name}</a>\n   💰 {html.escape(str(price_str))} · {html.escape(availability)}")
     lines.append("\n💡 Чтобы добавить товар в мониторинг, пришлите его ссылку.")
     return "\n".join(lines)
 

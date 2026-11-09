@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from app.parsers.yandex_market import parse_yandex_market_search_html, YandexMarketParser
+from app.parsers.yandex_market import YandexMarketParser, parse_yandex_market_search_html
 
 
 class YandexMarketSearchTests(unittest.TestCase):
