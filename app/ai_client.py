@@ -145,9 +145,7 @@ async def ask_ai(
         response = await _ask_grok(prompt, system=system, max_tokens=max_tokens)
     elif provider == "gemini":
         response = await _ask_gemini(prompt, system=system, max_tokens=max_tokens)
-    elif provider == "groq":
-        response = await _ask_groq(prompt, system=system, max_tokens=max_tokens)
-    elif GROQ_API_KEY:
+    elif provider == "groq" or GROQ_API_KEY:
         response = await _ask_groq(prompt, system=system, max_tokens=max_tokens)
     elif GROK_API_KEY:
         response = await _ask_grok(prompt, system=system, max_tokens=max_tokens)

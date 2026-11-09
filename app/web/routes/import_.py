@@ -9,10 +9,10 @@ from pathlib import Path
 from fastapi import APIRouter, File, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
+from app.config import IMPORT_MAX_FILE_BYTES
 from app.web.app import templates
 from app.web.image_urls import displayable_image_url
 from app.web.schemas import ImportResult
-from app.config import IMPORT_MAX_FILE_BYTES
 
 router = APIRouter()
 

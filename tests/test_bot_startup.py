@@ -8,8 +8,8 @@ from python_socks import ProxyConnectionError
 
 class BotStartupTests(unittest.TestCase):
     def test_start_bot_closes_ai_clients(self):
-        import app.bot as bot_module
         import app.ai_client as ai_client
+        import app.bot as bot_module
 
         close_clients = AsyncMock()
 

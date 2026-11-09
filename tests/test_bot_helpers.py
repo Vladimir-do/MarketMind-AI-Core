@@ -1,8 +1,8 @@
 import asyncio
 import time
 import unittest
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from app.bot import (

@@ -52,7 +52,11 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
         await ai_client.close_ai_clients()
 
     async def test_missing_grok_key_reports_configuration_error(self):
-        with patch.object(ai_client, "AI_PROVIDER", "grok"), patch.object(ai_client, "GROK_API_KEY", ""):
+        with (
+            patch.object(ai_client, "AI_ENABLED", True),
+            patch.object(ai_client, "AI_PROVIDER", "grok"),
+            patch.object(ai_client, "GROK_API_KEY", ""),
+        ):
             self.assertFalse(ai_client.ai_is_available())
             self.assertIn("GROK_API_KEY", ai_client.ai_missing_message())
 
@@ -67,6 +71,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ask_ai_routes_to_grok(self):
         with (
+            patch.object(ai_client, "AI_ENABLED", True),
             patch.object(ai_client, "AI_PROVIDER", "grok"),
             patch.object(ai_client, "GROK_API_KEY", "xai-test"),
             patch.object(ai_client, "_ask_grok", new=AsyncMock(return_value="ok")) as ask_grok,
@@ -77,6 +82,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ask_ai_routes_to_claude(self):
         with (
+            patch.object(ai_client, "AI_ENABLED", True),
             patch.object(ai_client, "AI_PROVIDER", "claude"),
             patch.object(ai_client, "ANTHROPIC_API_KEY", "sk-test"),
             patch.object(ai_client, "_ask_claude", new=AsyncMock(return_value="ok")) as ask_claude,
@@ -87,12 +93,13 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ask_ai_raises_typed_error_for_provider_failure(self):
         with (
+            patch.object(ai_client, "AI_ENABLED", True),
             patch.object(ai_client, "AI_PROVIDER", "grok"),
             patch.object(ai_client, "GROK_API_KEY", "xai-test"),
             patch.object(ai_client, "_ask_grok", new=AsyncMock(return_value="AI error: network failed")),
+            self.assertRaisesRegex(ai_client.AIClientError, "network failed"),
         ):
-            with self.assertRaisesRegex(ai_client.AIClientError, "network failed"):
-                await ai_client.ask_ai("hello")
+            await ai_client.ask_ai("hello")
 
     async def test_ask_claude_uses_configured_current_model(self):
         from types import SimpleNamespace

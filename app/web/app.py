@@ -52,9 +52,9 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        from app.ai_client import close_ai_clients
         from app.ai_recommendation.db_approval import DatabaseApprovalQueue
         from app.database import Database
-        from app.ai_client import close_ai_clients
 
         db = Database()
         await db.init()
