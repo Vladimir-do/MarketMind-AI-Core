@@ -207,6 +207,19 @@ class UniversalParser(BaseParser):
                 if price is not None:
                     break
 
+        # ── 5a. Цена в видимом тексте с явной меткой ───────────────────────
+        if price is None:
+            visible_text = soup.get_text(" ", strip=True)
+            price_match = re.search(
+                r"(?:цена|price)\\s*[:：]?\\s*([\\d\\s\\u00a0.,]+)",
+                visible_text,
+                flags=re.IGNORECASE,
+            )
+            if price_match:
+                parsed = _parse_int_price(price_match.group(1))
+                if parsed and 1 < parsed < 100_000_000:
+                    price = parsed
+
         # ── 6. itemprop / class эвристики для изображения ────────────────────
         if not image_url:
             for selector in (
