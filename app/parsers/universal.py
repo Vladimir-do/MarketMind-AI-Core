@@ -211,7 +211,7 @@ class UniversalParser(BaseParser):
         if price is None:
             visible_text = soup.get_text(" ", strip=True)
             price_match = re.search(
-                r"(?:цена|price)\\s*[:：]?\\s*([\\d\\s\\u00a0.,]+)",
+                r"(?:цена|price)\s*[:：]?\s*([\d\s\u00a0.,]+)",
                 visible_text,
                 flags=re.IGNORECASE,
             )
