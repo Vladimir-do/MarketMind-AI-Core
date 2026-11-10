@@ -1369,6 +1369,38 @@ class TelegramReadServiceHandlerTests(unittest.TestCase):
         self.assertIn("Broadcast Product", sent[0][1])
         self.assertIn("99", sent[0][1])
 
+    def test_broadcast_changes_marks_unknown_availability_as_unknown(self):
+        import app.bot as bot_module
+
+        fake_product = type("P", (), {"id": 1, "name": "Unknown Stock Product"})()
+        fake_price = type("PH", (), {"price": 99, "availability_status": "unknown"})()
+        sent = []
+
+        class FakeBot:
+            async def send_message(self, uid, text, **kwargs):
+                sent.append(text)
+
+        async def run():
+            with (
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_recent_price_changes",
+                    new=AsyncMock(return_value=[(fake_price, fake_product)]),
+                ),
+                patch.object(
+                    bot_module.telegram_read_service,
+                    "get_subscriber_ids",
+                    new=AsyncMock(return_value=[111]),
+                ),
+                patch.object(bot_module, "bot", FakeBot()),
+            ):
+                await bot_module._broadcast_changes()
+
+        asyncio.run(run())
+        self.assertEqual(len(sent), 1)
+        self.assertIn("❔", sent[0])
+        self.assertNotIn("❌", sent[0])
+
     def test_broadcast_changes_no_changes_does_not_query_subscribers_or_send(self):
         import app.bot as bot_module
 

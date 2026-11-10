@@ -101,13 +101,26 @@ def format_marketplace_health(items: Iterable[dict]) -> str:
     return "\n".join(lines)
 
 
+def availability_icon(status: str | None) -> str:
+    """Return a Telegram marker without treating unknown as out of stock."""
+    normalized = str(status or "unknown").strip().lower()
+    return {
+        "in_stock": "✅",
+        "out_of_stock": "❌",
+        "unknown": "❔",
+        "blocked": "⚠️",
+        "deleted": "🗑️",
+        "draft": "📝",
+    }.get(normalized, "❔")
+
+
 def format_product_list(products: Iterable, latest_by_product: dict) -> str:
     products = list(products)
     lines = [f"📦 <b>Отслеживается {len(products)} товаров:</b>\n"]
     for product in products:
         last = latest_by_product.get(product.id)
         price_str = f"{last.price} ₽" if last and last.price else "—"
-        icon = "✅" if last and last.availability_status == "in_stock" else "❌"
+        icon = availability_icon(last.availability_status if last else "unknown")
         lines.append(f"{icon} <a href='{html.escape(str(product.url), quote=True)}'>{html.escape(str(product.name or 'товар')[:50])}</a> — {html.escape(str(price_str))}")
     return "\n".join(lines)
 

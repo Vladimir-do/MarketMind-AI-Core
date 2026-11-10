@@ -23,7 +23,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from app.telegram_messages import format_product_list
+from app.telegram_messages import availability_icon, format_product_list
 
 
 class FakeUser:
@@ -142,6 +142,21 @@ class BotHtmlEscapingTests(unittest.TestCase):
         self.assertIn("Looks &lt;suspicious&gt; &amp; odd", combined)
         self.assertNotIn("Cable & Wire <5m>", combined)
         self.assertNotIn("Looks <suspicious> & odd", combined)
+
+    def test_availability_icon_distinguishes_unknown_from_out_of_stock(self):
+        self.assertEqual(availability_icon("in_stock"), "✅")
+        self.assertEqual(availability_icon("out_of_stock"), "❌")
+        self.assertEqual(availability_icon("unknown"), "❔")
+        self.assertEqual(availability_icon(None), "❔")
+
+    def test_format_product_list_does_not_mark_unknown_as_out_of_stock(self):
+        product = type("P", (), {"id": 1, "url": "https://example.com/a", "name": "Unknown stock"})()
+        price = type("PH", (), {"price": 150, "availability_status": "unknown"})()
+
+        result = format_product_list([product], {1: price})
+
+        self.assertIn("❔", result)
+        self.assertNotIn("❌", result)
 
     def test_format_product_list_escapes_product_name(self):
         product = type("P", (), {"id": 1, "url": "https://example.com/a", "name": "Tea & Coffee <Set>"})()

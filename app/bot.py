@@ -113,15 +113,16 @@ from app.telegram_marketplace_utils import (
     _marketplace_result_count,
 )
 from app.telegram_messages import (
-    command_limit as _message_command_limit,
-)
-from app.telegram_messages import (
+    availability_icon,
     format_blocked_patterns,
     format_marketplace_health,
     format_network_diagnostics,
     format_product_list,
     format_recent_scrape_attempts,
     format_status_message,
+)
+from app.telegram_messages import (
+    command_limit as _message_command_limit,
 )
 from app.telegram_read_service import TelegramReadService
 from app.telegram_runtime import run_telegram_polling, telegram_reconnect_delay
@@ -1238,7 +1239,7 @@ async def _broadcast_changes():
 
         lines = ["📊 <b>Изменения цен:</b>"]
         for ph, p in rows:
-            icon = "✅" if ph.availability_status == "in_stock" else "❌"
+            icon = availability_icon(ph.availability_status)
             lines.append(f"{icon} {p.name[:40]}: {ph.price} ₽")
 
         text = "\n".join(lines)
