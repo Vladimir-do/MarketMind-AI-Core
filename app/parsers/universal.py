@@ -300,10 +300,11 @@ def _parse_int_price(raw) -> int | None:
             elif dot >= 0 or comma >= 0:
                 separator = "." if dot >= 0 else ","
                 decimals = len(text) - text.rfind(separator) - 1
-                if decimals in (1, 2):
-                    text = text.replace(",", ".")
-                else:
-                    text = text.replace(".", "").replace(",", "")
+                text = (
+                    text.replace(",", ".")
+                    if decimals in (1, 2)
+                    else text.replace(".", "").replace(",", "")
+                )
 
             value = int(Decimal(text))
         if 1 <= value <= 100_000_000:
