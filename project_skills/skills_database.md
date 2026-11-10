@@ -366,7 +366,8 @@ async def handle_urls(message: types.Message, state: FSMContext):
 - Выходной результат: `ProductData` с ценой, скидкой, рейтингом, отзывами, брендом, image_url.
 - Пошаговый алгоритм: достать nm id; рассчитать basket host/path; попробовать candidates/endpoints; распарсить JSON; получить reviews/search fallback; собрать ProductData.
 - Правила качества: несколько endpoints; timeout; fallback search; корректная цена в рублях.
-- Типичные ошибки: неверный basket shard; price units в копейках; региональные отличия.
+- Типичные ошибки: неверный basket shard; price units в копейках; региональные отличия; предположение, что sizes[0] всегда содержит цену.
+- Price extraction note: обходить все элементы sizes до первой корректной положительной price.total; размер без цены не должен обнулять цену всей карточки. basic считать старой ценой только если она выше total. Для buyer price API использовать cards/v4/detail и поддерживать products как в корне, так и в legacy data.products; старые cards/v1, cards/v2 и cards/detail считать устаревшими, пока не подтверждена их доступность.
 - Антипаттерны: открывать WB браузером без нужды.
 - Production рекомендации: кешировать basket mapping, добавить регион/warehouse params.
 - Возможность переиспользования: WB catalog import, мониторинг скидок.

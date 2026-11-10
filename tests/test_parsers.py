@@ -14,6 +14,8 @@ from app.parsers.wildberries import (
     WildberriesParser,
     _build_wb_image_url,
     _extract_wb_id,
+    _extract_wb_products,
+    _extract_wbbasket_prices,
     _get_basket_host,
     _wbbasket_candidates,
 )
@@ -265,6 +267,41 @@ class ParserTests(unittest.TestCase):
         self.assertTrue(WildberriesParser.can_handle("https://www.wb.ru/catalog/311895731?targetUrl=XS"))
         self.assertFalse(WildberriesParser.can_handle("https://www.wildberries.ru/"))
         self.assertFalse(WildberriesParser.can_handle("https://www.wildberries.ru/catalog/"))
+
+    def test_wb_v4_products_top_level_response(self):
+        products = [{"id": 311895731, "name": "Headphones"}]
+        self.assertEqual(_extract_wb_products({"products": products}), products)
+
+    def test_wb_legacy_nested_products_response_remains_supported(self):
+        products = [{"id": 311895731, "name": "Headphones"}]
+        self.assertEqual(_extract_wb_products({"data": {"products": products}}), products)
+
+    def test_wb_products_rejects_malformed_payload(self):
+        self.assertEqual(_extract_wb_products(None), [])
+        self.assertEqual(_extract_wb_products({"products": "not-a-list"}), [])
+
+    def test_wbbasket_price_skips_sizes_without_price(self):
+        price, old_price = _extract_wbbasket_prices(
+            [
+                {"name": "size without price"},
+                {"price": None},
+                {"price": {"total": 0, "basic": 10000}},
+                {"price": {"total": 129900, "basic": 199900}},
+            ]
+        )
+
+        self.assertEqual(price, 1299)
+        self.assertEqual(old_price, 1999)
+
+    def test_wbbasket_price_handles_malformed_sizes_and_equal_old_price(self):
+        self.assertEqual(
+            _extract_wbbasket_prices([None, "invalid", {"price": []}]),
+            (None, None),
+        )
+        self.assertEqual(
+            _extract_wbbasket_prices([{"price": {"total": 129900, "basic": 129900}}]),
+            (1299, None),
+        )
 
     def test_wildberries_parse_product(self):
         raw = {

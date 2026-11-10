@@ -106,6 +106,42 @@ def _wbbasket_candidates(nm_id: int) -> list[str]:
     return [primary] + [b for b in fallback if b != primary]
 
 
+def _extract_wbbasket_prices(sizes: object) -> tuple[int | None, int | None]:
+    """Возвращает первую доступную цену WB card.json в рублях."""
+    if not isinstance(sizes, list):
+        return None, None
+
+    for size in sizes:
+        if not isinstance(size, dict):
+            continue
+        price_data = size.get("price")
+        if not isinstance(price_data, dict):
+            continue
+
+        total = price_data.get("total")
+        if isinstance(total, bool) or not isinstance(total, (int, float)) or total <= 0:
+            continue
+
+        price = int(total) // 100
+        if price <= 0:
+            continue
+
+        basic = price_data.get("basic")
+        old_price = None
+        if (
+            not isinstance(basic, bool)
+            and isinstance(basic, (int, float))
+            and basic > 0
+        ):
+            candidate = int(basic) // 100
+            if candidate > price:
+                old_price = candidate
+
+        return price, old_price
+
+    return None, None
+
+
 def _wb_path_parts(nm_id: int) -> tuple[int, int]:
     return nm_id // 100000, nm_id // 1000
 
@@ -134,10 +170,21 @@ def _build_wb_headers() -> dict[str, str]:
 
 # Несколько версий API — пробуем по очереди
 API_URLS = [
-    "https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&nm={nm_id}",
-    "https://card.wb.ru/cards/detail?appType=1&curr=rub&dest=-1257786&nm={nm_id}",
-    "https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&dest=-1257786&nm={nm_id}",
+    "https://card.wb.ru/cards/v4/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm={nm_id}",
 ]
+
+
+def _extract_wb_products(payload: object) -> list[dict]:
+    """Поддерживает оба формата WB: старый data.products и новый products."""
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data")
+    products = data.get("products") if isinstance(data, dict) else None
+    if not products:
+        products = payload.get("products")
+    if not isinstance(products, list):
+        return []
+    return [product for product in products if isinstance(product, dict)]
 WB_WARMUP_SEARCH_URL = (
     "https://search.wb.ru/exactmatch/ru/common/v4/search"
     "?appType=1&curr=rub&dest=-1257786&query=test&resultset=catalog&sort=popular"
@@ -265,7 +312,7 @@ class WildberriesParser(BaseParser):
                             )
                             continue
 
-                        products = data.get("data", {}).get("products", [])
+                        products = _extract_wb_products(data)
                         if not products:
                             reason = f"api not_found: {api_url}"
                             failure_reasons.append(reason)
@@ -386,7 +433,7 @@ class WildberriesParser(BaseParser):
                 marketplace="wildberries",
             )
 
-        products = payload.get("data", {}).get("products") or payload.get("products") or []
+        products = _extract_wb_products(payload)
         if not products:
             return None
         return self._parse_product(products[0], url, nm_id, None)
@@ -451,7 +498,7 @@ class WildberriesParser(BaseParser):
     ) -> ProductData | None:
         """Запасной вариант — ищем товар через поисковый API WB."""
         try:
-            search_url = f"https://search.wb.ru/exactmatch/ru/common/v5/search?appType=1&curr=rub&dest=-1257786&query={nm_id}&resultset=catalog&sort=popular"
+            search_url = f"https://search.wb.ru/exactmatch/ru/common/v9/search?appType=1&curr=rub&dest=-1257786&spp=30&lang=ru&page=1&query={nm_id}&resultset=catalog&sort=popular"
             request_proxy = proxy
             if proxy and proxy.startswith(("socks5://", "socks4://", "socks5h://")):
                 request_proxy = None
@@ -473,7 +520,7 @@ class WildberriesParser(BaseParser):
                     )
                     return None
                 data = await resp.json(content_type=None)
-                products = data.get("data", {}).get("products", [])
+                products = _extract_wb_products(data)
                 if not products:
                     await self._record_attempt(
                         url=url,
@@ -596,19 +643,7 @@ class WildberriesParser(BaseParser):
                 )
                 continue
 
-            price = None
-            old_price = None
-            sizes = data.get("sizes") or []
-            if sizes:
-                p = sizes[0].get("price") or {}
-                total = p.get("total")
-                if isinstance(total, (int, float)):
-                    price = int(total) // 100
-                basic = p.get("basic")
-                if isinstance(basic, (int, float)):
-                    old_price = int(basic) // 100
-                    if price and old_price == price:
-                        old_price = None
+            price, old_price = _extract_wbbasket_prices(data.get("sizes"))
 
             availability = "in_stock" if (data.get("sale") is not None or price is not None) else "out_of_stock"
             discount_pct = None

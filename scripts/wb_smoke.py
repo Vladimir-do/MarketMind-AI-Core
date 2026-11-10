@@ -1,98 +1,78 @@
+"""Ручная диагностика доступности card.json Wildberries."""
+
+import argparse
 import asyncio
 import sys
+from pathlib import Path
 
 import aiohttp
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+stdout_reconfigure = getattr(sys.stdout, "reconfigure", None)
+if callable(stdout_reconfigure):
+    stdout_reconfigure(encoding="utf-8", errors="backslashreplace")
 
 
-async def smoke_wb_card_json() -> bool:
-    item_id = "311895731"
+async def smoke_wb_card_json(item_id: int = 311895731) -> bool:
+    """Проверяет card.json по тем же корзинам и путям, что и основной парсер."""
+    from app.parsers.wildberries import (
+        _build_wb_headers,
+        _extract_wb_id,
+        _extract_wbbasket_prices,
+        _wb_path_parts,
+        _wbbasket_candidates,
+    )
 
-    # Расширенный список корзин на 2026 год
-    # WB добавил много новых диапазонов
-    def get_basket_extended(mid):
-        mid = int(mid)
-        if 0 <= mid <= 143999:
-            return "01"
-        if 144000 <= mid <= 287999:
-            return "02"
-        if 288000 <= mid <= 431999:
-            return "03"
-        if 432000 <= mid <= 719999:
-            return "04"
-        if 720000 <= mid <= 1007999:
-            return "05"
-        if 1008000 <= mid <= 1061999:
-            return "06"
-        if 1062000 <= mid <= 1115999:
-            return "07"
-        if 1116000 <= mid <= 1169999:
-            return "08"
-        if 1170000 <= mid <= 1313999:
-            return "09"
-        if 1314000 <= mid <= 1601999:
-            return "10"
-        if 1602000 <= mid <= 1655999:
-            return "11"
-        if 1656000 <= mid <= 1919999:
-            return "12"
-        if 1920000 <= mid <= 2045999:
-            return "13"
-        if 2046000 <= mid <= 2189999:
-            return "14"
-        if 2190000 <= mid <= 2405999:
-            return "15"
-        if 2406000 <= mid <= 2621999:
-            return "16"
-        if 2622000 <= mid <= 2873999:
-            return "17"
-        if 2874000 <= mid <= 3125999:
-            return "18"
-        return "19"  # и так далее
+    nm_id = _extract_wb_id(str(item_id))
+    if nm_id is None:
+        raise ValueError("Артикул WB должен содержать от 6 до 12 цифр")
 
-    # Пробуем вычислить корзину для твоего ID
-    short_id = int(item_id) // 100
-    basket = get_basket_extended(short_id)
-    vol = int(item_id) // 100000
-    part = int(item_id) // 1000
-    baskets = list(dict.fromkeys([basket, "17", "18", "19", "20", "21"]))
+    vol, part = _wb_path_parts(nm_id)
+    baskets = _wbbasket_candidates(nm_id)
 
-    async with aiohttp.ClientSession() as session:
-        print(f"--- Тестируем товар {item_id} ---")
-        # Сначала пробуем расчетную корзину
-        # А потом еще пару соседних на всякий случай
-        for b in baskets:
-            url = f"https://basket-{b}.wbbasket.ru/vol{vol}/part{part}/{item_id}/info/ru/card.json"
-            print(f"Пробую: {url}")
+    async with aiohttp.ClientSession(headers=_build_wb_headers()) as session:
+        print(f"--- Проверка товара WB {nm_id} ---")
+        print(f"Корзина по алгоритму парсера: {baskets[0]}; кандидатов: {len(baskets)}")
+
+        for basket in baskets:
+            url = f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{nm_id}/info/ru/card.json"
+            print(f"Пробую корзину {basket}: {url}")
             try:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                }
-                async with session.get(url, headers=headers, timeout=5) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        print(f"\nOK! Сработала корзина {b}")
-                        print(f"Название: {data.get('imt_name')}")
-                        sizes = data.get("sizes") or []
-                        price = None
-                        if sizes:
-                            total = (sizes[0].get("price") or {}).get("total")
-                            if total:
-                                price = total / 100
-                        print(f"Цена: {price if price is not None else 'нет в card.json'} руб.")
-                        return True
-                    else:
-                        print(f"FAIL {b}: Код {resp.status}")
-            except Exception as e:
-                print(f"WARN Ошибка на {b}: {e}")
-    print("FAIL: карточка не найдена ни в одной из проверенных корзин.")
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status != 200:
+                        print(f"  HTTP {resp.status}")
+                        continue
+                    data = await resp.json(content_type=None)
+            except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
+                print(f"  Ошибка: {type(exc).__name__}: {exc}")
+                continue
+
+            if not isinstance(data, dict) or not (data.get("imt_name") or "").strip():
+                print("  HTTP 200, но карточка не содержит названия товара")
+                continue
+
+            print(f"\nOK! Найдена карточка в корзине {basket}")
+            print(f"Название: {data['imt_name']}")
+            price, _old_price = _extract_wbbasket_prices(data.get("sizes"))
+            print(f"Цена: {price if price is not None else 'нет в card.json'} руб.")
+            return True
+
+    print("FAIL: карточка не найдена ни в одной корзине из списка основного парсера.")
     return False
 
 
-def main() -> int:
-    return 0 if asyncio.run(smoke_wb_card_json()) else 1
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Проверка card.json Wildberries")
+    parser.add_argument("item_id", nargs="?", default="311895731", help="Артикул WB (6–12 цифр)")
+    args = parser.parse_args(argv)
+    try:
+        return 0 if asyncio.run(smoke_wb_card_json(int(args.item_id))) else 1
+    except ValueError as exc:
+        parser.error(str(exc))
+    return 2
 
 
 if __name__ == "__main__":
