@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import ssl
 import time
 from typing import Any
@@ -21,6 +22,20 @@ from app.ai_recommendation.provider import AIResponse
 from app.ai_recommendation.providers.base import BaseAIProvider
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_ai_proxy() -> str | None:
+    configured_proxy = os.environ.get("AI_HTTP_PROXY", "").strip()
+    if configured_proxy:
+        if configured_proxy.lower() in {"direct", "none", "off"}:
+            return None
+        return configured_proxy
+    for key in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+        value = os.environ.get(key, "").strip()
+        if value and value.lower() not in {"direct", "none", "off"}:
+            return value
+    return None
+
 
 _DEFAULT_BASE_URLS: dict[str, str] = {
     "openai": "https://api.openai.com/v1",
@@ -86,13 +101,20 @@ class OpenAICompatibleProvider(BaseAIProvider):
         start = time.monotonic()
         logger.info(
             "AI request provider=%s model=%s url=%s timeout_s=%s stage=request_started",
-            self.name(), self._model, url, self._timeout,
+            self.name(),
+            self._model,
+            url,
+            self._timeout,
         )
         try:
             timeout_obj = aiohttp.ClientTimeout(total=self._timeout, connect=min(self._timeout, 20.0))
+            # aiohttp does not read proxy environment variables by default.
+            # MarketMind runs behind HAPP on this host, so route provider
+            # requests through the explicitly configured AI proxy.
+            proxy_url = _resolve_ai_proxy()
             async with (
                 aiohttp.ClientSession(timeout=timeout_obj) as session,
-                session.post(url, json=payload, headers=headers) as resp,
+                session.post(url, json=payload, headers=headers, proxy=proxy_url) as resp,
             ):
                 try:
                     body = await resp.json(content_type=None)
@@ -121,7 +143,12 @@ class OpenAICompatibleProvider(BaseAIProvider):
                 )
                 logger.info(
                     "AI response provider=%s model=%s status=%s latency_ms=%s input_tokens=%s output_tokens=%s stage=response_received",
-                    self.name(), result.model, resp.status, result.latency_ms, result.input_tokens, result.output_tokens,
+                    self.name(),
+                    result.model,
+                    resp.status,
+                    result.latency_ms,
+                    result.input_tokens,
+                    result.output_tokens,
                 )
                 return result
         except ProviderHTTPError as exc:

@@ -33,10 +33,12 @@ class SkillManifestTests(unittest.TestCase):
         self.assertEqual(graph.get("scraping.generic").status, "missing")
 
     def test_graph_resolves_dependencies_before_skill(self):
-        graph = SkillGraph([
-            SkillManifest("html.fetch", "HTML Fetch", "scraping", status="available"),
-            SkillManifest("html.parse", "HTML Parse", "scraping", status="available", requires=("html.fetch",)),
-        ])
+        graph = SkillGraph(
+            [
+                SkillManifest("html.fetch", "HTML Fetch", "scraping", status="available"),
+                SkillManifest("html.parse", "HTML Parse", "scraping", status="available", requires=("html.fetch",)),
+            ]
+        )
 
         resolution = graph.resolve(["html.parse"])
 
@@ -44,23 +46,25 @@ class SkillManifestTests(unittest.TestCase):
         self.assertEqual([step.manifest.skill_id for step in resolution.steps], ["html.fetch", "html.parse"])
 
     def test_graph_selects_best_available_fallback(self):
-        graph = SkillGraph([
-            SkillManifest("primary", "Primary", "test", status="missing", fallback_to=("slow", "stable")),
-            SkillManifest(
-                "slow",
-                "Slow",
-                "test",
-                status="available",
-                quality=SkillQuality(reliability=0.5, speed=0.9, reuse=0.5, complexity=0.2),
-            ),
-            SkillManifest(
-                "stable",
-                "Stable",
-                "test",
-                status="available",
-                quality=SkillQuality(reliability=0.95, speed=0.5, reuse=0.8, complexity=0.3),
-            ),
-        ])
+        graph = SkillGraph(
+            [
+                SkillManifest("primary", "Primary", "test", status="missing", fallback_to=("slow", "stable")),
+                SkillManifest(
+                    "slow",
+                    "Slow",
+                    "test",
+                    status="available",
+                    quality=SkillQuality(reliability=0.5, speed=0.9, reuse=0.5, complexity=0.2),
+                ),
+                SkillManifest(
+                    "stable",
+                    "Stable",
+                    "test",
+                    status="available",
+                    quality=SkillQuality(reliability=0.95, speed=0.5, reuse=0.8, complexity=0.3),
+                ),
+            ]
+        )
 
         resolution = graph.resolve(["primary"])
 
@@ -69,23 +73,26 @@ class SkillManifestTests(unittest.TestCase):
         self.assertEqual(resolution.steps[0].selected_for, "primary")
 
     def test_scoring_policy_changes_fallback_choice(self):
-        graph = SkillGraph([
-            SkillManifest("primary", "Primary", "test", status="missing", fallback_to=("fast", "stable")),
-            SkillManifest(
-                "fast",
-                "Fast",
-                "test",
-                status="available",
-                quality=SkillQuality(reliability=0.55, speed=0.98, reuse=0.5, complexity=0.2, risk=0.45),
-            ),
-            SkillManifest(
-                "stable",
-                "Stable",
-                "test",
-                status="available",
-                quality=SkillQuality(reliability=0.95, speed=0.45, reuse=0.8, complexity=0.3, risk=0.08),
-            ),
-        ], scoring_policy=ScoringPolicy.FAST)
+        graph = SkillGraph(
+            [
+                SkillManifest("primary", "Primary", "test", status="missing", fallback_to=("fast", "stable")),
+                SkillManifest(
+                    "fast",
+                    "Fast",
+                    "test",
+                    status="available",
+                    quality=SkillQuality(reliability=0.55, speed=0.98, reuse=0.5, complexity=0.2, risk=0.45),
+                ),
+                SkillManifest(
+                    "stable",
+                    "Stable",
+                    "test",
+                    status="available",
+                    quality=SkillQuality(reliability=0.95, speed=0.45, reuse=0.8, complexity=0.3, risk=0.08),
+                ),
+            ],
+            scoring_policy=ScoringPolicy.FAST,
+        )
 
         self.assertEqual(graph.resolve(["primary"]).steps[0].manifest.skill_id, "fast")
 

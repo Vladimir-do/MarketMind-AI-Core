@@ -50,7 +50,9 @@ def validate_card_payload(payload: dict[str, Any]) -> ValidationResult:
         issues.append(ValidationIssue("image_urls", "Нельзя указать больше 50 изображений"))
     for url in image_urls:
         if not str(url).startswith(("http://", "https://")):
-            issues.append(ValidationIssue("image_urls", "Ссылки на изображения должны начинаться с http:// или https://"))
+            issues.append(
+                ValidationIssue("image_urls", "Ссылки на изображения должны начинаться с http:// или https://")
+            )
             break
 
     attributes = data.get("attributes") or {}

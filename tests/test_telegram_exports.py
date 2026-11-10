@@ -25,7 +25,9 @@ class TelegramExportTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_html_report_sends_html_document(self):
         bot = AsyncMock()
-        with patch("app.reporter.export_html_report", AsyncMock(return_value=io.BytesIO(b"<html></html>"))) as export_report:
+        with patch(
+            "app.reporter.export_html_report", AsyncMock(return_value=io.BytesIO(b"<html></html>"))
+        ) as export_report:
             await send_html_report(bot, object(), 456)
 
         export_report.assert_awaited_once()

@@ -112,13 +112,16 @@ def audit_unified_product_seo(
     findings.extend(_check_snapshot_title(product.name or "", rules=rules))
     findings.extend(_check_snapshot_description(product.description or "", rules=rules))
     findings.extend(_check_snapshot_keywords(product.tags, product.name or "", competitor_terms, rules=rules))
-    findings.extend(_check_snapshot_depth(
-        category=product.category,
-        attributes=dict(product.attributes) if product.attributes else {},
-        image_count=len(product.image_urls) if product.image_urls else 0,
-        rules=rules,
-    ))
+    findings.extend(
+        _check_snapshot_depth(
+            category=product.category,
+            attributes=dict(product.attributes) if product.attributes else {},
+            image_count=len(product.image_urls) if product.image_urls else 0,
+            rules=rules,
+        )
+    )
     from app.semantic_core import build_semantic_core, semantic_coverage_findings
+
     semantic = build_semantic_core(
         name=product.name,
         description=product.description,
@@ -162,13 +165,26 @@ def _check_snapshot_title(title: str, *, rules: SEOMarketplaceRule | None = None
     if len(title) < rules.title_min:
         findings.append(SEOFinding("seo_title_short", "name", "warning", "Название слишком короткое для SEO-карточки."))
     if len(title) > rules.title_max:
-        findings.append(SEOFinding("seo_title_long", "name", "critical", f"Название превышает лимит {rules.title_max} символов."))
+        findings.append(
+            SEOFinding("seo_title_long", "name", "critical", f"Название превышает лимит {rules.title_max} символов.")
+        )
     title_tokens = _tokens(title)
     if not title_tokens or title_tokens[0] in GENERIC_PRODUCT_TYPES:
-        findings.append(SEOFinding("seo_title_product_type", "name", "warning", "Название должно начинаться с понятного типа товара."))
+        findings.append(
+            SEOFinding(
+                "seo_title_product_type", "name", "warning", "Название должно начинаться с понятного типа товара."
+            )
+        )
     bad_words = sorted(set(title_tokens) & rules.forbidden_words)
     if bad_words:
-        findings.append(SEOFinding("seo_title_forbidden_words", "name", "warning", f"В названии есть рискованные слова: {', '.join(bad_words)}."))
+        findings.append(
+            SEOFinding(
+                "seo_title_forbidden_words",
+                "name",
+                "warning",
+                f"В названии есть рискованные слова: {', '.join(bad_words)}.",
+            )
+        )
     return findings
 
 
@@ -181,27 +197,55 @@ def _check_snapshot_description(description: str, *, rules: SEOMarketplaceRule |
         rules = get_marketplace_rules("universal")
     findings: list[SEOFinding] = []
     if len(description) < rules.description_min:
-        findings.append(SEOFinding("seo_description_short", "description", "warning", "Описание недостаточно раскрывает товар и сценарии использования."))
+        findings.append(
+            SEOFinding(
+                "seo_description_short",
+                "description",
+                "warning",
+                "Описание недостаточно раскрывает товар и сценарии использования.",
+            )
+        )
     if "Преимущества:" not in description:
-        findings.append(SEOFinding("seo_description_benefits", "description", "info", "В описании нет отдельного блока преимуществ."))
+        findings.append(
+            SEOFinding(
+                "seo_description_benefits", "description", "info", "В описании нет отдельного блока преимуществ."
+            )
+        )
     bad_words = sorted(set(_tokens(description)) & rules.forbidden_words)
     if bad_words:
-        findings.append(SEOFinding("seo_description_forbidden_words", "description", "warning", f"В описании есть рискованные слова: {', '.join(bad_words)}."))
+        findings.append(
+            SEOFinding(
+                "seo_description_forbidden_words",
+                "description",
+                "warning",
+                f"В описании есть рискованные слова: {', '.join(bad_words)}.",
+            )
+        )
     return findings
 
 
-def _check_keywords(draft: OzonCardDraft, competitor_terms: list[str], *, rules: SEOMarketplaceRule | None = None) -> list[SEOFinding]:
+def _check_keywords(
+    draft: OzonCardDraft, competitor_terms: list[str], *, rules: SEOMarketplaceRule | None = None
+) -> list[SEOFinding]:
     return _check_snapshot_keywords(draft.keywords, draft.name or "", competitor_terms, rules=rules)
 
 
-def _check_snapshot_keywords(keywords_raw: list[str] | None, title: str, competitor_terms: list[str], *, rules: SEOMarketplaceRule | None = None) -> list[SEOFinding]:
+def _check_snapshot_keywords(
+    keywords_raw: list[str] | None, title: str, competitor_terms: list[str], *, rules: SEOMarketplaceRule | None = None
+) -> list[SEOFinding]:
     if rules is None:
         rules = get_marketplace_rules("universal")
     keywords = _normalize_terms(keywords_raw or [])
     findings: list[SEOFinding] = []
     if len(keywords) < rules.min_keywords:
-        findings.append(SEOFinding("seo_keywords_few", "keywords", "warning", "Слишком мало SEO-ключей для проверки полноты карточки."))
-    missing_competitor_terms = [term for term in competitor_terms if term not in keywords and term not in _tokens(title)]
+        findings.append(
+            SEOFinding(
+                "seo_keywords_few", "keywords", "warning", "Слишком мало SEO-ключей для проверки полноты карточки."
+            )
+        )
+    missing_competitor_terms = [
+        term for term in competitor_terms if term not in keywords and term not in _tokens(title)
+    ]
     if missing_competitor_terms:
         findings.append(
             SEOFinding(
@@ -236,13 +280,26 @@ def _check_snapshot_depth(
         rules = get_marketplace_rules("universal")
     findings: list[SEOFinding] = []
     if not category:
-        findings.append(SEOFinding("seo_category_missing", "category_hint", "warning", "Не указана категория карточки."))
+        findings.append(
+            SEOFinding("seo_category_missing", "category_hint", "warning", "Не указана категория карточки.")
+        )
     if len(attributes) < rules.min_attributes:
-        findings.append(SEOFinding("seo_attributes_few", "attributes", "warning", "Недостаточно характеристик для SEO и фильтров маркетплейса."))
+        findings.append(
+            SEOFinding(
+                "seo_attributes_few",
+                "attributes",
+                "warning",
+                "Недостаточно характеристик для SEO и фильтров маркетплейса.",
+            )
+        )
     if image_count < rules.min_images:
         findings.append(SEOFinding("seo_images_few", "images", "info", "Для карточки желательно 3+ изображения."))
     if selling_point_count is not None and selling_point_count < 3:
-        findings.append(SEOFinding("seo_selling_points_few", "selling_points", "info", "Добавьте 3-4 конкретных преимущества товара."))
+        findings.append(
+            SEOFinding(
+                "seo_selling_points_few", "selling_points", "info", "Добавьте 3-4 конкретных преимущества товара."
+            )
+        )
     return findings
 
 
@@ -297,11 +354,7 @@ def _recommend(findings: list[SEOFinding]) -> list[SEORecommendation]:
 
 
 def _tokens(text: str) -> list[str]:
-    return [
-        token
-        for token in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", (text or "").lower())
-        if not token.isdigit()
-    ]
+    return [token for token in re.findall(r"[A-Za-zА-Яа-яЁё0-9+]{3,}", (text or "").lower()) if not token.isdigit()]
 
 
 def _normalize_terms(terms: list[str]) -> list[str]:

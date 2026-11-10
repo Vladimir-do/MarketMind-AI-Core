@@ -25,4 +25,3 @@ class ProductSnapshot(BaseModel):
     image_url: HttpUrl | None = None
 
     raw: dict[str, Any] | None = None
-

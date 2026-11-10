@@ -31,18 +31,12 @@ async def dashboard_stats(request: Request):
     for p in products:
         counter[_detect_marketplace(p.url)] += 1
 
-    marketplace_stats = [
-        MarketplaceStats(marketplace=m, count=c)
-        for m, c in counter.most_common()
-    ]
+    marketplace_stats = [MarketplaceStats(marketplace=m, count=c) for m, c in counter.most_common()]
 
     attempts = await db.get_recent_scrape_attempts(limit=1000)
     blocks = await db.get_recent_blocked_patterns(limit=1000)
     mp_counter: Counter[str] = Counter(a.marketplace for a in attempts)
-    health_markets = [
-        MarketplaceStats(marketplace=m, count=c)
-        for m, c in mp_counter.most_common()
-    ]
+    health_markets = [MarketplaceStats(marketplace=m, count=c) for m, c in mp_counter.most_common()]
 
     return DashboardStats(
         total_products=len(products),

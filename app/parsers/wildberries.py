@@ -2,6 +2,7 @@
 wildberries.py — парсер Wildberries через API.
 Поддерживает несколько версий API с автофоллбэком.
 """
+
 import asyncio
 import re
 from collections.abc import Awaitable, Callable
@@ -105,6 +106,42 @@ def _wbbasket_candidates(nm_id: int) -> list[str]:
     return [primary] + [b for b in fallback if b != primary]
 
 
+def _extract_wbbasket_prices(sizes: object) -> tuple[int | None, int | None]:
+    """Возвращает первую доступную цену WB card.json в рублях."""
+    if not isinstance(sizes, list):
+        return None, None
+
+    for size in sizes:
+        if not isinstance(size, dict):
+            continue
+        price_data = size.get("price")
+        if not isinstance(price_data, dict):
+            continue
+
+        total = price_data.get("total")
+        if isinstance(total, bool) or not isinstance(total, (int, float)) or total <= 0:
+            continue
+
+        price = int(total) // 100
+        if price <= 0:
+            continue
+
+        basic = price_data.get("basic")
+        old_price = None
+        if (
+            not isinstance(basic, bool)
+            and isinstance(basic, (int, float))
+            and basic > 0
+        ):
+            candidate = int(basic) // 100
+            if candidate > price:
+                old_price = candidate
+
+        return price, old_price
+
+    return None, None
+
+
 def _wb_path_parts(nm_id: int) -> tuple[int, int]:
     return nm_id // 100000, nm_id // 1000
 
@@ -122,20 +159,32 @@ def _build_wb_headers() -> dict[str, str]:
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
         "Origin": "https://www.wildberries.ru",
         "Referer": "https://www.wildberries.ru/",
-        "Sec-Ch-Ua": "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Google Chrome\";v=\"122\"",
+        "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
         "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": "\"Windows\"",
+        "Sec-Ch-Ua-Platform": '"Windows"',
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "cross-site",
     }
 
+
 # Несколько версий API — пробуем по очереди
 API_URLS = [
-    "https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&nm={nm_id}",
-    "https://card.wb.ru/cards/detail?appType=1&curr=rub&dest=-1257786&nm={nm_id}",
-    "https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&dest=-1257786&nm={nm_id}",
+    "https://card.wb.ru/cards/v4/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm={nm_id}",
 ]
+
+
+def _extract_wb_products(payload: object) -> list[dict]:
+    """Поддерживает оба формата WB: старый data.products и новый products."""
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data")
+    products = data.get("products") if isinstance(data, dict) else None
+    if not products:
+        products = payload.get("products")
+    if not isinstance(products, list):
+        return []
+    return [product for product in products if isinstance(product, dict)]
 WB_WARMUP_SEARCH_URL = (
     "https://search.wb.ru/exactmatch/ru/common/v4/search"
     "?appType=1&curr=rub&dest=-1257786&query=test&resultset=catalog&sort=popular"
@@ -263,7 +312,7 @@ class WildberriesParser(BaseParser):
                             )
                             continue
 
-                        products = data.get("data", {}).get("products", [])
+                        products = _extract_wb_products(data)
                         if not products:
                             reason = f"api not_found: {api_url}"
                             failure_reasons.append(reason)
@@ -326,11 +375,14 @@ class WildberriesParser(BaseParser):
     async def _fetch_via_cloud_function(self, url: str, nm_id: int) -> ProductData | None:
         t0 = perf_counter()
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                WB_CLOUD_FUNCTION_URL,
-                json={"product_id": nm_id},
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    WB_CLOUD_FUNCTION_URL,
+                    json={"product_id": nm_id},
+                    timeout=aiohttp.ClientTimeout(total=20),
+                ) as resp,
+            ):
                 latency_ms = int((perf_counter() - t0) * 1000)
                 if resp.status != 200:
                     await self._record_attempt(
@@ -370,17 +422,18 @@ class WildberriesParser(BaseParser):
                 price=payload.get("price"),
                 old_price=payload.get("old_price"),
                 discount_pct=payload.get("discount_pct"),
-                availability=payload.get("availability", "out_of_stock"),
+                availability=payload.get("availability") or "unknown",
                 url=url,
                 image_url=payload.get("image_url"),
                 rating=payload.get("rating"),
                 reviews_count=payload.get("reviews_count"),
                 seller_name=payload.get("seller_name"),
+                seller_rating=payload.get("seller_rating"),
                 brand=payload.get("brand"),
                 marketplace="wildberries",
             )
 
-        products = payload.get("data", {}).get("products") or payload.get("products") or []
+        products = _extract_wb_products(payload)
         if not products:
             return None
         return self._parse_product(products[0], url, nm_id, None)
@@ -403,12 +456,15 @@ class WildberriesParser(BaseParser):
         if price and old_price and old_price > price:
             discount_pct = round((old_price - price) / old_price * 100)
 
+        has_stock_rows = any(bool(size.get("stocks")) for size in sizes if isinstance(size, dict))
         in_stock = any(
             stock.get("qty", 0) > 0
             for size in sizes
-            for stock in size.get("stocks", [])
+            if isinstance(size, dict)
+            for stock in (size.get("stocks") or [])
+            if isinstance(stock, dict)
         )
-        availability = "in_stock" if in_stock else "out_of_stock"
+        availability = "unknown" if not has_stock_rows else ("in_stock" if in_stock else "out_of_stock")
 
         image_url = _build_wb_image_url(nm_id)
 
@@ -427,7 +483,8 @@ class WildberriesParser(BaseParser):
             image_url=image_url,
             rating=p.get("reviewRating"),
             reviews_count=p.get("feedbacks"),
-            seller_name=p.get("brand"),
+            seller_name=p.get("supplier") or p.get("supplierName"),
+            seller_rating=p.get("supplierRating"),
             brand=p.get("brand"),
             marketplace="wildberries",
         )
@@ -441,7 +498,7 @@ class WildberriesParser(BaseParser):
     ) -> ProductData | None:
         """Запасной вариант — ищем товар через поисковый API WB."""
         try:
-            search_url = f"https://search.wb.ru/exactmatch/ru/common/v5/search?appType=1&curr=rub&dest=-1257786&query={nm_id}&resultset=catalog&sort=popular"
+            search_url = f"https://search.wb.ru/exactmatch/ru/common/v9/search?appType=1&curr=rub&dest=-1257786&spp=30&lang=ru&page=1&query={nm_id}&resultset=catalog&sort=popular"
             request_proxy = proxy
             if proxy and proxy.startswith(("socks5://", "socks4://", "socks5h://")):
                 request_proxy = None
@@ -463,7 +520,7 @@ class WildberriesParser(BaseParser):
                     )
                     return None
                 data = await resp.json(content_type=None)
-                products = data.get("data", {}).get("products", [])
+                products = _extract_wb_products(data)
                 if not products:
                     await self._record_attempt(
                         url=url,
@@ -586,19 +643,7 @@ class WildberriesParser(BaseParser):
                 )
                 continue
 
-            price = None
-            old_price = None
-            sizes = data.get("sizes") or []
-            if sizes:
-                p = (sizes[0].get("price") or {})
-                total = p.get("total")
-                if isinstance(total, (int, float)):
-                    price = int(total) // 100
-                basic = p.get("basic")
-                if isinstance(basic, (int, float)):
-                    old_price = int(basic) // 100
-                    if price and old_price == price:
-                        old_price = None
+            price, old_price = _extract_wbbasket_prices(data.get("sizes"))
 
             availability = "in_stock" if (data.get("sale") is not None or price is not None) else "out_of_stock"
             discount_pct = None
@@ -647,6 +692,7 @@ class WildberriesParser(BaseParser):
         try:
             import json
             import urllib.parse
+
             query_variants = self._search_query_variants(query)
             url_templates = [
                 "https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=1&curr=rub&dest=-1257786&lang=ru&locale=ru&query={query}&resultset=catalog&sort=popular&spp=30",
@@ -666,7 +712,9 @@ class WildberriesParser(BaseParser):
                                     continue
                                 data = json.loads(await resp.text())
                         except Exception as exc:
-                            logger.debug(f"WB search endpoint failed for query={variant!r}: {type(exc).__name__}: {exc}")
+                            logger.debug(
+                                f"WB search endpoint failed for query={variant!r}: {type(exc).__name__}: {exc}"
+                            )
                             continue
                         products = self._extract_search_products(data)
                         if products:
@@ -697,25 +745,23 @@ class WildberriesParser(BaseParser):
                 if price and old_price and old_price > price:
                     discount_pct = round((old_price - price) / old_price * 100)
                 has_stock_rows = any(size.get("stocks") for size in sizes)
-                in_stock = any(
-                    stock.get("qty", 0) > 0
-                    for size in sizes
-                    for stock in size.get("stocks", [])
-                )
+                in_stock = any(stock.get("qty", 0) > 0 for size in sizes for stock in size.get("stocks", []))
                 availability = "unknown" if not has_stock_rows else ("in_stock" if in_stock else "out_of_stock")
-                results.append(ProductData(
-                    name=p.get("name", ""),
-                    price=price,
-                    old_price=old_price,
-                    discount_pct=discount_pct,
-                    availability=availability,
-                    url=f"https://www.wildberries.ru/catalog/{nm_id}/detail.aspx",
-                    image_url=_build_wb_image_url(int(nm_id)),
-                    rating=p.get("reviewRating"),
-                    reviews_count=p.get("feedbacks"),
-                    brand=p.get("brand"),
-                    marketplace="wildberries",
-                ))
+                results.append(
+                    ProductData(
+                        name=p.get("name", ""),
+                        price=price,
+                        old_price=old_price,
+                        discount_pct=discount_pct,
+                        availability=availability,
+                        url=f"https://www.wildberries.ru/catalog/{nm_id}/detail.aspx",
+                        image_url=_build_wb_image_url(int(nm_id)),
+                        rating=p.get("reviewRating"),
+                        reviews_count=p.get("feedbacks"),
+                        brand=p.get("brand"),
+                        marketplace="wildberries",
+                    )
+                )
             return results
         except Exception as e:
             logger.error(f"WB поиск ошибка: {e}")

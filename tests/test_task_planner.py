@@ -22,14 +22,17 @@ Requirements:
         plan = TaskPlanner().build_plan(task)
 
         self.assertTrue(plan.executable)
-        self.assertEqual([step.skill_id for step in plan.steps], [
-            "scraping.manual_plan",
-            "scraping.fetch_pages",
-            "scraping.extract_products",
-            "scraping.validate_result",
-            "csv.export",
-            "quality.self_critic",
-        ])
+        self.assertEqual(
+            [step.skill_id for step in plan.steps],
+            [
+                "scraping.manual_plan",
+                "scraping.fetch_pages",
+                "scraping.extract_products",
+                "scraping.validate_result",
+                "csv.export",
+                "quality.self_critic",
+            ],
+        )
         self.assertEqual(plan.missing_skills, [])
         self.assertIn("Поля отделены от требований", plan.self_critic)
 
@@ -49,15 +52,18 @@ CSV
         plan = TaskPlanner().build_plan(task)
 
         self.assertEqual(task.parameters["scope"], "all_pages")
-        self.assertEqual([step.skill_id for step in plan.steps], [
-            "scraping.manual_plan",
-            "scraping.fetch_pages",
-            "pagination.detect",
-            "scraping.extract_products",
-            "scraping.validate_result",
-            "csv.export",
-            "quality.self_critic",
-        ])
+        self.assertEqual(
+            [step.skill_id for step in plan.steps],
+            [
+                "scraping.manual_plan",
+                "scraping.fetch_pages",
+                "pagination.detect",
+                "scraping.extract_products",
+                "scraping.validate_result",
+                "csv.export",
+                "quality.self_critic",
+            ],
+        )
         self.assertTrue(plan.executable)
         self.assertEqual(plan.missing_skills, [])
 
@@ -78,13 +84,14 @@ CSV
         self.assertEqual([step.skill_id for step in plan.steps], ["ozon.card.generate", "quality.self_critic"])
 
     def test_page_classification_training_plan_is_explicit(self):
-        task = detect_task_intent("Открой страницу и НЕ парси сразу. Сначала определи task_type page_structure confidence")
+        task = detect_task_intent(
+            "Открой страницу и НЕ парси сразу. Сначала определи task_type page_structure confidence"
+        )
         plan = TaskPlanner().build_plan(task)
 
         self.assertEqual(task.type, TaskType.PAGE_CLASSIFICATION_TRAINING)
         self.assertTrue(plan.executable)
         self.assertEqual([step.skill_id for step in plan.steps], ["page.classification.training"])
-
 
     def test_repair_plan_uses_regression_first_pipeline(self):
         task = detect_task_intent(
@@ -95,15 +102,18 @@ CSV
 
         self.assertEqual(task.type, TaskType.REPAIR)
         self.assertTrue(plan.executable)
-        self.assertEqual([step.skill_id for step in plan.steps], [
-            "repair.reproduce",
-            "repair.classify",
-            "repair.regression_test",
-            "repair.implement_fix",
-            "repair.verify",
-            "repair.skillpack_update",
-            "quality.self_critic",
-        ])
+        self.assertEqual(
+            [step.skill_id for step in plan.steps],
+            [
+                "repair.reproduce",
+                "repair.classify",
+                "repair.regression_test",
+                "repair.implement_fix",
+                "repair.verify",
+                "repair.skillpack_update",
+                "quality.self_critic",
+            ],
+        )
         self.assertIn("Severity, evidence types, blast radius and safety gates are explicit", plan.self_critic)
         self.assertIn("Regression test protects the repaired behavior", plan.self_critic)
 

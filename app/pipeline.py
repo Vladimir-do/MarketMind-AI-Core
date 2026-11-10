@@ -76,8 +76,10 @@ class ImportPipeline:
             "average_score": batch_analysis.average_score,
             "below_threshold": len(batch_analysis.products_below_threshold),
             "tier_distribution": batch_analysis.score_distribution,
-            "top_issues": [{"rule": r.finding.rule, "action": r.action, "priority": r.priority}
-                           for r in batch_analysis.top_recommendations],
+            "top_issues": [
+                {"rule": r.finding.rule, "action": r.action, "priority": r.priority}
+                for r in batch_analysis.top_recommendations
+            ],
         }
 
         return PipelineResult(
@@ -111,8 +113,10 @@ class ImportPipeline:
             "average_score": batch_analysis.average_score,
             "below_threshold": len(batch_analysis.products_below_threshold),
             "tier_distribution": batch_analysis.score_distribution,
-            "top_issues": [{"rule": r.finding.rule, "action": r.action, "priority": r.priority}
-                           for r in batch_analysis.top_recommendations],
+            "top_issues": [
+                {"rule": r.finding.rule, "action": r.action, "priority": r.priority}
+                for r in batch_analysis.top_recommendations
+            ],
         }
 
         all_errors: list[ValidationError | ImportRowError] = import_result.errors + validation_errors
@@ -178,4 +182,3 @@ class ImportPipeline:
             discount = round((1 - product.price / product.old_price) * 100)
             product.discount_pct = discount
         return product
-

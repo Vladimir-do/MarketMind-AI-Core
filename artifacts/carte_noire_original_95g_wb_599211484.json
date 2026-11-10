@@ -1,0 +1,275 @@
+{
+  "draft": {
+    "offer_id": "kofe-rastvorimyy-carte-noire-ori-3b1558",
+    "name": "Кофе растворимый Carte Noire Original сублимированный, 95 г",
+    "description": "Растворимый сублимированный кофе Carte Noire Original в стеклянной банке, масса нетто 95 г. Для изготовления используется 100% арабика; в описании поставщика указано добавление молотого кофе. Зёрна выращены в Бразилии, страна производства по карточке Coffeemag — Россия. Для приготовления растворите необходимое количество кофе в горячей воде. Сверяйте состав и маркировку с конкретной банкой: характеристики могут отличаться в зависимости от партии.",
+    "category_hint": "Продукты питания / Чай, кофе, какао / Кофе растворимый",
+    "brand": "Carte Noire",
+    "price": null,
+    "old_price": null,
+    "vat": "0",
+    "weight_g": null,
+    "width_mm": null,
+    "height_mm": null,
+    "depth_mm": null,
+    "images": [
+      "https://www.coffeemag.ru/photo/photo27596.jpeg"
+    ],
+    "attributes": {
+      "Вес нетто": "95 г",
+      "Вид кофе": "Растворимый сублимированный",
+      "Состав": "100% арабика",
+      "Тип упаковки": "Стеклянная банка",
+      "Вкус": "Original, натуральный",
+      "Без кофеина": "Нет",
+      "Примечание по стране производства": "разные каталоги могут отличаться по партии/рынку; не фиксировать страну без фото маркировки.",
+      "Вес, г": "нужно заполнить",
+      "Ширина, мм": "нужно заполнить",
+      "Высота, мм": "нужно заполнить",
+      "Глубина, мм": "нужно заполнить",
+      "Артикул Wildberries": "599211484",
+      "Цена": "484 ₽ — внешний ориентир, не подтверждённая цена продавца Ozon/WB",
+      "Страна выращивания зерна": "Бразилия (по карточке Coffeemag)",
+      "Страна производства": "Россия (по карточке Coffeemag; проверить маркировку партии)",
+      "Особенность": "С добавлением молотого кофе (по карточке Coffeemag)",
+      "Внешний ценовой ориентир": "484 ₽ — ранее найденное предложение; не цена продажи и не цена Ozon"
+    },
+    "keywords": [
+      "кофе",
+      "растворимый",
+      "carte",
+      "noire",
+      "сублимированный",
+      "арабика",
+      "стекло",
+      "ориджинал",
+      "карт",
+      "нуар"
+    ],
+    "checklist": [
+      "Сверить фактический срок годности и условия хранения на упаковке",
+      "Проверить соответствие дизайна упаковки полученной партии",
+      "Добавить точные габариты и транспортный вес в карточку товара",
+      "Проверить, что фото Komus соответствует упаковке товара в карточке WB №599211484",
+      "Сверить срок годности и условия хранения с маркировкой банки",
+      "Уточнить страну производства по этикетке конкретной партии",
+      "Указать транспортный вес и габариты упаковки по фактическому измерению",
+      "Заменить ориентир 484 ₽ на фактическую цену продавца перед загрузкой",
+      "Проверить обязательные атрибуты категории в Ozon Seller",
+      "Проверить совпадение фотографии с текущей банкой Wildberries №599211484",
+      "Сверить состав и отметку «с добавлением молотого кофе» с этикеткой партии",
+      "Подтвердить страну производства по маркировке конкретной банки",
+      "Заполнить транспортный вес и габариты по фактическим измерениям",
+      "Указать фактическую цену продажи перед импортом — поле цены оставлено пустым"
+    ],
+    "ai_notes": "Текст описания заменён на консервативный вариант по карточке Coffeemag. Изображение взято из галереи совпадающей карточки Coffeemag и всё равно требует визуальной сверки с фото WB. Цена продажи намеренно не заполнена. Вес нетто 95 г не подменяет транспортный вес.",
+    "competitor_summary": "Найдено конкурентов: 8; по площадкам: Яндекс Маркет — 8; цены: 484–14445 ₽, медиана 1707 ₽; частые слова: carte, noire, кофе, растворимый, original, сублимированный, 95г, банка",
+    "competitors": [
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый Carte Noire Ориджинал, арабика, 95 г",
+        "price": 484,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": 4.9,
+        "reviews_count": 17600,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-carte-noire-original-steklyannaya-banka-95-g/103579538144",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/17397089/2a0000019a2ffa1c46708a0fe8c9aaef6ff4/orig"
+      },
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый карт нуар (CARTE NOIRE) сублимированный, стекло 95 гр",
+        "price": 494,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": 4.8,
+        "reviews_count": 12,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-kart-nuar-carte-noire-sublimirovannyy-steklo-95-gr/4425498797",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/4950407/2a0000019226468df42073f20d431c235557/orig"
+      },
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый Carte Noire \"Original\", арабика, стеклянная банка, 95 гр",
+        "price": 772,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": 5.0,
+        "reviews_count": 3,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-carte-noire-original-95-g/4629830089",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/5151433/2a000001927a8607e5a4eaa7b4832208d910/orig"
+      },
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый Carte Noire Ориджинал сублимированный, ст/б 95г, 121873",
+        "price": 2556,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": null,
+        "reviews_count": null,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-carte-noire-oridzhinal-sublimirovannyy-stb-95g-121873/5735039086",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/5268049/img_id5903040443101718988.jpeg/orig"
+      },
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый Carte Noire \"Original\", сублимированный, стеклянная банка, 95г (4251905/W8590), 1шт.",
+        "price": 1898,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": null,
+        "reviews_count": null,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-carte-noire-original-sublimirovannyy-steklyannaya-banka-95g-4251905w8590-1sht/6072466926",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/21059768/picd8970f5e7233d9ac4e7496bc5769f609/orig"
+      },
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый Carte Noire \"Original\", сублимированный, стеклянная банка, 95г (4251905/W8590), 12шт.",
+        "price": 14445,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": null,
+        "reviews_count": null,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-carte-noire-original-sublimirovannyy-steklyannaya-banka-95g-4251905w8590-12sht/6073026614",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/21059768/picd8970f5e7233d9ac4e7496bc5769f609/orig"
+      },
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый Carte Noire Original 95 г 2 шт",
+        "price": 1517,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": 4.8,
+        "reviews_count": 49,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-carte-noire-original-95-g-2-sht/102213467373",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/17765397/2a0000019fccf1e58e27fc0a8abd56b33fec/orig"
+      },
+      {
+        "marketplace": "yandex_market",
+        "name": "Кофе растворимый Carte Noire \"Original\", сублимированный, стеклянная банка, 95г (4251905/W8590), 6шт.",
+        "price": 8164,
+        "old_price": null,
+        "discount_pct": null,
+        "rating": null,
+        "reviews_count": null,
+        "availability": "in_stock",
+        "seller_name": "",
+        "url": "https://market.yandex.ru/card/kofe-rastvorimyy-carte-noire-original-sublimirovannyy-steklyannaya-banka-95g-4251905w8590-6sht/6072888182",
+        "image_url": "https://avatars.mds.yandex.net/get-mpic/21059768/picd8970f5e7233d9ac4e7496bc5769f609/orig"
+      }
+    ],
+    "selling_points": [
+      "100% натуральная арабика сбалансированной средней обжарки",
+      "Быстрорастворимый сублимированный формат для удобного приготовления",
+      "Герметичная стеклянная банка надежно сохраняет аромат и вкус"
+    ],
+    "source_text": "товар: Кофе растворимый Carte Noire Original, 100% арабика, сублимированный, 95 г\nбренд: Carte Noire\nкатегория: Продукты питания / Чай, кофе, какао / Кофе растворимый\nцена: 484\nвес нетто: 95 г\nвид кофе: растворимый сублимированный\nсостав: кофе натуральный растворимый сублимированный, 100% арабика\nтип упаковки: стеклянная банка\nвкус: Original, натуральный\nстепень обжарки: средняя\nинтенсивность вкуса: 8 из 10 (данные Яндекс Маркета, сверить с упаковкой)\nбез кофеина: нет\nусловия хранения: от 0 до +25 °C (по карточке Яндекс Маркета; проверить маркировку)\nсрок годности: ориентировочно 24 месяца, проверить на упаковке\nизображение товара: https://media.komus.ru/medias/sys_master/product-images/product-images/h70/h8c/13561049055262/121873-1-800Wx800H.jpg\nисточник Wildberries: https://www.wildberries.ru/catalog/599211484/detail.aspx?targetUrl=MI\nПримечание по цене: 484 ₽ — найденная ранее цена внешнего предложения, НЕ подтверждена как цена продавца WB или Ozon. Использовать только как черновой ориентир, не указывать как гарантированную цену.\nПримечание по фото: найдено фото аналогичной банки Carte Noire Original 95 г у поставщика Komus; это референс, проверить соответствие фактической версии упаковки WB.\nПримечание по стране производства: разные каталоги могут отличаться по партии/рынку; не фиксировать страну без фото маркировки.\nПримечание по габаритам и транспортному весу: надёжных данных для этой единицы не подтверждено, не придумывать.\nДополнительные источники: Характеристики сверены по карточкам Яндекс Маркета и российских поставщиков: https://m.integration.vs.market.yandex.net/card/kofe-rastvorimyy-carte-noire-original/103809387598 ; https://www.ofsi.ru/product/kofe-rastvorimyy-carte-noire-95-g-steklo.html ; https://www.coffeemag.ru/coffee/kofe-rastvorimyj-Carte-Noire-Original-95-gr7945 ."
+  },
+  "ozon_import_payload": {
+    "endpoint_note": "Черновик под Ozon Seller API. Перед отправкой нужны category_id/type_id и обязательные attribute_id из Ozon.",
+    "method": "POST /v3/product/import",
+    "items": [
+      {
+        "offer_id": "kofe-rastvorimyy-carte-noire-ori-3b1558",
+        "name": "Кофе растворимый Carte Noire Original сублимированный, 95 г",
+        "description": "Растворимый сублимированный кофе Carte Noire Original в стеклянной банке, масса нетто 95 г. Для изготовления используется 100% арабика; в описании поставщика указано добавление молотого кофе. Зёрна выращены в Бразилии, страна производства по карточке Coffeemag — Россия. Для приготовления растворите необходимое количество кофе в горячей воде. Сверяйте состав и маркировку с конкретной банкой: характеристики могут отличаться в зависимости от партии.",
+        "barcode": "",
+        "price": "",
+        "old_price": "",
+        "vat": "0",
+        "currency_code": "RUB",
+        "images": [
+          "https://www.coffeemag.ru/photo/photo27596.jpeg"
+        ],
+        "weight": null,
+        "weight_unit": "g",
+        "width": null,
+        "height": null,
+        "depth": null,
+        "dimension_unit": "mm",
+        "attributes": [
+          {
+            "name": "Артикул Wildberries",
+            "value": "599211484"
+          },
+          {
+            "name": "Без кофеина",
+            "value": "Нет"
+          },
+          {
+            "name": "Вес нетто",
+            "value": "95 г"
+          },
+          {
+            "name": "Вес, г",
+            "value": "нужно заполнить"
+          },
+          {
+            "name": "Вид кофе",
+            "value": "Растворимый сублимированный"
+          },
+          {
+            "name": "Вкус",
+            "value": "Original, натуральный"
+          },
+          {
+            "name": "Высота, мм",
+            "value": "нужно заполнить"
+          },
+          {
+            "name": "Глубина, мм",
+            "value": "нужно заполнить"
+          },
+          {
+            "name": "Интенсивность вкуса",
+            "value": "8/10 — по карточке Яндекс Маркета, сверить с упаковкой"
+          },
+          {
+            "name": "Примечание по стране производства",
+            "value": "разные каталоги могут отличаться по партии/рынку; не фиксировать страну без фото маркировки."
+          },
+          {
+            "name": "Состав",
+            "value": "100% арабика"
+          },
+          {
+            "name": "Срок годности",
+            "value": "Ориентировочно 24 месяца — проверить маркировку"
+          },
+          {
+            "name": "Степень обжарки",
+            "value": "Средняя"
+          },
+          {
+            "name": "Тип упаковки",
+            "value": "Стеклянная банка"
+          },
+          {
+            "name": "Условия хранения",
+            "value": "0…+25 °C — сверить с этикеткой"
+          },
+          {
+            "name": "Цена",
+            "value": "484 ₽ — внешний ориентир, не подтверждённая цена продавца Ozon/WB"
+          },
+          {
+            "name": "Ширина, мм",
+            "value": "нужно заполнить"
+          }
+        ]
+      }
+    ]
+  }
+}

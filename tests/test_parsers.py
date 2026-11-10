@@ -1,5 +1,7 @@
 import asyncio
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -12,6 +14,8 @@ from app.parsers.wildberries import (
     WildberriesParser,
     _build_wb_image_url,
     _extract_wb_id,
+    _extract_wb_products,
+    _extract_wbbasket_prices,
     _get_basket_host,
     _wbbasket_candidates,
 )
@@ -72,6 +76,43 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(data.brand, "Example")
         self.assertEqual(data.marketplace, "yandex_market")
 
+    def test_yandex_market_extracts_explicit_reviews_and_seller(self):
+        html = """
+        <script type="application/ld+json">
+        {
+          "@type": "Product",
+          "name": "Кофемолка",
+          "review": [
+            {"@type": "Review", "reviewBody": "Мелет быстро и равномерно."},
+            {"@type": "Review", "reviewBody": "   Мелет быстро и равномерно.  "},
+            {"@type": "Review", "reviewBody": "Шумновата ночью."},
+            {"@type": "Review", "reviewBody": ""}
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "2500",
+            "seller": {"@type": "Organization", "name": "Магазин Пример"}
+          }
+        }
+        </script>
+        """
+        data = parse_yandex_market_html(html, "https://market.yandex.ru/product--coffee/123")
+        self.assertIsNotNone(data)
+        self.assertEqual(data.seller_name, "Магазин Пример")
+        self.assertEqual(data.reviews, ["Мелет быстро и равномерно.", "Шумновата ночью."])
+        self.assertEqual(data.availability, "unknown")
+
+    def test_yandex_market_does_not_invent_stock_or_accept_invalid_rating(self):
+        html = """
+        <script type="application/ld+json">
+        {"@type":"Product", "name":"Товар", "aggregateRating":{"ratingValue":"8.9"}}
+        </script>
+        """
+        data = parse_yandex_market_html(html, "https://market.yandex.ru/product--item/123")
+        self.assertIsNotNone(data)
+        self.assertIsNone(data.rating)
+        self.assertEqual(data.availability, "unknown")
+
     def test_yandex_market_attempt_recorder_gets_normalized_fields(self):
         attempts = []
 
@@ -95,6 +136,97 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(attempts[0]["status"], "blocked")
         self.assertEqual(attempts[0]["http_status"], 403)
         self.assertEqual(attempts[0]["latency_ms"], 42)
+
+    def test_yandex_market_retries_transient_5xx_then_succeeds(self):
+        html = "<html><body><h1>Тестовый товар</h1></body></html>"
+        statuses = [503, 200]
+        session_count = 0
+
+        class FakeResponse:
+            def __init__(self, status):
+                self.status = status
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def text(self, errors="strict"):
+                return html
+
+        class FakeSession:
+            def __init__(self, **kwargs):
+                nonlocal session_count
+                session_count += 1
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            def get(self, url, timeout=None):
+                return FakeResponse(statuses.pop(0))
+
+        parser = YandexMarketParser()
+        with (
+            patch("app.parsers.yandex_market.aiohttp.ClientSession", side_effect=FakeSession),
+            patch("app.parsers.yandex_market.asyncio.sleep", new_callable=AsyncMock) as sleep,
+        ):
+            data = asyncio.run(parser.fetch_product("https://market.yandex.ru/product--test/1"))
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data.name, "Тестовый товар")
+        self.assertEqual(session_count, 2)
+        sleep.assert_awaited_once_with(1.0)
+
+    def test_yandex_market_does_not_retry_rate_limit(self):
+        session_count = 0
+
+        class FakeResponse:
+            status = 429
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def text(self, errors="strict"):
+                return "rate limited"
+
+        class FakeSession:
+            def __init__(self, **kwargs):
+                nonlocal session_count
+                session_count += 1
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            def get(self, url, timeout=None):
+                return FakeResponse()
+
+        attempts = []
+
+        async def recorder(**kwargs):
+            attempts.append(kwargs)
+
+        parser = YandexMarketParser(attempt_recorder=recorder)
+        with (
+            patch("app.parsers.yandex_market.aiohttp.ClientSession", side_effect=FakeSession),
+            patch("app.parsers.yandex_market.asyncio.sleep", new_callable=AsyncMock) as sleep,
+        ):
+            data = asyncio.run(parser.fetch_product("https://market.yandex.ru/product--test/1"))
+
+        self.assertIsNone(data)
+        self.assertEqual(session_count, 1)
+        sleep.assert_not_awaited()
+        self.assertEqual(attempts[0]["status"], "blocked")
+        self.assertEqual(attempts[0]["http_status"], 429)
 
     def test_cache_html_service_title_is_ignored(self):
         html = "<html><head><title>Google Search</title></head><body></body></html>"
@@ -136,6 +268,41 @@ class ParserTests(unittest.TestCase):
         self.assertFalse(WildberriesParser.can_handle("https://www.wildberries.ru/"))
         self.assertFalse(WildberriesParser.can_handle("https://www.wildberries.ru/catalog/"))
 
+    def test_wb_v4_products_top_level_response(self):
+        products = [{"id": 311895731, "name": "Headphones"}]
+        self.assertEqual(_extract_wb_products({"products": products}), products)
+
+    def test_wb_legacy_nested_products_response_remains_supported(self):
+        products = [{"id": 311895731, "name": "Headphones"}]
+        self.assertEqual(_extract_wb_products({"data": {"products": products}}), products)
+
+    def test_wb_products_rejects_malformed_payload(self):
+        self.assertEqual(_extract_wb_products(None), [])
+        self.assertEqual(_extract_wb_products({"products": "not-a-list"}), [])
+
+    def test_wbbasket_price_skips_sizes_without_price(self):
+        price, old_price = _extract_wbbasket_prices(
+            [
+                {"name": "size without price"},
+                {"price": None},
+                {"price": {"total": 0, "basic": 10000}},
+                {"price": {"total": 129900, "basic": 199900}},
+            ]
+        )
+
+        self.assertEqual(price, 1299)
+        self.assertEqual(old_price, 1999)
+
+    def test_wbbasket_price_handles_malformed_sizes_and_equal_old_price(self):
+        self.assertEqual(
+            _extract_wbbasket_prices([None, "invalid", {"price": []}]),
+            (None, None),
+        )
+        self.assertEqual(
+            _extract_wbbasket_prices([{"price": {"total": 129900, "basic": 129900}}]),
+            (1299, None),
+        )
+
     def test_wildberries_parse_product(self):
         raw = {
             "name": "Headphones",
@@ -161,6 +328,62 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(data.old_price, 1999)
         self.assertEqual(data.availability, "in_stock")
         self.assertEqual(data.marketplace, "wildberries")
+
+    def test_wildberries_product_without_stock_rows_is_unknown_not_out_of_stock(self):
+        data = WildberriesParser()._parse_product(
+            {
+                "name": "Органайзер",
+                "brand": "Brand",
+                "sizes": [{"price": {"product": 50000}}],
+            },
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+            session=None,
+        )
+
+        self.assertEqual(data.availability, "unknown")
+        self.assertEqual(data.brand, "Brand")
+
+    def test_wildberries_product_with_explicit_zero_stock_is_out_of_stock(self):
+        data = WildberriesParser()._parse_product(
+            {
+                "name": "Органайзер",
+                "sizes": [{"stocks": [{"qty": 0}]}],
+            },
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+            session=None,
+        )
+
+        self.assertEqual(data.availability, "out_of_stock")
+
+    def test_wildberries_brand_is_not_misreported_as_seller(self):
+        data = WildberriesParser()._parse_product(
+            {
+                "name": "Наушники",
+                "brand": "Acme",
+                "supplier": "ООО Продавец",
+                "supplierRating": 4.9,
+                "sizes": [{"stocks": [{"qty": 1}]}],
+            },
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+            session=None,
+        )
+
+        self.assertEqual(data.brand, "Acme")
+        self.assertEqual(data.seller_name, "ООО Продавец")
+        self.assertEqual(data.seller_rating, 4.9)
+
+    def test_wildberries_cloud_payload_missing_availability_is_unknown(self):
+        data = WildberriesParser()._parse_cloud_payload(
+            {"name": "Товар", "price": 100, "brand": "Acme"},
+            "https://www.wildberries.ru/catalog/311895731/detail.aspx",
+            311895731,
+        )
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data.availability, "unknown")
 
     def test_wb_search_parses_old_price_and_discount(self):
         parser = WildberriesParser()
@@ -195,6 +418,7 @@ class ParserTests(unittest.TestCase):
 
             async def text(self):
                 import json
+
                 return json.dumps(payload, ensure_ascii=False)
 
         class FakeSession:
@@ -242,17 +466,19 @@ class ParserTests(unittest.TestCase):
             async def text(self):
                 import json
 
-                return json.dumps({
-                    "data": {
-                        "products": [
-                            {
-                                "id": 123456789,
-                                "name": "Органайзер для проводов",
-                                "sizes": [{"price": {"product": 50000}}],
-                            }
-                        ]
+                return json.dumps(
+                    {
+                        "data": {
+                            "products": [
+                                {
+                                    "id": 123456789,
+                                    "name": "Органайзер для проводов",
+                                    "sizes": [{"price": {"product": 50000}}],
+                                }
+                            ]
+                        }
                     }
-                })
+                )
 
         class FakeSession:
             def __init__(self, *args, **kwargs):
@@ -368,7 +594,7 @@ class ParserTests(unittest.TestCase):
         self.assertIsNotNone(data)
         self.assertEqual(data["name"], "Car Phone Holder")
         self.assertEqual(data["price"], 1299)
-        self.assertEqual(data["availability"], "in_stock")
+        self.assertEqual(data["availability"], "unknown")
         self.assertEqual(data["image_url"], "https://cdn.example/img.webp")
 
     def test_ozon_html_parser_accepts_lazy_and_protocol_relative_images(self):
@@ -404,6 +630,17 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(data["price"], 248)
         self.assertEqual(data["availability"], "in_stock")
 
+    def test_ozon_html_without_stock_evidence_returns_unknown(self):
+        html = """
+        <html><body>
+          <h1>Car Phone Holder</h1>
+          <div data-widget="webPrice"><span>248 ₽</span></div>
+        </body></html>
+        """
+        data = parse_ozon_html(html, "https://www.ozon.ru/product/test")
+        self.assertIsNotNone(data)
+        self.assertEqual(data["availability"], "unknown")
+
     def test_ozon_html_detects_product_out_of_stock_widget(self):
         html = """
         <html>
@@ -431,8 +668,30 @@ class ParserTests(unittest.TestCase):
         self.assertIsNotNone(data)
         self.assertEqual(data["name"], "Car Phone Holder")
         self.assertEqual(data["price"], 1299)
-        self.assertEqual(data["availability"], "in_stock")
+        self.assertEqual(data["availability"], "unknown")
         self.assertEqual(data["image_url"], "https://cdn.example/img.webp")
+
+    def test_ozon_api_json_parser_extracts_explicit_review_signals(self):
+        payload = {
+            "widgetStates": {
+                "webProductHeading": '{"title": "Car Phone Holder"}',
+                "webPrice": '{"price": "1 299 ₽"}',
+                "webReviewSummary": '{"aggregateRating": {"ratingValue": "4.8", "reviewCount": "153"}, "reviews": [{"text": "Крепкий держатель"}, {"text": "Удобно пользоваться"}]}',
+            },
+        }
+        data = parse_ozon_api_json(payload, "https://www.ozon.ru/product/test")
+        self.assertEqual(data["rating"], 4.8)
+        self.assertEqual(data["reviews_count"], 153)
+        self.assertEqual(data["reviews"], ["Крепкий держатель", "Удобно пользоваться"])
+
+    def test_ozon_api_json_parser_does_not_invent_missing_review_signals(self):
+        data = parse_ozon_api_json(
+            {"widgetStates": {"webProductHeading": '{"title": "Car Phone Holder"}'}},
+            "https://www.ozon.ru/product/test",
+        )
+        self.assertIsNone(data["rating"])
+        self.assertIsNone(data["reviews_count"])
+        self.assertEqual(data["reviews"], [])
 
     def test_mcp_product_payload_normalizer(self):
         data = normalize_mcp_product_payload(
@@ -482,6 +741,39 @@ class ParserTests(unittest.TestCase):
 
 
 class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_dump_debug_rotates_to_50_and_keeps_latest_incident(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            debug_dir = Path(temp_dir)
+            for index in range(51):
+                stem = f"20200101_000000_incident_{index:02}"
+                (debug_dir / f"{stem}.png").write_bytes(b"old png")
+                (debug_dir / f"{stem}.html").write_text("old html", encoding="utf-8")
+            research_dump = debug_dir / "20200101_000000_research.md"
+            research_dump.write_text("keep", encoding="utf-8")
+
+            async def write_screenshot(*, path, full_page):
+                Path(path).write_bytes(b"latest png")
+
+            page = SimpleNamespace(
+                screenshot=AsyncMock(side_effect=write_screenshot),
+                content=AsyncMock(return_value="latest html"),
+            )
+            updater = OzonUpdater.__new__(OzonUpdater)
+            with patch.object(updater, "_debug_dir", return_value=debug_dir):
+                await updater._dump_debug(page, "incident")
+
+            timestamped = {
+                path.stem
+                for path in debug_dir.iterdir()
+                if path.suffix in {".png", ".html"}
+                and path.name != "last_incident.png"
+                and path.name != "last_incident.html"
+            }
+            self.assertEqual(len(timestamped), 50)
+            self.assertEqual((debug_dir / "last_incident.png").read_bytes(), b"latest png")
+            self.assertEqual((debug_dir / "last_incident.html").read_text(encoding="utf-8"), "latest html")
+            self.assertTrue(research_dump.exists())
+
     async def test_alt_sources_uses_mcp_before_cache(self):
         expected = {
             "url": "https://www.ozon.ru/product/test",
@@ -542,13 +834,15 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
             patch.dict("os.environ", {"OZON_SKIP_BROWSER_AFTER_API_BLOCK": "1"}, clear=True),
             patch(
                 "app.parsers.ozon.fetch_from_alt_sources",
-                AsyncMock(return_value={
-                    "name": "MCP Product",
-                    "price": 1299,
-                    "availability": "in_stock",
-                    "image_url": "https://cdn.example/image.webp",
-                    "brand": "MCPBrand",
-                }),
+                AsyncMock(
+                    return_value={
+                        "name": "MCP Product",
+                        "price": 1299,
+                        "availability": "in_stock",
+                        "image_url": "https://cdn.example/image.webp",
+                        "brand": "MCPBrand",
+                    }
+                ),
             ),
         ):
             data = await parser.fetch_product("https://www.ozon.ru/product/test")
@@ -664,12 +958,14 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
             patch.dict("os.environ", {"OZON_SKIP_BROWSER_AFTER_API_BLOCK": "1"}, clear=True),
             patch(
                 "app.updater.fetch_from_alt_sources",
-                AsyncMock(return_value={
-                    "name": "MCP Product",
-                    "price": 1299,
-                    "availability": "in_stock",
-                    "image_url": "https://cdn.example/image.webp",
-                }),
+                AsyncMock(
+                    return_value={
+                        "name": "MCP Product",
+                        "price": 1299,
+                        "availability": "in_stock",
+                        "image_url": "https://cdn.example/image.webp",
+                    }
+                ),
             ),
         ):
             data = await updater.process_url("https://www.ozon.ru/product/test")
@@ -712,12 +1008,14 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         updater = FakeUpdater()
         with patch(
             "app.updater.fetch_from_alt_sources",
-            AsyncMock(return_value={
-                "name": "MCP Product",
-                "price": 1299,
-                "availability": "in_stock",
-                "image_url": "https://cdn.example/image.webp",
-            }),
+            AsyncMock(
+                return_value={
+                    "name": "MCP Product",
+                    "price": 1299,
+                    "availability": "in_stock",
+                    "image_url": "https://cdn.example/image.webp",
+                }
+            ),
         ):
             data = await updater.process_url("https://www.ozon.ru/product/test")
 
@@ -826,12 +1124,14 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         updater = FakeUpdater()
         with patch(
             "app.updater.fetch_from_alt_sources",
-            AsyncMock(return_value={
-                "name": "MCP Product",
-                "price": 1299,
-                "availability": "in_stock",
-                "image_url": "https://cdn.example/image.webp",
-            }),
+            AsyncMock(
+                return_value={
+                    "name": "MCP Product",
+                    "price": 1299,
+                    "availability": "in_stock",
+                    "image_url": "https://cdn.example/image.webp",
+                }
+            ),
         ):
             data = await updater.process_url("https://www.ozon.ru/product/test")
 
@@ -899,6 +1199,7 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         remaining products instead of letting the whole run silently drop
         to 0 updated."""
         callbacks = []
+        added_history = []
         product_failing = SimpleNamespace(
             id=1,
             name="Crashes during fetch",
@@ -918,7 +1219,7 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
                 return None
 
             def add(self, row):
-                pass
+                added_history.append(row)
 
             async def commit(self):
                 return None
@@ -958,3 +1259,6 @@ class OzonUpdaterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(changes), 1)
         self.assertEqual(changes[0]["name"], "Works fine")
         self.assertTrue(any("Works fine" in text for text in callbacks))
+        self.assertEqual(added_history, [])
+        self.assertTrue(any("Ошибка при обновлении" in text for text in callbacks))
+        self.assertFalse(any("Ozon временно заблокировал" in text for text in callbacks))

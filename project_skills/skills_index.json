@@ -113,7 +113,10 @@
         "price-analytics-forecast"
       ],
       "source_paths": [
-        "app/database.py"
+        "app/database.py",
+        "app/worker.py",
+        "app/bot.py",
+        "app/projects/imports.py"
       ]
     },
     {
@@ -193,7 +196,12 @@
       ],
       "source_paths": [
         "app/bot.py",
-        "parser_v2/app/bot.py"
+        "parser_v2/app/bot.py",
+        "app/agent.py",
+        "app/card_filler.py",
+        "app/telegram_ai_reports.py",
+        "app/telegram_messages.py",
+        "app/telegram_card_handlers.py"
       ]
     },
     {
@@ -396,7 +404,8 @@
       "source_paths": [
         "app/utils/proxy.py",
         "app/config.py",
-        "app/bot.py"
+        "app/bot.py",
+        "app/parsers/system_proxy.py"
       ]
     },
     {
@@ -471,7 +480,9 @@
         "telegram-voice-whisper"
       ],
       "source_paths": [
-        "app/ai_client.py"
+        "app/ai_client.py",
+        "app/bot.py",
+        "app/web/app.py"
       ]
     },
     {
@@ -587,7 +598,9 @@
       ],
       "source_paths": [
         "app/bot.py",
-        "app/card_filler.py"
+        "app/card_filler.py",
+        "app/telegram_card_handlers.py",
+        "app/telegram_marketplace_utils.py"
       ]
     },
     {

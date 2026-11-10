@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 _MAX_PER_MARKETPLACE = 5
 _MAX_WB_REVIEWS_FETCHED = 3
+_MAX_OZON_REVIEW_FETCHED = 2
 
 # Same class of bug as D31 (app/card_filler.py::_filter_relevant_competitors):
 # search_all_marketplaces() is a plain full-text search on the product's own
@@ -40,8 +41,20 @@ _MAX_WB_REVIEWS_FETCHED = 3
 # the two into one shared utility is a separate, broader change, not part of
 # this fix.
 _COMPETITOR_STOP_WORDS = {
-    "для", "или", "без", "при", "под", "над", "товар", "шт", "набор",
-    "ozon", "wb", "wildberries", "черный", "белый",
+    "для",
+    "или",
+    "без",
+    "при",
+    "под",
+    "над",
+    "товар",
+    "шт",
+    "набор",
+    "ozon",
+    "wb",
+    "wildberries",
+    "черный",
+    "белый",
 }
 
 
@@ -72,9 +85,7 @@ class CompetitorAnalysisService:
         self._db = db
         self._store = CompetitorSnapshotStore(db)
 
-    async def refresh_competitors(
-        self, project_id: str, product_id: int
-    ) -> tuple[str, list[CompetitorSnapshot]]:
+    async def refresh_competitors(self, project_id: str, product_id: int) -> tuple[str, list[CompetitorSnapshot]]:
         card = await EffectiveProductCardService(self._db).get_effective_card(project_id, product_id)
         passport = build_passport(card)
         query = " ".join(passport.title.split())
@@ -90,6 +101,10 @@ class CompetitorAnalysisService:
         wb_products = results.get("wildberries") or []
         if wb_products:
             await self._attach_wb_reviews(wb_products, limit=_MAX_WB_REVIEWS_FETCHED)
+
+        ozon_products = results.get("ozon") or []
+        if ozon_products:
+            await self._attach_ozon_review_signals(ozon_products, limit=_MAX_OZON_REVIEW_FETCHED)
 
         flat: list[tuple[str, object]] = [
             (marketplace, product) for marketplace, products in results.items() for product in products
@@ -121,3 +136,33 @@ class CompetitorAnalysisService:
                 reviews = await parser._fetch_reviews(session, nm_id)
                 if reviews:
                     products[index] = replace(product, reviews=reviews)
+
+    @staticmethod
+    async def _attach_ozon_review_signals(products: list, *, limit: int) -> None:
+        """Fetch lightweight Ozon product API data for a few top competitors.
+
+        Only explicit review text and rating fields returned by Ozon are attached;
+        blocked, missing, or malformed responses leave the original result intact.
+        """
+        from app.parsers.ozon import OzonParser
+
+        parser = OzonParser()
+        for index in range(min(limit, len(products))):
+            product = products[index]
+            if not product.url:
+                continue
+            try:
+                data = await parser._fetch_api_data(product.url)
+            except Exception as exc:
+                logger.debug("Ozon review enrichment failed for %s: %s", product.url, exc)
+                continue
+            if not data:
+                continue
+            products[index] = replace(
+                product,
+                rating=data.get("rating") if data.get("rating") is not None else product.rating,
+                reviews_count=(
+                    data.get("reviews_count") if data.get("reviews_count") is not None else product.reviews_count
+                ),
+                reviews=data.get("reviews") or product.reviews,
+            )

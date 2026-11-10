@@ -11,7 +11,6 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
 SKIP_DIRS = {
     ".git",
     ".idea",
@@ -140,18 +139,10 @@ def build_report(root: Path, limit: int = 15) -> DefragReport:
         for path in sorted(python_files, key=_safe_size, reverse=True)[:limit]
     ]
 
-    runtime_dirs = [
-        _dir_info(root / item, root)
-        for item in RUNTIME_PATHS
-        if (root / item).exists()
-    ]
+    runtime_dirs = [_dir_info(root / item, root) for item in RUNTIME_PATHS if (root / item).exists()]
     runtime_dirs.sort(key=lambda item: item.bytes, reverse=True)
 
-    duplicate_envs = [
-        item
-        for item in (".venv", "venv")
-        if (root / item).exists()
-    ]
+    duplicate_envs = [item for item in (".venv", "venv") if (root / item).exists()]
 
     return DefragReport(
         root=root.as_posix(),

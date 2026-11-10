@@ -438,15 +438,10 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
 
         async with self.db.session() as s:
             record = (
-                await s.execute(
-                    select(ApprovalRecord).where(
-                        ApprovalRecord.approval_id == rollback[0].approval_id
-                    )
-                )
+                await s.execute(select(ApprovalRecord).where(ApprovalRecord.approval_id == rollback[0].approval_id))
             ).scalar_one()
             record.snapshot_before = (
-                '{"field": "name", "value": "До отката", '
-                f'"timestamp": "{datetime.now(UTC).isoformat()}"}}'
+                f'{{"field": "name", "value": "До отката", "timestamp": "{datetime.now(UTC).isoformat()}"}}'
             )
             record.applied_at = datetime.now(UTC)
             await s.commit()
@@ -531,9 +526,7 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
             await s.commit()
 
         resp = await self.client.get(
-            f"/api/products/{pid}/timeline"
-            "?date_from=2026-07-17T00:00:00+00:00"
-            "&date_to=2026-07-17T23:59:59+00:00"
+            f"/api/products/{pid}/timeline?date_from=2026-07-17T00:00:00+00:00&date_to=2026-07-17T23:59:59+00:00"
         )
         self.assertEqual(resp.status_code, 200)
         event_types = {item["event_type"] for item in resp.json()["items"]}
@@ -548,12 +541,10 @@ class ProductDetailTests(unittest.IsolatedAsyncioTestCase):
         pid = await self._get_product_id("Ozon")
         async with self.db.session() as s:
             rows = (
-                await s.execute(
-                    select(PriceHistory)
-                    .where(PriceHistory.product_id == pid)
-                    .order_by(PriceHistory.id)
-                )
-            ).scalars().all()
+                (await s.execute(select(PriceHistory).where(PriceHistory.product_id == pid).order_by(PriceHistory.id)))
+                .scalars()
+                .all()
+            )
             rows[0].recorded_at = datetime(2026, 7, 17, 10, 0, tzinfo=UTC)
             rows[1].recorded_at = datetime(2026, 7, 17, 11, 0, tzinfo=UTC)
             await s.commit()

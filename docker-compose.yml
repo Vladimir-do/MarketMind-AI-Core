@@ -6,8 +6,8 @@ services:
     env_file:
       - .env
     volumes:
-      - bot-data:/app/app/data
-      - ./app/data/ozon_profile:/app/app/data/ozon_profile
+      - marketmind-runtime:/app/runtime
+      - ./runtime/ozon_profile:/app/runtime/ozon_profile
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,5 +32,5 @@ services:
       - "127.0.0.1:5432:5432"
 
 volumes:
-  bot-data:
+  marketmind-runtime:
   pg-data:

@@ -14,9 +14,7 @@ class TelegramAiReportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("База", message)
 
     async def test_forecast_includes_product_with_enough_prices(self):
-        db = SimpleNamespace(
-            get_all_products=AsyncMock(return_value=[SimpleNamespace(id=1, name="Товар")])
-        )
+        db = SimpleNamespace(get_all_products=AsyncMock(return_value=[SimpleNamespace(id=1, name="Товар")]))
         analyzer = Mock()
         analyzer._get_prices = AsyncMock(return_value=[100, 110, 120])
 
@@ -25,6 +23,21 @@ class TelegramAiReportTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("Прогноз", message)
         self.assertIn("Товар", message)
+
+    async def test_alerts_escape_product_name_and_url(self):
+        analyzer = Mock()
+        analyzer.price_alert_check = AsyncMock(return_value=[{
+            "icon": "🎯", "name": "Phone <script>", "price": 100,
+            "message": "Price < 120 & falling",
+            "url": "https://example.com/' onmouseover='alert(1)",
+        }])
+
+        with patch("app.ai_analyzer.DeepAnalyzer", return_value=analyzer):
+            message = await build_price_alerts_message(object())
+
+        self.assertIn("Phone &lt;script&gt;", message)
+        self.assertIn("Price &lt; 120 &amp; falling", message)
+        self.assertNotIn("onmouseover='alert(1)'", message)
 
     async def test_alerts_reports_empty_list(self):
         analyzer = Mock()

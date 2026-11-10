@@ -3,12 +3,14 @@ updater.py — Парсинг Озон через Playwright.
 Максимальная маскировка: случайные UA, имитация человека,
 скрытие webdriver, поддержка прокси.
 """
+
 import asyncio
 import contextlib
 import json
 import os
 import random
 import re
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -90,6 +92,7 @@ BROWSER_INIT_SCRIPT = """
 
 
 # ── Извлечение данных из HTML ─────────────────────────────────────────────────
+
 
 def _parse_price(text: str) -> int | None:
     digits = re.sub(r"[^\d]", "", text)
@@ -181,12 +184,66 @@ def _iter_json_values(value):
                 return
 
 
+def _ozon_review_signals(payload: dict, *, limit: int = 20) -> dict:
+    """Extract only explicit review text and aggregate rating signals from Ozon JSON."""
+    rating = None
+    reviews_count = None
+    reviews: list[str] = []
+    seen: set[str] = set()
+    review_container_keys = {"review", "reviews", "feedbacks", "reviewList", "reviewsList"}
+    review_text_keys = ("reviewBody", "reviewText", "text", "content", "comment", "message")
+
+    for node in _iter_json_values(payload):
+        for key, value in node.items():
+            if key in {"aggregateRating", "ratingSummary", "rating"} and isinstance(value, dict):
+                raw_rating = value.get("ratingValue", value.get("average", value.get("value")))
+                try:
+                    candidate = float(str(raw_rating).replace(",", "."))
+                except (TypeError, ValueError):
+                    candidate = None
+                if candidate is not None and 0 <= candidate <= 5:
+                    rating = candidate
+                for count_key in ("reviewCount", "ratingCount", "count", "total"):
+                    try:
+                        count = int(str(value.get(count_key)).replace(" ", "").replace("\u00a0", ""))
+                    except (TypeError, ValueError):
+                        continue
+                    if count >= 0:
+                        reviews_count = count
+                        break
+            if key not in review_container_keys:
+                continue
+            entries = value if isinstance(value, list) else [value]
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                body = next(
+                    (
+                        entry.get(text_key)
+                        for text_key in review_text_keys
+                        if isinstance(entry.get(text_key), str) and entry.get(text_key).strip()
+                    ),
+                    None,
+                )
+                if body:
+                    clean = re.sub(r"\s+", " ", body).strip()
+                    if clean and clean.casefold() not in seen:
+                        seen.add(clean.casefold())
+                        reviews.append(clean[:2000])
+                        if len(reviews) >= limit:
+                            break
+        if len(reviews) >= limit:
+            break
+    return {"rating": rating, "reviews_count": reviews_count, "reviews": reviews}
+
+
 def parse_ozon_api_json(payload: dict, url: str) -> dict | None:
     """Извлекает карточку из JSON-ответов Ozon composer/entrypoint API."""
     name_candidates = []
     price = None
     image_url = None
     out_of_stock = False
+    review_signals = _ozon_review_signals(payload)
 
     name_keys = {"name", "title", "productName", "nameText"}
     price_keys = {"price", "finalPrice", "cardPrice", "currentPrice", "priceWithCard"}
@@ -232,8 +289,16 @@ def parse_ozon_api_json(payload: dict, url: str) -> dict | None:
     if not name:
         return None
 
-    availability = "out_of_stock" if out_of_stock and not price else "in_stock" if price else "out_of_stock"
-    return {"name": name, "price": price, "availability": availability, "image_url": image_url}
+    # A price alone does not prove stock availability. Only explicit stock
+    # signals should produce in_stock/out_of_stock; otherwise preserve unknown.
+    availability = "out_of_stock" if out_of_stock else "unknown"
+    return {
+        "name": name,
+        "price": price,
+        "availability": availability,
+        "image_url": image_url,
+        **review_signals,
+    }
 
 
 def _detect_ozon_html_availability(soup: BeautifulSoup, price: int | None) -> str:
@@ -252,7 +317,7 @@ def _detect_ozon_html_availability(soup: BeautifulSoup, price: int | None) -> st
     if re.search(r"нет в наличии|товар недоступен|закончился|сообщить о поступлении", stock_text):
         return "out_of_stock"
 
-    return "in_stock" if price else "out_of_stock"
+    return "unknown"
 
 
 def parse_ozon_html(html: str, url: str) -> dict | None:
@@ -301,9 +366,7 @@ def parse_ozon_html(html: str, url: str) -> dict | None:
             break
 
     # Наличие
-    blocked_text = soup.find(string=re.compile(
-        r"доступ ограничен", re.I
-    ))
+    blocked_text = soup.find(string=re.compile(r"доступ ограничен", re.I))
     if blocked_text:
         return None  # страница блокировки
     availability = _detect_ozon_html_availability(soup, price)
@@ -326,6 +389,7 @@ def parse_ozon_html(html: str, url: str) -> dict | None:
 
 
 # ── Ninja браузер ─────────────────────────────────────────────────────────────
+
 
 class OzonUpdater:
     """Парсер Озона через Playwright."""
@@ -400,11 +464,30 @@ class OzonUpdater:
             await page.screenshot(path=str(base) + ".png", full_page=True)
             html = await page.content()
             (Path(str(base) + ".html")).write_text(html, encoding="utf-8")
+            debug_dir = base.parent
+            shutil.copy2(str(base) + ".png", debug_dir / "last_incident.png")
+            shutil.copy2(str(base) + ".html", debug_dir / "last_incident.html")
+            self._rotate_debug_dumps(debug_dir)
         except Exception:
             logger.debug("Non-critical operation failed", exc_info=True)
 
+    @staticmethod
+    def _rotate_debug_dumps(debug_dir: Path, keep: int = 50) -> None:
+        dump_stems = sorted(
+            {
+                path.stem
+                for path in debug_dir.iterdir()
+                if path.suffix in {".png", ".html"}
+                and re.match(r"^\d{8}_\d{6}_", path.stem)
+            }
+        )
+        for stem in dump_stems[:-keep]:
+            (debug_dir / f"{stem}.png").unlink(missing_ok=True)
+            (debug_dir / f"{stem}.html").unlink(missing_ok=True)
+
     async def __aenter__(self):
         from playwright.async_api import async_playwright
+
         self._pw = await async_playwright().start()
 
         headless_env = os.getenv("OZON_HEADLESS", "").strip()
@@ -450,7 +533,9 @@ class OzonUpdater:
         if self.proxy:
             logger.info("Ozon browser proxy configured: %s", mask_proxy_url(self.proxy))
             if not proxy_is_reachable(self.proxy):
-                logger.warning(f"Прокси недоступен (не слушает порт): {mask_proxy_url(self.proxy)}. Запускаю без прокси.")
+                logger.warning(
+                    f"Прокси недоступен (не слушает порт): {mask_proxy_url(self.proxy)}. Запускаю без прокси."
+                )
                 self.proxy = None
             else:
                 launch_args["proxy"] = {"server": self.proxy}
@@ -466,6 +551,7 @@ class OzonUpdater:
             return
         if not self._pw:
             from playwright.async_api import async_playwright
+
             self._pw = await async_playwright().start()
 
         profile_dir = self._profile_dir or ""
@@ -492,7 +578,9 @@ class OzonUpdater:
             )
         else:
             self._browser = await self._pw.chromium.launch(**launch_args)
-            logger.info(f"🌐 Браузер запущен {'с прокси ' + mask_proxy_url(self.proxy) if self.proxy else '(без прокси)'}")
+            logger.info(
+                f"🌐 Браузер запущен {'с прокси ' + mask_proxy_url(self.proxy) if self.proxy else '(без прокси)'}"
+            )
 
     async def __aexit__(self, *args):
         browser_started = bool(self._context or self._browser)
@@ -563,7 +651,8 @@ class OzonUpdater:
 
             if random.random() < 0.3:
                 import math
-                cx, cy = random.randint(200, vp["width"]-200), random.randint(200, vp["height"]-200)
+
+                cx, cy = random.randint(200, vp["width"] - 200), random.randint(200, vp["height"] - 200)
                 for angle in range(0, 360, 45):
                     rad = math.radians(angle)
                     x = cx + int(20 * math.cos(rad))
@@ -775,9 +864,9 @@ class OzonUpdater:
                         except Exception:
                             t = ""
                         logger.warning(
-                            f"h1/title не появились (попытка {attempt+1}) url={current_url} title_len={len(t)}"
+                            f"h1/title не появились (попытка {attempt + 1}) url={current_url} title_len={len(t)}"
                         )
-                        await self._dump_debug(page, f"ozon_no_title_{attempt+1}")
+                        await self._dump_debug(page, f"ozon_no_title_{attempt + 1}")
                         await self._wait_for_network(3, 6)
                         continue
 
@@ -796,9 +885,9 @@ class OzonUpdater:
                         incident = _extract_ozon_incident_id(html)
                         suffix = f" incident={incident}" if incident else ""
                         logger.warning(
-                            f"Блокировка Ozon/abt-challenge на попытке {attempt+1}/{RETRY_ATTEMPTS}{suffix}"
+                            f"Блокировка Ozon/abt-challenge на попытке {attempt + 1}/{RETRY_ATTEMPTS}{suffix}"
                         )
-                        await self._dump_debug(page, f"ozon_blocked_{attempt+1}")
+                        await self._dump_debug(page, f"ozon_blocked_{attempt + 1}")
                         if attempt + 1 < RETRY_ATTEMPTS:
                             await self._wait_for_network(15, 30)
                             continue
@@ -821,9 +910,9 @@ class OzonUpdater:
                     return html
 
                 except Exception as e:
-                    logger.warning(f"Попытка {attempt+1}/{RETRY_ATTEMPTS} ошибка: {e}")
-                    await self._dump_debug(page, f"ozon_exception_{attempt+1}")
-                    base_delay = 5 * (2 ** attempt)
+                    logger.warning(f"Попытка {attempt + 1}/{RETRY_ATTEMPTS} ошибка: {e}")
+                    await self._dump_debug(page, f"ozon_exception_{attempt + 1}")
+                    base_delay = 5 * (2**attempt)
                     await self._wait_for_network(base_delay, base_delay * 2)
 
             await self._record_attempt(
@@ -989,10 +1078,7 @@ class OzonUpdater:
                 added += 1
                 if callback:
                     icon = "✅" if data["availability"] == "in_stock" else "❌"
-                    await callback(
-                        f"{icon} <b>{data['name'][:60]}</b>\n"
-                        f"💰 {data['price']} ₽ | {data['availability']}"
-                    )
+                    await callback(f"{icon} <b>{data['name'][:60]}</b>\n💰 {data['price']} ₽ | {data['availability']}")
             else:
                 if callback:
                     await callback(f"⚠️ Не удалось получить данные (Озон заблокировал):\n{url}")
@@ -1009,39 +1095,52 @@ class OzonUpdater:
 
         for i, product in enumerate(products, 1):
             logger.info(f"[{i}/{len(products)}] {product.name}")
+            failure = None
             try:
                 data = await self.process_url(product.url, product_id=product.id)
             except Exception as e:
-                # A single product's browser/session failure (e.g. Playwright
-                # crashed) must not abort the rest of the batch -- fall back
-                # to the existing "no data" handling below instead of
-                # letting the exception propagate out of update_all() and
-                # silently drop every remaining product in this run.
+                # A local browser/session failure is not evidence that the
+                # marketplace blocked this product. Keep the batch running,
+                # but do not write a misleading blocked PriceHistory row.
                 logger.error(f"update_all: ошибка на {product.url}: {e}")
+                failure = e
                 data = None
 
             if data:
                 _, price_changed = await self.db.save_product(product.url, data)
                 updated += 1
                 if price_changed:
-                    changes.append({
-                        "name": data["name"],
-                        "price": data["price"],
-                        "availability": data["availability"],
-                        "url": product.url,
-                    })
+                    changes.append(
+                        {
+                            "name": data["name"],
+                            "price": data["price"],
+                            "availability": data["availability"],
+                            "url": product.url,
+                        }
+                    )
                 if callback:
                     icon = "✅" if data["availability"] == "in_stock" else "❌"
                     await callback(f"{icon} {data['name'][:50]}: {data['price']} ₽")
+            elif failure is not None:
+                logger.warning(
+                    f"Не удалось обновить {product.url}: {type(failure).__name__}"
+                )
+                if callback:
+                    await callback(
+                        f"⚠️ Ошибка при обновлении {product.name[:50]}: "
+                        f"{type(failure).__name__}"
+                    )
             else:
                 last = await self.db.get_last_price(product.id)
                 if not last or last.availability_status != "blocked":
                     async with self.db.session() as s:
-                        s.add(PriceHistory(
-                            product_id=product.id,
-                            price=None,
-                            availability_status="blocked",
-                        ))
+                        s.add(
+                            PriceHistory(
+                                product_id=product.id,
+                                price=None,
+                                availability_status="blocked",
+                            )
+                        )
                         await s.commit()
                 logger.warning(f"Временно недоступен (blocked): {product.url}")
                 if callback:

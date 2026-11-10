@@ -74,6 +74,4 @@ def parse_json_response(text: str, schema: type[_SchemaT]) -> _SchemaT:
         return schema.model_validate(data)
     except ValidationError as exc:
         logger.warning("Content pipeline schema validation failed for %s: %s", schema.__name__, exc)
-        raise ContentPipelineParseError(
-            f"LLM response did not match {schema.__name__}: {exc}", raw_text=text
-        ) from exc
+        raise ContentPipelineParseError(f"LLM response did not match {schema.__name__}: {exc}", raw_text=text) from exc

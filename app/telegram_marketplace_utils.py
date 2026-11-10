@@ -50,9 +50,22 @@ def _format_cross_marketplace_results(
             url = html.escape(product.url or "")
             price_str = f"{product.price} ₽" if product.price is not None else "цена не определена"
             availability = product.availability or "наличие не определено"
-            lines.append(f"{i}. <a href='{url}'>{name}</a>\n   💰 {price_str} · {html.escape(availability)}")
+            lines.append(f"{i}. <a href='{url}'>{name}</a>\n   💰 {html.escape(str(price_str))} · {html.escape(availability)}")
     lines.append("\n💡 Чтобы добавить товар в мониторинг, пришлите его ссылку.")
     return "\n".join(lines)
+
+
+def build_competitor_search_status(query: str) -> str:
+    """Tell the user which sources are searched when Ozon is cooling down."""
+    blocked_message = ozon_search_blocked_message()
+    safe_query = html.escape(query)
+    if blocked_message:
+        return (
+            f"🔎 {html.escape(blocked_message)} "
+            "Ищу альтернативы на Wildberries и Яндекс Маркете "
+            f"для карточки: <b>{safe_query}</b>..."
+        )
+    return f"🔎 Ищу конкурентов для карточки: <b>{safe_query}</b>..."
 
 
 def _flatten_competitor_results(results_by_marketplace: dict[str, list]) -> list[dict]:
@@ -72,8 +85,19 @@ def _flatten_competitor_results(results_by_marketplace: dict[str, list]) -> list
     return items
 
 
-async def _search_competitors_with_fallback(query: str, max_per_site: int = 5) -> list[dict]:
+async def _search_competitors_with_fallback(
+    query: str,
+    max_per_site: int = 5,
+    *,
+    exclude_marketplaces: tuple[str, ...] = (),
+) -> list[dict]:
     blocked_message = ozon_search_blocked_message()
-    exclude = ("ozon",) if blocked_message else ()
-    all_results = await search_all_marketplaces(query, max_per_site=max_per_site, exclude_marketplaces=exclude)
+    exclude = list(dict.fromkeys(exclude_marketplaces))
+    if blocked_message and "ozon" not in exclude:
+        exclude.append("ozon")
+    all_results = await search_all_marketplaces(
+        query,
+        max_per_site=max_per_site,
+        exclude_marketplaces=tuple(exclude),
+    )
     return _flatten_competitor_results(all_results)

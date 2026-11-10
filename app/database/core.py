@@ -40,12 +40,11 @@ from app.utils.proxy import mask_proxy_url
 
 # ── Database класс ────────────────────────────────────────────────────────────
 
+
 class Database:
     def __init__(self):
         self._engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
-        self._session_factory = async_sessionmaker(
-            self._engine, class_=AsyncSession, expire_on_commit=False
-        )
+        self._session_factory = async_sessionmaker(self._engine, class_=AsyncSession, expire_on_commit=False)
 
     async def init(self):
         """Инициализирует базу данных.
@@ -96,22 +95,17 @@ class Database:
                 await conn.exec_driver_sql(sql)
 
         if "fetch_status" in columns:
-            await conn.exec_driver_sql(
-                "UPDATE scrape_attempts SET status = COALESCE(status, fetch_status)"
-            )
+            await conn.exec_driver_sql("UPDATE scrape_attempts SET status = COALESCE(status, fetch_status)")
         if "created_at" in columns:
-            await conn.exec_driver_sql(
-                "UPDATE scrape_attempts SET recorded_at = COALESCE(recorded_at, created_at)"
-            )
-        await conn.exec_driver_sql(
-            "UPDATE scrape_attempts SET source = COALESCE(source, 'legacy')"
-        )
+            await conn.exec_driver_sql("UPDATE scrape_attempts SET recorded_at = COALESCE(recorded_at, created_at)")
+        await conn.exec_driver_sql("UPDATE scrape_attempts SET source = COALESCE(source, 'legacy')")
         await conn.exec_driver_sql(
             "UPDATE scrape_attempts SET success = COALESCE(success, CASE WHEN status = 'ok' THEN 1 ELSE 0 END)"
         )
 
     async def get_all_products(self) -> list[Product]:
         from sqlalchemy import select
+
         async with self.session() as s:
             result = await s.execute(select(Product))
             return result.scalars().all()
@@ -120,11 +114,7 @@ class Database:
         from sqlalchemy import desc, select
 
         async with self.session() as s:
-            result = await s.execute(
-                select(Product)
-                .order_by(desc(Product.last_check), desc(Product.id))
-                .limit(1)
-            )
+            result = await s.execute(select(Product).order_by(desc(Product.last_check), desc(Product.id)).limit(1))
             return result.scalar_one_or_none()
 
     async def create_job(self, job_type: str, payload: dict | None = None, *, job_id: str | None = None) -> JobRecord:
@@ -236,12 +226,14 @@ class Database:
 
     async def get_product_by_hash(self, url_hash: str) -> Product | None:
         from sqlalchemy import select
+
         async with self.session() as s:
             result = await s.execute(select(Product).where(Product.url_hash == url_hash))
             return result.scalar_one_or_none()
 
     async def get_last_price(self, product_id: int) -> PriceHistory | None:
         from sqlalchemy import desc, select
+
         async with self.session() as s:
             result = await s.execute(
                 select(PriceHistory)
@@ -296,50 +288,54 @@ class Database:
             error_text=errors_text or error_text,
         )
         async with self.session() as s:
-            s.add(ScrapeAttempt(
-                job_id=0,
-                product_id=product_id,
-                url=url,
-                site=site,
-                marketplace=marketplace,
-                task_type=task_type,
-                parser_used=parser_used,
-                fetch_status=status,
-                source=source,
-                status=status,
-                success=success,
-                http_status=http_status,
-                latency_ms=latency_ms,
-                proxy=proxy,
-                browser_profile=browser_profile,
-                strategy=strategy,
-                warnings=warnings_text,
-                confidence=confidence,
-                next_best_strategy=next_best_strategy,
-                error_class=error_class,
-                error_text=error_text,
-                errors=errors_text,
-                created_at=now,
-                recorded_at=now,
-            ))
-            if trigger:
-                s.add(BlockedPattern(
-                    recorded_at=now,
+            s.add(
+                ScrapeAttempt(
+                    job_id=0,
+                    product_id=product_id,
                     url=url,
-                    url_hash=url_to_hash(url) if url else None,
+                    site=site,
                     marketplace=marketplace,
+                    task_type=task_type,
+                    parser_used=parser_used,
+                    fetch_status=status,
                     source=source,
                     status=status,
-                    trigger=trigger,
+                    success=success,
+                    http_status=http_status,
+                    latency_ms=latency_ms,
                     proxy=proxy,
                     browser_profile=browser_profile,
                     strategy=strategy,
-                    cooldown_sec=max(0, int(cooldown_sec or 0)),
-                    http_status=http_status,
-                    latency_ms=max(0, int(latency_ms or 0)),
+                    warnings=warnings_text,
+                    confidence=confidence,
+                    next_best_strategy=next_best_strategy,
                     error_class=error_class,
-                    error_text=(error_text[:1000] if error_text else None),
-                ))
+                    error_text=error_text,
+                    errors=errors_text,
+                    created_at=now,
+                    recorded_at=now,
+                )
+            )
+            if trigger:
+                s.add(
+                    BlockedPattern(
+                        recorded_at=now,
+                        url=url,
+                        url_hash=url_to_hash(url) if url else None,
+                        marketplace=marketplace,
+                        source=source,
+                        status=status,
+                        trigger=trigger,
+                        proxy=proxy,
+                        browser_profile=browser_profile,
+                        strategy=strategy,
+                        cooldown_sec=max(0, int(cooldown_sec or 0)),
+                        http_status=http_status,
+                        latency_ms=max(0, int(latency_ms or 0)),
+                        error_class=error_class,
+                        error_text=(error_text[:1000] if error_text else None),
+                    )
+                )
             await s.commit()
         if trigger:
             self._append_blocked_pattern_jsonl(
@@ -431,7 +427,9 @@ class Database:
             logger.warning(
                 "blocked pattern write failed (marketplace=%s trigger=%s): "
                 "adaptive cooldown/circuit-breaker data may be incomplete",
-                marketplace, trigger, exc_info=True,
+                marketplace,
+                trigger,
+                exc_info=True,
             )
             return
         json_payload = {**payload, "recorded_at": now.isoformat()}
@@ -521,8 +519,7 @@ class Database:
         network_count = sum(1 for item in blocks if item.trigger == "network")
         browser_blocks = [item for item in blocks if item.source == "browser"]
         browser_failures = [
-            item for item in attempts
-            if item.source == "browser" and item.status not in {"ok", "skipped"}
+            item for item in attempts if item.source == "browser" and item.status not in {"ok", "skipped"}
         ]
         api_blocks = [item for item in blocks if item.source in {"api", "html"}]
 
@@ -567,15 +564,10 @@ class Database:
         }
 
         def build_reputation(field: str) -> dict:
-            keys = sorted({
-                str(getattr(item, field))
-                for item in attempts
-                if getattr(item, field)
-            } | {
-                str(getattr(item, field))
-                for item in blocks
-                if getattr(item, field)
-            })
+            keys = sorted(
+                {str(getattr(item, field)) for item in attempts if getattr(item, field)}
+                | {str(getattr(item, field)) for item in blocks if getattr(item, field)}
+            )
             reputation = {}
             for key in keys:
                 key_attempts = [item for item in attempts if str(getattr(item, field) or "") == key]
@@ -671,13 +663,9 @@ class Database:
 
         url_hash = url_to_hash(url) if url else None
         same_url = [event for event in recent if url_hash and event.url_hash == url_hash]
-        browser_blocks = [
-            event for event in recent
-            if event.source == "browser" and event.status == "blocked"
-        ]
+        browser_blocks = [event for event in recent if event.source == "browser" and event.status == "blocked"]
         browser_failures = [
-            event for event in attempts
-            if event.source == "browser" and event.status not in {"ok", "skipped"}
+            event for event in attempts if event.source == "browser" and event.status not in {"ok", "skipped"}
         ]
         network_failures = [event for event in recent if event.trigger == "network"]
 
@@ -885,12 +873,14 @@ class Database:
             price_changed = not last or last.price != new_price or last.availability_status != new_status
 
             if price_changed:
-                s.add(PriceHistory(
-                    product_id=product.id,
-                    price=new_price,
-                    availability_status=new_status,
-                    recorded_at=now,
-                ))
+                s.add(
+                    PriceHistory(
+                        product_id=product.id,
+                        price=new_price,
+                        availability_status=new_status,
+                        recorded_at=now,
+                    )
+                )
                 if last and not is_new:
                     logger.info(
                         f"Изменение [{product.name}]: "

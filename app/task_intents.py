@@ -168,7 +168,9 @@ class StructuredTask:
             parameters=dict(merged.parameters),
             payload=merged.payload,
             confidence=min(1.0, merged.confidence + 0.05),
-            plan=_build_plan(merged.type, merged.target_url, fields, merged.output, merged.requirements, merged.parameters),
+            plan=_build_plan(
+                merged.type, merged.target_url, fields, merged.output, merged.requirements, merged.parameters
+            ),
         )
 
 
@@ -401,11 +403,7 @@ def _looks_like_repair_task(low: str) -> bool:
 
 
 def _split_failure_warnings(error_text: str) -> list[str]:
-    return [
-        item.strip()
-        for item in re.split(r";|\n", error_text or "")
-        if item.strip()
-    ]
+    return [item.strip() for item in re.split(r";|\n", error_text or "") if item.strip()]
 
 
 def _build_repair_task(raw: str, urls: list[str]) -> StructuredTask:
@@ -453,17 +451,68 @@ def _build_repair_task(raw: str, urls: list[str]) -> StructuredTask:
 
 
 def _detect_failure_area(low: str) -> str:
-    if any(marker in low for marker in ("page_structure", "empty", "unknown_js", "\u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440", "\u043f\u0443\u0441\u0442\u0430\u044f \u0441\u0442\u0440\u0430\u043d")):
+    if any(
+        marker in low
+        for marker in (
+            "page_structure",
+            "empty",
+            "unknown_js",
+            "\u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440",
+            "\u043f\u0443\u0441\u0442\u0430\u044f \u0441\u0442\u0440\u0430\u043d",
+        )
+    ):
         return "page_structure"
-    if any(marker in low for marker in ("intent", "context", "task_type", "\u043d\u0430\u043c\u0435\u0440\u0435\u043d", "\u043a\u043e\u043d\u0442\u0435\u043a\u0441\u0442")):
+    if any(
+        marker in low
+        for marker in (
+            "intent",
+            "context",
+            "task_type",
+            "\u043d\u0430\u043c\u0435\u0440\u0435\u043d",
+            "\u043a\u043e\u043d\u0442\u0435\u043a\u0441\u0442",
+        )
+    ):
         return "intent"
-    if any(marker in low for marker in ("parse", "scrape", "extract", "selector", "html", "\u043f\u0430\u0440\u0441", "\u0438\u0437\u0432\u043b\u0435\u043a", "\u0441\u0435\u043b\u0435\u043a\u0442\u043e\u0440")):
+    if any(
+        marker in low
+        for marker in (
+            "parse",
+            "scrape",
+            "extract",
+            "selector",
+            "html",
+            "\u043f\u0430\u0440\u0441",
+            "\u0438\u0437\u0432\u043b\u0435\u043a",
+            "\u0441\u0435\u043b\u0435\u043a\u0442\u043e\u0440",
+        )
+    ):
         return "parser"
-    if any(marker in low for marker in ("csv", "xlsx", "json", "export", "\u044d\u043a\u0441\u043f\u043e\u0440\u0442", "\u0441\u043e\u0445\u0440\u0430\u043d")):
+    if any(
+        marker in low
+        for marker in (
+            "csv",
+            "xlsx",
+            "json",
+            "export",
+            "\u044d\u043a\u0441\u043f\u043e\u0440\u0442",
+            "\u0441\u043e\u0445\u0440\u0430\u043d",
+        )
+    ):
         return "export"
     if any(marker in low for marker in ("pytest", "test", "\u0442\u0435\u0441\u0442")):
         return "test"
-    if any(marker in low for marker in ("403", "429", "timeout", "blocked", "captcha", "\u0431\u043b\u043e\u043a", "\u0442\u0430\u0439\u043c\u0430\u0443\u0442")):
+    if any(
+        marker in low
+        for marker in (
+            "403",
+            "429",
+            "timeout",
+            "blocked",
+            "captcha",
+            "\u0431\u043b\u043e\u043a",
+            "\u0442\u0430\u0439\u043c\u0430\u0443\u0442",
+        )
+    ):
         return "network_or_antibot"
     return "unknown"
 
@@ -472,11 +521,34 @@ def _detect_repair_evidence_types(low: str) -> list[str]:
     evidence: list[str] = []
     markers = {
         "traceback": ("traceback", "exception", "stack trace"),
-        "failing_test": ("pytest failed", "assertionerror", "test failed", "\u0442\u0435\u0441\u0442 \u043f\u0430\u0434"),
-        "empty_extraction": ("no product records were extracted", "0 records", "empty result", "\u043d\u0435 \u0441\u043f\u0430\u0440\u0441", "\u043d\u0435 \u0441\u043e\u0431\u0440\u0430\u043b"),
-        "wrong_intent": ("wrong intent", "intent", "task_type", "\u043d\u0435\u0432\u0435\u0440\u043d\u043e \u043f\u043e\u043d\u044f\u043b"),
+        "failing_test": (
+            "pytest failed",
+            "assertionerror",
+            "test failed",
+            "\u0442\u0435\u0441\u0442 \u043f\u0430\u0434",
+        ),
+        "empty_extraction": (
+            "no product records were extracted",
+            "0 records",
+            "empty result",
+            "\u043d\u0435 \u0441\u043f\u0430\u0440\u0441",
+            "\u043d\u0435 \u0441\u043e\u0431\u0440\u0430\u043b",
+        ),
+        "wrong_intent": (
+            "wrong intent",
+            "intent",
+            "task_type",
+            "\u043d\u0435\u0432\u0435\u0440\u043d\u043e \u043f\u043e\u043d\u044f\u043b",
+        ),
         "http_status": ("http_status", "403", "429", "500", "502", "503"),
-        "bad_output_file": ("csv", "xlsx", "json", "export", "\u0444\u0430\u0439\u043b", "\u044d\u043a\u0441\u043f\u043e\u0440\u0442"),
+        "bad_output_file": (
+            "csv",
+            "xlsx",
+            "json",
+            "export",
+            "\u0444\u0430\u0439\u043b",
+            "\u044d\u043a\u0441\u043f\u043e\u0440\u0442",
+        ),
         "live_smoke": ("live smoke", "smoke", "\u0436\u0438\u0432\u0430\u044f \u043f\u0440\u043e\u0432\u0435\u0440"),
     }
     for name, values in markers.items():
@@ -488,9 +560,13 @@ def _detect_repair_evidence_types(low: str) -> list[str]:
 
 
 def _detect_repair_severity(low: str, evidence_types: list[str]) -> str:
-    if re.search(r"\b(security|secret|token)\b", low) or any(marker in low for marker in ("\u0441\u0435\u043a\u0440\u0435\u0442", "\u0442\u043e\u043a\u0435\u043d")):
+    if re.search(r"\b(security|secret|token)\b", low) or any(
+        marker in low for marker in ("\u0441\u0435\u043a\u0440\u0435\u0442", "\u0442\u043e\u043a\u0435\u043d")
+    ):
         return "critical"
-    if re.search(r"\b(production|prod)\b", low) or any(marker in low for marker in ("\u043f\u0440\u043e\u0434", "\u0431\u043e\u0435\u0432")):
+    if re.search(r"\b(production|prod)\b", low) or any(
+        marker in low for marker in ("\u043f\u0440\u043e\u0434", "\u0431\u043e\u0435\u0432")
+    ):
         return "critical"
     if "traceback" in evidence_types or "failing_test" in evidence_types or "empty_extraction" in evidence_types:
         return "high"
@@ -595,8 +671,10 @@ def _looks_like_scraping_task(raw: str, low: str, urls: list[str]) -> bool:
         "результат",
         "сохран",
     )
-    return _has_explicit_scraping_command(low) or any(word in low for word in scraping_words) or (
-        "\n" in raw and any(word in low for word in structure_words)
+    return (
+        _has_explicit_scraping_command(low)
+        or any(word in low for word in scraping_words)
+        or ("\n" in raw and any(word in low for word in structure_words))
     )
 
 
@@ -694,7 +772,11 @@ def _classify_scraping_domain_task(raw: str, urls: list[str], fields: list[str])
         parameters["page_structure"] = "catalog_or_article"
         return parameters
 
-    if "jsonplaceholder.typicode.com" in host or "/api/" in path or any(marker in low for marker in (" api ", "json api", "endpoint")):
+    if (
+        "jsonplaceholder.typicode.com" in host
+        or "/api/" in path
+        or any(marker in low for marker in (" api ", "json api", "endpoint"))
+    ):
         parameters["task_type"] = "api_source"
         parameters["entity_type"] = "record"
         parameters["next_strategy"] = "api"
@@ -763,8 +845,8 @@ def _extract_fields(raw: str) -> list[str]:
 
 def _extract_labeled_fields(raw: str) -> list[str]:
     fields: list[str] = []
-    label_fields = f"{chr(0x43f)}{chr(0x43e)}{chr(0x43b)}{chr(0x44f)}"
-    label_field = f"{chr(0x43f)}{chr(0x43e)}{chr(0x43b)}{chr(0x435)}"
+    label_fields = f"{chr(0x43F)}{chr(0x43E)}{chr(0x43B)}{chr(0x44F)}"
+    label_field = f"{chr(0x43F)}{chr(0x43E)}{chr(0x43B)}{chr(0x435)}"
     pattern = rf"^\s*(?:fields?|{label_fields}|{label_field})\s*[:=]\s*(.+)$"
     for line in raw.splitlines():
         match = re.match(pattern, line, flags=re.I)
@@ -825,29 +907,31 @@ def _canonical_field_name(normalized: str) -> str | None:
         "фото": "image_url",
         "описание": "description",
     }
-    aliases.update({
-        "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435": "title",
-        "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435_\u043a\u043d\u0438\u0433\u0438": "title",
-        "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435_\u0442\u043e\u0432\u0430\u0440\u0430": "title",
-        "\u0438\u043c\u044f": "title",
-        "\u043d\u0430\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u0435": "title",
-        "\u0446\u0435\u043d\u0430": "price",
-        "\u0446\u0435\u043d\u0443": "price",
-        "\u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c": "price",
-        "\u043d\u0430\u043b\u0438\u0447\u0438\u0435": "availability",
-        "\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c": "availability",
-        "\u0440\u0435\u0439\u0442\u0438\u043d\u0433": "rating",
-        "\u043e\u0446\u0435\u043d\u043a\u0430": "rating",
-        "\u0441\u0441\u044b\u043b\u043a\u0430": "product_url",
-        "\u0441\u0441\u044b\u043b\u043a\u0443": "product_url",
-        "\u0441\u0441\u044b\u043b\u043a\u0430_\u043d\u0430_\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443": "product_url",
-        "\u0441\u0441\u044b\u043b\u043a\u0443_\u043d\u0430_\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443": "product_url",
-        "url_\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438": "product_url",
-        "\u043a\u0430\u0440\u0442\u0438\u043d\u043a\u0430": "image_url",
-        "\u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435": "image_url",
-        "\u0444\u043e\u0442\u043e": "image_url",
-        "\u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0435": "description",
-    })
+    aliases.update(
+        {
+            "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435": "title",
+            "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435_\u043a\u043d\u0438\u0433\u0438": "title",
+            "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435_\u0442\u043e\u0432\u0430\u0440\u0430": "title",
+            "\u0438\u043c\u044f": "title",
+            "\u043d\u0430\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u0435": "title",
+            "\u0446\u0435\u043d\u0430": "price",
+            "\u0446\u0435\u043d\u0443": "price",
+            "\u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c": "price",
+            "\u043d\u0430\u043b\u0438\u0447\u0438\u0435": "availability",
+            "\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c": "availability",
+            "\u0440\u0435\u0439\u0442\u0438\u043d\u0433": "rating",
+            "\u043e\u0446\u0435\u043d\u043a\u0430": "rating",
+            "\u0441\u0441\u044b\u043b\u043a\u0430": "product_url",
+            "\u0441\u0441\u044b\u043b\u043a\u0443": "product_url",
+            "\u0441\u0441\u044b\u043b\u043a\u0430_\u043d\u0430_\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443": "product_url",
+            "\u0441\u0441\u044b\u043b\u043a\u0443_\u043d\u0430_\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443": "product_url",
+            "url_\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438": "product_url",
+            "\u043a\u0430\u0440\u0442\u0438\u043d\u043a\u0430": "image_url",
+            "\u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435": "image_url",
+            "\u0444\u043e\u0442\u043e": "image_url",
+            "\u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0435": "description",
+        }
+    )
     return aliases.get(normalized)
 
 
@@ -931,7 +1015,8 @@ def _is_requirement_candidate(normalized: str) -> bool:
 
 def _is_report_instruction_candidate(normalized: str) -> bool:
     return bool(
-        normalized in {
+        normalized
+        in {
             "после_выполнения_напиши",
             "сколько_книг_собрано",
             "какие_файлы_созданы",
@@ -950,12 +1035,8 @@ def _is_ascii_field_name(normalized: str) -> bool:
 
 
 def _is_save_output_command(normalized: str) -> bool:
-    save_stem = f"{chr(0x441)}{chr(0x43e)}{chr(0x445)}"
-    return "csv" in normalized and (
-        "save" in normalized
-        or "export" in normalized
-        or save_stem in normalized
-    )
+    save_stem = f"{chr(0x441)}{chr(0x43E)}{chr(0x445)}"
+    return "csv" in normalized and ("save" in normalized or "export" in normalized or save_stem in normalized)
 
 
 def _is_requirement_action(normalized: str) -> bool:
@@ -968,7 +1049,8 @@ def _is_requirement_action(normalized: str) -> bool:
 def _is_scope_command_candidate(normalized: str) -> bool:
     normalized = normalized.strip().replace("-", "_")
     return bool(
-        normalized in {
+        normalized
+        in {
             "собери_все",
             "собери_все_книги",
             "спарси_все",
@@ -1006,13 +1088,15 @@ def _extract_requirements(raw: str) -> list[str]:
         "error handling": ("error handling", "errors", "ошиб"),
         "pagination": ("pagination", "пагинац"),
     }
-    low_map.update({
-        "logging": (*low_map["logging"], "логирован"),
-        "retry": (*low_map["retry"], "ретра", "повтор"),
-        "delay": (*low_map["delay"], "задерж"),
-        "error handling": (*low_map["error handling"], "ошиб"),
-        "pagination": (*low_map["pagination"], "пагинац"),
-    })
+    low_map.update(
+        {
+            "logging": (*low_map["logging"], "логирован"),
+            "retry": (*low_map["retry"], "ретра", "повтор"),
+            "delay": (*low_map["delay"], "задерж"),
+            "error handling": (*low_map["error handling"], "ошиб"),
+            "pagination": (*low_map["pagination"], "пагинац"),
+        }
+    )
     low = raw.lower()
     return [name for name, markers in low_map.items() if any(marker in low for marker in markers)]
 
@@ -1028,11 +1112,26 @@ def _extract_parameters(raw: str) -> dict[str, object]:
         or re.search(r"\b(собери|спарси|получи|извлеки)\s+данные\s+по\s+всем\b", low)
         or re.search(r"\b(собери|спарси|получи|извлеки)\s+все\b", low)
         or re.search(r"\b(collect|scrape|parse|extract)\s+all\b", low)
-        or any(token in normalized for token in ("собери_все", "собери_все_книги", "все_товары", "все_книги", "всем_книгам", "all_pages", "all_products", "all_books"))
+        or any(
+            token in normalized
+            for token in (
+                "собери_все",
+                "собери_все_книги",
+                "все_товары",
+                "все_книги",
+                "всем_книгам",
+                "all_pages",
+                "all_products",
+                "all_books",
+            )
+        )
     ):
         params["scope"] = "all_pages"
         params["pagination"] = True
-    elif re.search(r"\b(собери|спарси|получи|извлеки)\s+с\s+первой\s+страницы\b", low) or "собери_с_первой_страницы" in normalized:
+    elif (
+        re.search(r"\b(собери|спарси|получи|извлеки)\s+с\s+первой\s+страницы\b", low)
+        or "собери_с_первой_страницы" in normalized
+    ):
         params["scope"] = "first_page"
     elif "pagination" in low or "пагинац" in low:
         params["pagination"] = True
@@ -1041,9 +1140,7 @@ def _extract_parameters(raw: str) -> dict[str, object]:
 
 def _mentions_price_assortment(raw: str) -> bool:
     low = raw.lower()
-    return bool(
-        re.search(r"\b(price|prices|цены|цену|прайс|стоимость|ассортимент|меню)\b", low)
-    )
+    return bool(re.search(r"\b(price|prices|цены|цену|прайс|стоимость|ассортимент|меню)\b", low))
 
 
 def _mentions_restaurant_menu(raw: str) -> bool:
@@ -1268,7 +1365,17 @@ def _is_training_protocol_fragment(raw: str) -> bool:
         "почему ты так решил",
     }:
         return True
-    protocol_tokens = {"status", "warnings", "task_type", "page_structure", "confidence", "intent", "action", "url", "http_status"}
+    protocol_tokens = {
+        "status",
+        "warnings",
+        "task_type",
+        "page_structure",
+        "confidence",
+        "intent",
+        "action",
+        "url",
+        "http_status",
+    }
     if re.search(r"[а-яё]", text, flags=re.I):
         return False
     tokens = set(re.findall(r"[a-z_]+", text))

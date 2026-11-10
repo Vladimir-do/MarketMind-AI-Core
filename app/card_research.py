@@ -2,7 +2,7 @@ import html
 import re
 from statistics import median
 
-from app.ai_client import ai_is_available, ask_ai
+from app.ai_client import AIClientError, ai_is_available, ask_ai
 
 
 async def build_card_research_report(query: str, competitors: list[dict]) -> str:
@@ -20,13 +20,16 @@ async def build_card_research_report(query: str, competitors: list[dict]) -> str
     if not ai_is_available():
         return local_report + "\n\n<i>AI недоступен, показан локальный анализ.</i>"
 
-    ai_text = await ask_ai(
-        _build_ai_prompt(query, competitors, prices, words),
-        system=AI_RESEARCH_SYSTEM_PROMPT,
-        max_tokens=1200,
-    )
-    if not ai_text or ai_text.startswith("AI error:") or "AI недоступен" in ai_text:
-        return local_report + f"\n\n<i>{html.escape(ai_text or 'AI не вернул ответ.')}</i>"
+    try:
+        ai_text = await ask_ai(
+            _build_ai_prompt(query, competitors, prices, words),
+            system=AI_RESEARCH_SYSTEM_PROMPT,
+            max_tokens=1200,
+        )
+    except AIClientError:
+        return local_report + "\n\n<i>AI временно недоступен, показан локальный анализ.</i>"
+    if not ai_text:
+        return local_report + "\n\n<i>AI не вернул ответ, показан локальный анализ.</i>"
 
     return local_report + "\n\n<b>AI-рекомендации для карточки:</b>\n" + html.escape(ai_text)
 
@@ -46,10 +49,7 @@ def _build_local_report(query: str, competitors: list[dict], prices: list[int], 
 
     if prices:
         lines.append(
-            "Цена: "
-            f"мин <b>{min(prices)} ₽</b>, "
-            f"медиана <b>{int(median(prices))} ₽</b>, "
-            f"макс <b>{max(prices)} ₽</b>"
+            f"Цена: мин <b>{min(prices)} ₽</b>, медиана <b>{int(median(prices))} ₽</b>, макс <b>{max(prices)} ₽</b>"
         )
     else:
         lines.append("Цена: не удалось определить по выдаче")
@@ -70,11 +70,17 @@ def _build_local_report(query: str, competitors: list[dict], prices: list[int], 
 
     lines.append("\n<b>Что взять в карточку:</b>")
     if words:
-        lines.append(f"Название: используйте 3-5 сильных слов из выдачи: {', '.join(html.escape(w) for w, _ in words[:5])}.")
+        lines.append(
+            f"Название: используйте 3-5 сильных слов из выдачи: {', '.join(html.escape(w) for w, _ in words[:5])}."
+        )
     if prices:
-        lines.append(f"Цена: ориентир для старта около медианы, <b>{int(median(prices))} ₽</b>, если товар сопоставим по качеству.")
+        lines.append(
+            f"Цена: ориентир для старта около медианы, <b>{int(median(prices))} ₽</b>, если товар сопоставим по качеству."
+        )
     lines.append("Фото: главное фото на светлом фоне, плюс 3-5 ракурсов, размер, комплектация, сценарий использования.")
-    lines.append("Характеристики: обязательно заполнить материал, цвет, размер, вес, комплектацию и совместимость, если применимо.")
+    lines.append(
+        "Характеристики: обязательно заполнить материал, цвет, размер, вес, комплектацию и совместимость, если применимо."
+    )
     return "\n".join(lines)
 
 
@@ -111,8 +117,20 @@ def _build_ai_prompt(query: str, competitors: list[dict], prices: list[int], wor
 
 def _top_words(names: list[str]) -> list[tuple[str, int]]:
     stop = {
-        "для", "или", "без", "при", "под", "над", "товар", "шт", "набор",
-        "ozon", "wb", "wildberries", "черный", "белый",
+        "для",
+        "или",
+        "без",
+        "при",
+        "под",
+        "над",
+        "товар",
+        "шт",
+        "набор",
+        "ozon",
+        "wb",
+        "wildberries",
+        "черный",
+        "белый",
     }
     counts: dict[str, int] = {}
     for name in names:

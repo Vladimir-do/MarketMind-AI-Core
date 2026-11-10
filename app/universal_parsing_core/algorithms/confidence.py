@@ -23,7 +23,8 @@ def calculate_confidence(
         return 0.2
 
     complete_entities = [
-        entity for entity in entities
+        entity
+        for entity in entities
         if entity.title
         and entity.price is not None
         and bool(entity.url)
@@ -31,15 +32,14 @@ def calculate_confidence(
         and not bool(entity.attributes.get("title_is_price_only"))
     ]
     title_price_entities = [
-        entity for entity in entities
-        if entity.title
-        and entity.price is not None
-        and not bool(entity.attributes.get("title_is_price_only"))
+        entity
+        for entity in entities
+        if entity.title and entity.price is not None and not bool(entity.attributes.get("title_is_price_only"))
     ]
     price_only_entities = [
-        entity for entity in entities
-        if entity.price is not None
-        and (not entity.title or bool(entity.attributes.get("title_is_price_only")))
+        entity
+        for entity in entities
+        if entity.price is not None and (not entity.title or bool(entity.attributes.get("title_is_price_only")))
     ]
 
     if complete_entities:

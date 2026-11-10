@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import json
 import re
@@ -13,6 +14,9 @@ from app.parsers.base import BaseParser, ProductData
 from app.utils.urls import YANDEX_MARKET_HOSTS, is_yandex_market_url  # noqa: F401 — backward compat re-export
 
 AttemptRecorder = Callable[..., Awaitable[None]]
+
+MAX_FETCH_ATTEMPTS = 3
+RETRY_BASE_DELAY_SECONDS = 1.0
 
 
 def parse_yandex_market_html(html: str, url: str) -> ProductData | None:
@@ -39,7 +43,9 @@ def parse_yandex_market_html(html: str, url: str) -> ProductData | None:
     rating = _rating_from_json(product)
     reviews_count = _reviews_count_from_json(product)
     brand = _brand_from_json(product)
-    category = _json_value(product, "category")
+    category = _category_from_json(product)
+    seller_name = _seller_from_offer(offer)
+    reviews = _reviews_from_json(product)
 
     return ProductData(
         name=name,
@@ -51,10 +57,62 @@ def parse_yandex_market_html(html: str, url: str) -> ProductData | None:
         image_url=image_url,
         rating=rating,
         reviews_count=reviews_count,
+        seller_name=seller_name,
         brand=brand,
-        category=category if isinstance(category, str) else None,
+        category=category,
         marketplace="yandex_market",
+        reviews=reviews,
     )
+
+
+def parse_yandex_market_search_html(html: str, max_results: int = 5) -> list[ProductData]:
+    """Extract real product offers from Schema.org Product nodes in ItemList."""
+    if max_results <= 0 or not html:
+        return []
+    soup = BeautifulSoup(html, "lxml")
+    products: list[ProductData] = []
+    seen_urls: set[str] = set()
+    for node in _walk_json(_json_ld_items(soup)):
+        if not isinstance(node, dict) or str(node.get("@type", "")).lower() != "product":
+            continue
+        name = _clean_name(node.get("name"))
+        product_url = str(node.get("url") or node.get("@id") or "").strip()
+        if not name or not product_url:
+            continue
+        product_url = urljoin("https://market.yandex.ru/", product_url)
+        # A search page URL is not a product destination and must never be exported.
+        if "/search" in product_url.lower() or "market.yandex.ru" not in product_url.lower():
+            continue
+        canonical_url = product_url.split("?", 1)[0].rstrip("/").lower()
+        if canonical_url in seen_urls:
+            continue
+        seen_urls.add(canonical_url)
+        offer = node.get("offers")
+        price = _price_from_offer(offer)
+        image_url = _image_from_json(node)
+        if image_url:
+            image_url = urljoin("https://market.yandex.ru/", image_url)
+        products.append(
+            ProductData(
+                name=name,
+                price=price,
+                old_price=None,
+                discount_pct=None,
+                availability=_availability_from_offer(offer, "", price),
+                url=product_url,
+                image_url=image_url,
+                rating=_rating_from_json(node),
+                reviews_count=_reviews_count_from_json(node),
+                seller_name=_seller_from_offer(offer),
+                brand=_brand_from_json(node),
+                category=_category_from_json(node),
+                marketplace="yandex_market",
+                reviews=_reviews_from_json(node),
+            )
+        )
+        if len(products) >= max_results:
+            break
+    return products
 
 
 class YandexMarketParser(BaseParser):
@@ -92,68 +150,168 @@ class YandexMarketParser(BaseParser):
     async def fetch_product(self, url: str) -> ProductData | None:
         started = perf_counter()
         status_code = None
+        for attempt in range(MAX_FETCH_ATTEMPTS):
+            attempt_started = perf_counter()
+            try:
+                retry_server_error = False
+                async with (
+                    aiohttp.ClientSession(headers=_headers(url)) as session,
+                    session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response,
+                ):
+                    status_code = response.status
+                    retry_server_error = status_code >= 500 and attempt + 1 < MAX_FETCH_ATTEMPTS
+                    html = "" if retry_server_error else await response.text(errors="replace")
+
+                if retry_server_error:
+                    delay = RETRY_BASE_DELAY_SECONDS * (2**attempt)
+                    logger.warning(
+                        "Yandex Market temporary server error: "
+                        f"status={status_code}, attempt={attempt + 1}/{MAX_FETCH_ATTEMPTS}; "
+                        f"retrying in {delay:.1f}s"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                latency_ms = int((perf_counter() - attempt_started) * 1000)
+                if status_code in {403, 429}:
+                    logger.warning(f"Yandex Market blocked: status={status_code} url={url}")
+                    await self._record_attempt(
+                        url=url,
+                        source="html",
+                        status="blocked",
+                        http_status=status_code,
+                        latency_ms=latency_ms,
+                    )
+                    return None
+                if status_code >= 400:
+                    await self._record_attempt(
+                        url=url,
+                        source="html",
+                        status="http_error",
+                        http_status=status_code,
+                        latency_ms=latency_ms,
+                    )
+                    return None
+                data = parse_yandex_market_html(html, url)
+                if not data and _looks_blocked(html.lower()):
+                    await self._record_attempt(
+                        url=url,
+                        source="html",
+                        status="blocked",
+                        http_status=status_code,
+                        latency_ms=latency_ms,
+                    )
+                    return None
+                await self._record_attempt(
+                    url=url,
+                    source="html",
+                    status="ok" if data else "parse_error",
+                    http_status=status_code,
+                    latency_ms=latency_ms,
+                )
+                return data
+            except (TimeoutError, aiohttp.ClientError) as exc:
+                latency_ms = int((perf_counter() - attempt_started) * 1000)
+                if attempt + 1 < MAX_FETCH_ATTEMPTS:
+                    delay = RETRY_BASE_DELAY_SECONDS * (2**attempt)
+                    logger.warning(
+                        "Yandex Market temporary network error: "
+                        f"{type(exc).__name__}, attempt={attempt + 1}/{MAX_FETCH_ATTEMPTS}; "
+                        f"retrying in {delay:.1f}s"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                logger.warning(f"Yandex Market fetch error after retries: {exc}")
+                await self._record_attempt(
+                    url=url,
+                    source="html",
+                    status="error",
+                    http_status=status_code,
+                    latency_ms=latency_ms,
+                    error=exc,
+                )
+                return None
+            except Exception as exc:
+                latency_ms = int((perf_counter() - attempt_started) * 1000)
+                logger.warning(f"Yandex Market fetch error: {exc}")
+                await self._record_attempt(
+                    url=url,
+                    source="html",
+                    status="error",
+                    http_status=status_code,
+                    latency_ms=latency_ms,
+                    error=exc,
+                )
+                return None
+
+        # Defensive fallback: the bounded loop always returns from its final attempt.
+        await self._record_attempt(
+            url=url,
+            source="html",
+            status="error",
+            http_status=status_code,
+            latency_ms=int((perf_counter() - started) * 1000),
+        )
+        return None
+
+    async def search(self, query: str, max_results: int = 5) -> list[ProductData]:
+        """Return individual product offers from search-page JSON-LD ItemList.
+
+        Parsing the search page with fetch_product() returns one synthetic result
+        whose URL is the search URL itself. Use the Product entries embedded in
+        the ItemList instead, preserving each real product URL and price.
+        """
+        url = f"https://market.yandex.ru/search?text={quote_plus(query)}"
+        started = perf_counter()
         try:
             async with (
                 aiohttp.ClientSession(headers=_headers(url)) as session,
                 session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response,
             ):
-                status_code = response.status
+                status = response.status
                 html = await response.text(errors="replace")
             latency_ms = int((perf_counter() - started) * 1000)
-            if status_code in {403, 429}:
-                logger.warning(f"Yandex Market blocked: status={status_code} url={url}")
+            if status in {403, 429}:
+                logger.warning(f"Yandex Market search blocked: status={status} query={query!r}")
                 await self._record_attempt(
-                    url=url,
-                    source="html",
-                    status="blocked",
-                    http_status=status_code,
-                    latency_ms=latency_ms,
+                    url=url, source="search_jsonld", status="blocked", http_status=status, latency_ms=latency_ms
                 )
-                return None
-            if status_code >= 400:
+                return []
+            if status >= 400:
                 await self._record_attempt(
-                    url=url,
-                    source="html",
-                    status="http_error",
-                    http_status=status_code,
-                    latency_ms=latency_ms,
+                    url=url, source="search_jsonld", status="http_error", http_status=status, latency_ms=latency_ms
                 )
-                return None
-            data = parse_yandex_market_html(html, url)
-            if not data and _looks_blocked(html.lower()):
-                await self._record_attempt(
-                    url=url,
-                    source="html",
-                    status="blocked",
-                    http_status=status_code,
-                    latency_ms=latency_ms,
-                )
-                return None
+                return []
+            results = parse_yandex_market_search_html(html, max_results=max_results)
             await self._record_attempt(
                 url=url,
-                source="html",
-                status="ok" if data else "parse_error",
-                http_status=status_code,
+                source="search_jsonld",
+                status="ok" if results else ("blocked" if _looks_blocked(html.lower()) else "parse_error"),
+                http_status=status,
                 latency_ms=latency_ms,
             )
-            return data
-        except Exception as exc:
-            latency_ms = int((perf_counter() - started) * 1000)
-            logger.warning(f"Yandex Market fetch error: {exc}")
+            logger.info(f"Yandex Market search: {len(results)} product offers for query={query!r}")
+            return results
+        except (TimeoutError, aiohttp.ClientError) as exc:
+            logger.warning(f"Yandex Market search network error: {type(exc).__name__}: {exc}")
             await self._record_attempt(
                 url=url,
-                source="html",
+                source="search_jsonld",
                 status="error",
-                http_status=status_code,
-                latency_ms=latency_ms,
+                latency_ms=int((perf_counter() - started) * 1000),
                 error=exc,
             )
-            return None
-
-    async def search(self, query: str, max_results: int = 5) -> list[ProductData]:
-        url = f"https://market.yandex.ru/search?text={quote_plus(query)}"
-        data = await self.fetch_product(url)
-        return [data] if data else []
+            return []
+        except Exception as exc:
+            logger.warning(f"Yandex Market search parse error: {type(exc).__name__}: {exc}")
+            await self._record_attempt(
+                url=url,
+                source="search_jsonld",
+                status="error",
+                latency_ms=int((perf_counter() - started) * 1000),
+                error=exc,
+            )
+            return []
 
 
 def _headers(url: str) -> dict[str, str]:
@@ -259,9 +417,12 @@ def _availability_from_offer(offer, text: str, price: int | None) -> str:
     joined = " ".join(values).lower()
     if "outofstock" in joined or "soldout" in joined or "нет в продаже" in text:
         return "out_of_stock"
-    if "instock" in joined or price:
+    if "instock" in joined:
         return "in_stock"
-    return "out_of_stock"
+    if "outofstock" in joined or "soldout" in joined:
+        return "out_of_stock"
+    # A missing stock signal is not proof that the product is unavailable.
+    return "unknown"
 
 
 def _image_from_json(product: dict) -> str | None:
@@ -277,17 +438,71 @@ def _rating_from_json(product: dict) -> float | None:
     rating = _json_value(product, "aggregateRating")
     value = _json_value(rating, "ratingValue")
     try:
-        return float(str(value).replace(",", ".")) if value is not None else None
-    except ValueError:
+        parsed = float(str(value).replace(",", ".")) if value is not None else None
+    except (TypeError, ValueError):
         return None
+    return parsed if parsed is not None and 0 <= parsed <= 5 else None
 
 
 def _reviews_count_from_json(product: dict) -> int | None:
     rating = _json_value(product, "aggregateRating")
     for key in ("reviewCount", "ratingCount"):
-        value = _int_price(_json_value(rating, key))
-        if value is not None:
+        raw = _json_value(rating, key)
+        try:
+            value = int(str(raw).replace(" ", "").replace("\u00a0", ""))
+        except (TypeError, ValueError):
+            continue
+        if value >= 0:
             return value
+    return None
+
+
+def _reviews_from_json(product: dict, limit: int = 20) -> list[str]:
+    """Extract only explicit review text; never synthesize review content."""
+    raw_reviews = _json_value(product, "review")
+    if isinstance(raw_reviews, dict):
+        raw_reviews = [raw_reviews]
+    if not isinstance(raw_reviews, list):
+        return []
+    reviews = []
+    seen = set()
+    for item in raw_reviews:
+        if not isinstance(item, dict):
+            continue
+        body = item.get("reviewBody") or item.get("description")
+        if not isinstance(body, str):
+            continue
+        body = re.sub(r"\s+", " ", body).strip()
+        if body and body.casefold() not in seen:
+            seen.add(body.casefold())
+            reviews.append(body[:2000])
+        if len(reviews) >= limit:
+            break
+    return reviews
+
+
+def _seller_from_offer(offer) -> str | None:
+    offers = offer if isinstance(offer, list) else [offer]
+    for item in offers:
+        if not isinstance(item, dict):
+            continue
+        seller = item.get("seller")
+        if isinstance(seller, dict):
+            name = seller.get("name")
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        elif isinstance(seller, str) and seller.strip():
+            return seller.strip()
+    return None
+
+
+def _category_from_json(product: dict) -> str | None:
+    value = _json_value(product, "category")
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, list):
+        parts = [str(part).strip() for part in value if str(part).strip()]
+        return " / ".join(parts) or None
     return None
 
 

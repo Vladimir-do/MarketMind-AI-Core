@@ -24,4 +24,3 @@ class FetchStatus(StrEnum):
     NETWORK_ERROR = "network_error"
     PARSE_ERROR = "parse_error"
     SKIPPED = "skipped"
-

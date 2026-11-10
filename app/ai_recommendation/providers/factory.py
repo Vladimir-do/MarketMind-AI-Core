@@ -32,7 +32,7 @@ _PROVIDER_MODELS: dict[ProviderType, str] = {
     ProviderType.deepseek: "deepseek-chat",
     ProviderType.mimo: "mimo-auto",
     ProviderType.ollama: "llama3",
-    ProviderType.claude: "claude-3-haiku-20240307",
+    ProviderType.claude: "claude-sonnet-5-5",
     ProviderType.grok: "grok-1",
     ProviderType.gemini: "gemini-2.5-flash",
     ProviderType.groq: "openai/gpt-oss-120b",

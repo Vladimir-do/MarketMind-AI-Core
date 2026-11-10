@@ -10,7 +10,11 @@ class CardResearchTests(unittest.IsolatedAsyncioTestCase):
             report = await build_card_research_report(
                 "держатель телефона",
                 [
-                    {"name": "Держатель телефона автомобильный магнитный", "price": 500, "url": "https://example.com/1"},
+                    {
+                        "name": "Держатель телефона автомобильный магнитный",
+                        "price": 500,
+                        "url": "https://example.com/1",
+                    },
                     {"name": "Держатель телефона в машину на панель", "price": 700, "url": "https://example.com/2"},
                     {"name": "Автомобильный держатель смартфона", "price": 900, "url": "https://example.com/3"},
                 ],
@@ -33,6 +37,22 @@ class CardResearchTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("AI-рекомендации", report)
         self.assertIn("SEO:", report)
+
+    async def test_typed_ai_error_keeps_local_report(self):
+        from app.ai_client import AIClientError
+
+        with (
+            patch("app.card_research.ai_is_available", return_value=True),
+            patch("app.card_research.ask_ai", new=AsyncMock(side_effect=AIClientError("network"))),
+        ):
+            report = await build_card_research_report(
+                "держатель телефона",
+                [{"name": "Держатель телефона автомобильный", "price": 500, "url": "https://example.com/1"}],
+            )
+
+        self.assertIn("Найдено товаров", report)
+        self.assertIn("AI временно недоступен", report)
+        self.assertNotIn("network", report)
 
     async def test_empty_report_is_clear(self):
         with patch("app.card_research.ai_is_available", return_value=False):

@@ -48,13 +48,30 @@ class _FakeGeminiSession:
 
 
 class AiClientTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncTearDown(self):
+        await ai_client.close_ai_clients()
+
     async def test_missing_grok_key_reports_configuration_error(self):
-        with patch.object(ai_client, "AI_PROVIDER", "grok"), patch.object(ai_client, "GROK_API_KEY", ""):
+        with (
+            patch.object(ai_client, "AI_ENABLED", True),
+            patch.object(ai_client, "AI_PROVIDER", "grok"),
+            patch.object(ai_client, "GROK_API_KEY", ""),
+        ):
             self.assertFalse(ai_client.ai_is_available())
             self.assertIn("GROK_API_KEY", ai_client.ai_missing_message())
 
+    async def test_ai_disabled_flag_disables_ai_even_with_keys(self):
+        with (
+            patch.object(ai_client, "AI_ENABLED", False),
+            patch.object(ai_client, "AI_PROVIDER", "gemini"),
+            patch.object(ai_client, "GEMINI_API_KEY", "gemini-test"),
+        ):
+            self.assertFalse(ai_client.ai_is_available())
+            self.assertIn("AI_ENABLED", ai_client.ai_missing_message())
+
     async def test_ask_ai_routes_to_grok(self):
         with (
+            patch.object(ai_client, "AI_ENABLED", True),
             patch.object(ai_client, "AI_PROVIDER", "grok"),
             patch.object(ai_client, "GROK_API_KEY", "xai-test"),
             patch.object(ai_client, "_ask_grok", new=AsyncMock(return_value="ok")) as ask_grok,
@@ -65,6 +82,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ask_ai_routes_to_claude(self):
         with (
+            patch.object(ai_client, "AI_ENABLED", True),
             patch.object(ai_client, "AI_PROVIDER", "claude"),
             patch.object(ai_client, "ANTHROPIC_API_KEY", "sk-test"),
             patch.object(ai_client, "_ask_claude", new=AsyncMock(return_value="ok")) as ask_claude,
@@ -72,6 +90,92 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
             result = await ai_client.ask_ai("hello")
         self.assertEqual(result, "ok")
         ask_claude.assert_awaited_once()
+
+    async def test_ask_ai_raises_typed_error_for_provider_failure(self):
+        with (
+            patch.object(ai_client, "AI_ENABLED", True),
+            patch.object(ai_client, "AI_PROVIDER", "grok"),
+            patch.object(ai_client, "GROK_API_KEY", "xai-test"),
+            patch.object(ai_client, "_ask_grok", new=AsyncMock(return_value="AI error: network failed")),
+            self.assertRaisesRegex(ai_client.AIClientError, "network failed"),
+        ):
+            await ai_client.ask_ai("hello")
+
+    async def test_ask_claude_uses_configured_current_model(self):
+        from types import SimpleNamespace
+
+        fake_client = SimpleNamespace(
+            messages=SimpleNamespace(
+                create=AsyncMock(return_value=SimpleNamespace(content=[SimpleNamespace(text="claude response")]))
+            )
+        )
+        fake_sdk_client = MagicMock()
+        fake_sdk_client.messages = fake_client.messages
+        fake_sdk_client.__aenter__ = AsyncMock(return_value=fake_client)
+        fake_sdk_client.__aexit__ = AsyncMock(return_value=False)
+        fake_sdk_client.close = AsyncMock()
+        anthropic_factory = MagicMock(return_value=fake_sdk_client)
+        fake_anthropic = SimpleNamespace(AsyncAnthropic=anthropic_factory)
+        fake_http_client = MagicMock()
+        with (
+            patch.object(ai_client, "ANTHROPIC_API_KEY", "sk-ant-test"),
+            patch.object(ai_client, "ANTHROPIC_MODEL", "claude-sonnet-5-5"),
+            patch.object(ai_client.httpx, "AsyncClient", return_value=fake_http_client) as http_factory,
+            patch.dict(
+                "os.environ",
+                {"AI_HTTP_PROXY": "", "HTTPS_PROXY": "http://127.0.0.1:10809", "ALL_PROXY": "socks://127.0.0.1:3067"},
+            ),
+            patch.dict("sys.modules", {"anthropic": fake_anthropic}),
+        ):
+            result = await ai_client._ask_claude("test prompt", system="system", max_tokens=123)
+
+        self.assertEqual(result, "claude response")
+        http_factory.assert_called_once_with(proxy="http://127.0.0.1:10809", trust_env=False)
+        anthropic_factory.assert_called_once_with(api_key="sk-ant-test", http_client=fake_http_client)
+        fake_client.messages.create.assert_awaited_once_with(
+            model="claude-sonnet-5-5",
+            max_tokens=123,
+            system="system",
+            messages=[{"role": "user", "content": "test prompt"}],
+        )
+
+    async def test_grok_reuses_session_and_close_allows_restart(self):
+        class FakeResponse:
+            status = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def json(self, content_type=None):
+                return {"choices": [{"message": {"content": "ok"}}]}
+
+        def make_session():
+            session = MagicMock()
+            session.closed = False
+            session.post = MagicMock(return_value=FakeResponse())
+
+            async def close():
+                session.closed = True
+
+            session.close = AsyncMock(side_effect=close)
+            return session
+
+        sessions = [make_session(), make_session()]
+        factory = MagicMock(side_effect=sessions)
+        with (
+            patch.object(ai_client, "GROK_API_KEY", "xai-test"),
+            patch.object(ai_client.aiohttp, "ClientSession", factory),
+        ):
+            self.assertEqual(await ai_client._ask_grok("one", system="s", max_tokens=10), "ok")
+            self.assertEqual(await ai_client._ask_grok("two", system="s", max_tokens=10), "ok")
+            self.assertEqual(factory.call_count, 1)
+            await ai_client.close_ai_clients()
+            self.assertTrue(sessions[0].closed)
+            self.assertEqual(await ai_client._ask_grok("three", system="s", max_tokens=10), "ok")
+            self.assertEqual(factory.call_count, 2)
 
     async def test_grok_string_error_payload_does_not_crash(self):
         class FakeResponse:
@@ -197,6 +301,39 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(FakeSession.posted_payloads[0]["model"], "some-future-model")
 
+    async def test_gemini_uses_configured_model_and_explicit_https_proxy(self):
+        captured = {}
+        response = _FakeGeminiResponse(
+            200,
+            '{"candidates":[{"content":{"parts":[{"text":"Gemini ready"}]}}]}',
+        )
+
+        class CapturingSession(_FakeGeminiSession):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, response=response, **kwargs)
+
+            def post(self, *args, **kwargs):
+                captured["url"] = args[0]
+                captured["kwargs"] = kwargs
+                captured["headers"] = kwargs.get("headers", {})
+                return super().post(*args, **kwargs)
+
+        with (
+            patch.object(ai_client, "GEMINI_API_KEY", "gemini-secret"),
+            patch.object(ai_client, "GEMINI_MODEL", "gemini-3.5-flash-lite"),
+            patch.object(ai_client.aiohttp, "ClientSession", CapturingSession),
+            patch.dict(
+                "os.environ",
+                {"AI_HTTP_PROXY": "", "HTTPS_PROXY": "http://127.0.0.1:10809", "ALL_PROXY": "socks://127.0.0.1:3067"},
+            ),
+        ):
+            result = await ai_client._ask_gemini("hello", system="system", max_tokens=10)
+
+        self.assertEqual(result, "Gemini ready")
+        self.assertTrue(captured["url"].endswith("/models/gemini-3.5-flash-lite:generateContent"))
+        self.assertEqual(captured["kwargs"]["proxy"], "http://127.0.0.1:10809")
+        self.assertEqual(captured["headers"]["x-goog-api-key"], "gemini-secret")
+
     async def test_gemini_http_429_returns_quota_message(self):
         body = (
             '{"error":{"code":429,"message":"Quota exceeded for metric: '
@@ -262,6 +399,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(result.startswith(expected_prefix))
                 self.assertNotIn("TimeoutError", result)
                 self.assertNotIn("gemini-secret", result)
+                await ai_client.close_ai_clients()
 
     async def test_gemini_404_and_500_are_classified_without_timeout(self):
         cases = [
@@ -285,6 +423,7 @@ class AiClientTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(result.startswith(expected_prefix))
                 self.assertNotIn("TimeoutError", result)
                 self.assertNotIn("gemini-secret", result)
+                await ai_client.close_ai_clients()
 
 
 class AiohttpTimeoutCompatTests(unittest.TestCase):
@@ -328,6 +467,7 @@ class AiohttpTimeoutCompatTests(unittest.TestCase):
 
     def test_gemini_exception_message_for_ssl_error(self):
         import ssl as _ssl
+
         exc = _ssl.SSLError("certificate verify failed")
         msg = ai_client._gemini_exception_message(exc)
         self.assertEqual(msg, "AI error: Gemini SSL/TLS error")
@@ -370,7 +510,9 @@ class RetryAfterHeaderTests(unittest.TestCase):
             patch.object(ai_client, "GEMINI_API_KEY", "test-key"),
             patch.object(ai_client, "logger", fake_logger),
         ):
-            result = ai_client._gemini_http_error_message(429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp())
+            result = ai_client._gemini_http_error_message(
+                429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp()
+            )
 
         self.assertIn("HTTP 429", result)
         self.assertIn("квот", result.lower())
@@ -399,7 +541,9 @@ class RetryAfterHeaderTests(unittest.TestCase):
             patch.object(ai_client, "GEMINI_API_KEY", "test-key"),
             patch.object(ai_client, "logger", fake_logger),
         ):
-            result = ai_client._gemini_http_error_message(429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp())
+            result = ai_client._gemini_http_error_message(
+                429, {"error": {"message": "Quota exceeded"}}, body, _FakeResp()
+            )
 
         self.assertIn("HTTP 429", result)
         logged = " ".join(str(arg) for call in fake_logger.warning.call_args_list for arg in call.args)

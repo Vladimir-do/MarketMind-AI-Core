@@ -26,16 +26,10 @@ def build_semantic_plan(
     title_terms = list(dict.fromkeys(core.primary_terms + core.brand_terms))[:title_budget]
 
     used = set(title_terms)
-    benefits_terms = [
-        term for term in (core.secondary_terms + core.attribute_terms) if term not in used
-    ]
+    benefits_terms = [term for term in (core.secondary_terms + core.attribute_terms) if term not in used]
     used |= set(benefits_terms)
 
-    description_terms = [
-        term
-        for term in (core.long_tail_terms + core.category_terms)
-        if term not in used
-    ]
+    description_terms = [term for term in (core.long_tail_terms + core.category_terms) if term not in used]
 
     excluded_terms = list(dict.fromkeys(core.forbidden_terms + core.noisy_terms))
 

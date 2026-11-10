@@ -61,16 +61,30 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         from app.parsers.base import ProductData
 
         return ProductData(
-            name=name, price=1000, old_price=None, discount_pct=None, availability="in_stock",
-            url=url, image_url=None, rating=4.7, reviews_count=100, marketplace="wildberries",
+            name=name,
+            price=1000,
+            old_price=None,
+            discount_pct=None,
+            availability="in_stock",
+            url=url,
+            image_url=None,
+            rating=4.7,
+            reviews_count=100,
+            marketplace="wildberries",
         )
 
     def _ozon_product(self, name):
         from app.parsers.base import ProductData
 
         return ProductData(
-            name=name, price=1100, old_price=None, discount_pct=None, availability="in_stock",
-            url="https://ozon.ru/product/1", image_url=None, marketplace="ozon",
+            name=name,
+            price=1100,
+            old_price=None,
+            discount_pct=None,
+            availability="in_stock",
+            url="https://ozon.ru/product/1",
+            image_url=None,
+            marketplace="ozon",
         )
 
     async def test_refresh_saves_batch_across_marketplaces(self):
@@ -78,18 +92,23 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
 
         search_results = {
             "wildberries": [
-                self._wb_product("Термокружка WB конкурент", "https://www.wildberries.ru/catalog/111222333/detail.aspx"),
+                self._wb_product(
+                    "Термокружка WB конкурент", "https://www.wildberries.ru/catalog/111222333/detail.aspx"
+                ),
             ],
             "ozon": [self._ozon_product("Термокружка Ozon конкурент")],
         }
 
-        with patch(
-            "app.competitor_analysis.service.search_all_marketplaces",
-            new=AsyncMock(return_value=search_results),
-        ) as mock_search, patch(
-            "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
-            new=AsyncMock(return_value=["Отличный товар", "Держит тепло весь день"]),
-        ) as mock_reviews:
+        with (
+            patch(
+                "app.competitor_analysis.service.search_all_marketplaces",
+                new=AsyncMock(return_value=search_results),
+            ) as mock_search,
+            patch(
+                "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
+                new=AsyncMock(return_value=["Отличный товар", "Держит тепло весь день"]),
+            ) as mock_reviews,
+        ):
             service = CompetitorAnalysisService(self.db)
             batch_id, records = await service.refresh_competitors(self.project.project_id, self.product_id)
 
@@ -107,9 +126,7 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual({r.batch_id for r in latest}, {batch_id})
         wb_record = next(r for r in latest if r.marketplace == "wildberries")
-        self.assertEqual(
-            self.store.reviews_of(wb_record), ["Отличный товар", "Держит тепло весь день"]
-        )
+        self.assertEqual(self.store.reviews_of(wb_record), ["Отличный товар", "Держит тепло весь день"])
         ozon_record = next(r for r in latest if r.marketplace == "ozon")
         self.assertEqual(self.store.reviews_of(ozon_record), [])
 
@@ -122,28 +139,72 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         ]
         search_results = {"wildberries": wb_products, "ozon": []}
 
-        with patch(
-            "app.competitor_analysis.service.search_all_marketplaces",
-            new=AsyncMock(return_value=search_results),
-        ), patch(
-            "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
-            new=AsyncMock(return_value=["отзыв"]),
-        ) as mock_reviews:
+        with (
+            patch(
+                "app.competitor_analysis.service.search_all_marketplaces",
+                new=AsyncMock(return_value=search_results),
+            ),
+            patch(
+                "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
+                new=AsyncMock(return_value=["отзыв"]),
+            ) as mock_reviews,
+        ):
             service = CompetitorAnalysisService(self.db)
             await service.refresh_competitors(self.project.project_id, self.product_id)
 
         self.assertEqual(mock_reviews.await_count, 3)  # _MAX_WB_REVIEWS_FETCHED
 
+    async def test_ozon_review_signals_are_enriched_for_top_competitors(self):
+        from app.competitor_analysis.service import CompetitorAnalysisService
+
+        ozon_products = [self._ozon_product(f"Термокружка Ozon {i}") for i in range(3)]
+        search_results = {"wildberries": [], "ozon": ozon_products, "yandex_market": []}
+        api_payload = {
+            "name": "Термокружка",
+            "price": 1100,
+            "availability": "unknown",
+            "rating": 4.8,
+            "reviews_count": 153,
+            "reviews": ["Хорошо держит тепло", "Удобная крышка"],
+        }
+
+        with (
+            patch(
+                "app.competitor_analysis.service.search_all_marketplaces",
+                new=AsyncMock(return_value=search_results),
+            ),
+            patch(
+                "app.parsers.ozon.OzonParser._fetch_api_data",
+                new=AsyncMock(return_value=api_payload),
+            ) as mock_api,
+        ):
+            service = CompetitorAnalysisService(self.db)
+            _, records = await service.refresh_competitors(self.project.project_id, self.product_id)
+
+        self.assertEqual(mock_api.await_count, 2)
+        ozon_records = [r for r in records if r.marketplace == "ozon"]
+        self.assertEqual(ozon_records[0].rating, 4.8)
+        self.assertEqual(ozon_records[0].reviews_count, 153)
+        self.assertEqual(
+            self.store.reviews_of(ozon_records[0]),
+            ["Хорошо держит тепло", "Удобная крышка"],
+        )
+        self.assertIsNone(ozon_records[2].rating)
+        self.assertEqual(self.store.reviews_of(ozon_records[2]), [])
+
     async def test_no_wb_results_skips_review_fetch(self):
         from app.competitor_analysis.service import CompetitorAnalysisService
 
-        with patch(
-            "app.competitor_analysis.service.search_all_marketplaces",
-            new=AsyncMock(return_value={"wildberries": [], "ozon": [self._ozon_product("Термокружка X")]}),
-        ), patch(
-            "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
-            new=AsyncMock(return_value=["отзыв"]),
-        ) as mock_reviews:
+        with (
+            patch(
+                "app.competitor_analysis.service.search_all_marketplaces",
+                new=AsyncMock(return_value={"wildberries": [], "ozon": [self._ozon_product("Термокружка X")]}),
+            ),
+            patch(
+                "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
+                new=AsyncMock(return_value=["отзыв"]),
+            ) as mock_reviews,
+        ):
             service = CompetitorAnalysisService(self.db)
             _, records = await service.refresh_competitors(self.project.project_id, self.product_id)
 
@@ -166,12 +227,15 @@ class CompetitorAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
             "Термокружка Stanley Classic 470 мл", "https://www.wildberries.ru/catalog/222333444/detail.aspx"
         )
 
-        with patch(
-            "app.competitor_analysis.service.search_all_marketplaces",
-            new=AsyncMock(return_value={"wildberries": [relevant], "ozon": [irrelevant]}),
-        ), patch(
-            "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
-            new=AsyncMock(return_value=[]),
+        with (
+            patch(
+                "app.competitor_analysis.service.search_all_marketplaces",
+                new=AsyncMock(return_value={"wildberries": [relevant], "ozon": [irrelevant]}),
+            ),
+            patch(
+                "app.competitor_analysis.service.WildberriesParser._fetch_reviews",
+                new=AsyncMock(return_value=[]),
+            ),
         ):
             service = CompetitorAnalysisService(self.db)
             _, records = await service.refresh_competitors(self.project.project_id, self.product_id)

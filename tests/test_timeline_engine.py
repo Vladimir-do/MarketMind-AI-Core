@@ -90,9 +90,7 @@ class TimelineEngineTests(unittest.TestCase):
         )
 
         same_time = [
-            event.event_type
-            for event in events
-            if event.occurred_at.astimezone(UTC).replace(tzinfo=None) == timestamp
+            event.event_type for event in events if event.occurred_at.astimezone(UTC).replace(tzinfo=None) == timestamp
         ]
         self.assertLess(
             same_time.index("ai_suggestion_approved"),
@@ -211,11 +209,7 @@ class TimelineEngineTests(unittest.TestCase):
             sort="oldest_first",
         )
 
-        same_instant = [
-            event.event_type
-            for event in events
-            if event.occurred_at == utc_time
-        ]
+        same_instant = [event.event_type for event in events if event.occurred_at == utc_time]
         self.assertEqual(same_instant, ["ai_suggestion_created", "price_changed"])
 
 

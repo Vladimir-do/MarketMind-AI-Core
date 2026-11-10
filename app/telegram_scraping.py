@@ -4,6 +4,7 @@ Extracted from bot.py to reduce module size. Functions that depend on bot-level
 globals (task_planner, parser_lock, get_chat_context, fetch_html) use lazy
 imports from app.bot at call time so that tests patching bot_module.* still work.
 """
+
 import csv
 import html
 import io
@@ -69,8 +70,10 @@ async def classify_page_before_parsing(url: str) -> str:
 async def fetch_html(url: str) -> tuple[int, str]:
     if "ozon.ru" in url.lower():
         from app.generic_scraper import fetch_html_browser as _fetch_html_browser
+
         return await _fetch_html_browser(url)
     from app.generic_scraper import fetch_html as _fetch_html
+
     return await _fetch_html(url)
 
 
@@ -88,7 +91,9 @@ class ScrapingPreflightDecision:
     warnings: tuple[str, ...] = ()
 
 
-def build_scraping_preflight_decision(task: StructuredTask, html_text: str, *, http_status: int = 0) -> ScrapingPreflightDecision:
+def build_scraping_preflight_decision(
+    task: StructuredTask, html_text: str, *, http_status: int = 0
+) -> ScrapingPreflightDecision:
     from app.universal_parsing_core.parsers.universal_html import UniversalHtmlParser
 
     result = UniversalHtmlParser().parse(task.target_url or "", html=html_text)
@@ -107,7 +112,11 @@ def build_scraping_preflight_decision(task: StructuredTask, html_text: str, *, h
         allowed = False
     if structure in {PageStructure.UNKNOWN}:
         allowed = False
-    if structure in browser_structures and result.next_strategy == "browser" and domain_task_type not in non_generic_task_types:
+    if (
+        structure in browser_structures
+        and result.next_strategy == "browser"
+        and domain_task_type not in non_generic_task_types
+    ):
         allowed = True
         fetcher = "browser"
     if explicit_fields and structure in allowed_structures and domain_task_type not in non_generic_task_types:
@@ -211,20 +220,33 @@ def format_structured_task_plan(task: StructuredTask) -> str:
         if task.target_url:
             lines.append(f"Цель: <code>{html.escape(task.target_url)}</code>")
         if task.parameters:
-            for key in ("failure_area", "severity", "blast_radius", "evidence_types", "verification_scope", "safety_gates"):
+            for key in (
+                "failure_area",
+                "severity",
+                "blast_radius",
+                "evidence_types",
+                "verification_scope",
+                "safety_gates",
+            ):
                 if key in task.parameters:
                     lines.append(f"{html.escape(key)}: <code>{html.escape(str(task.parameters[key]))}</code>")
             if task.parameters.get("last_error_text"):
-                lines.append(f"last_error_text: <code>{html.escape(str(task.parameters['last_error_text'])[:500])}</code>")
+                lines.append(
+                    f"last_error_text: <code>{html.escape(str(task.parameters['last_error_text'])[:500])}</code>"
+                )
             if task.parameters.get("last_validation_warnings"):
-                lines.append(f"last_validation_warnings: <code>{html.escape(str(task.parameters['last_validation_warnings'])[:500])}</code>")
+                lines.append(
+                    f"last_validation_warnings: <code>{html.escape(str(task.parameters['last_validation_warnings'])[:500])}</code>"
+                )
         lines.append("")
         lines.append("<b>Цикл ремонта:</b>")
         lines.append(" → ".join(html.escape(stage_label_ru(step.stage)) for step in agent_loop.steps))
         lines.append(f"Стратегия: <code>{html.escape(agent_loop.strategy)}</code>")
         lines.append("")
         for step in plan.steps:
-            marker = "✅" if step.status is SkillStatus.AVAILABLE else "🧩" if step.status is SkillStatus.PLANNED else "⚠️"
+            marker = (
+                "✅" if step.status is SkillStatus.AVAILABLE else "🧩" if step.status is SkillStatus.PLANNED else "⚠️"
+            )
             lines.append(
                 f"{step.index}. {marker} <code>{html.escape(step.skill_id)}</code> "
                 f"[q={step.quality_score:.2f}] — {html.escape(step.action)}"
@@ -234,7 +256,9 @@ def format_structured_task_plan(task: StructuredTask) -> str:
             lines.append("<b>Самопроверка:</b>")
             lines.extend(f"• {html.escape(_localize_bot_text(check))}" for check in plan.self_critic)
         lines.append("")
-        lines.append("Далее нужно воспроизвести failure signal, добавить регрессию, внести фикс и прогнать verification scope.")
+        lines.append(
+            "Далее нужно воспроизвести failure signal, добавить регрессию, внести фикс и прогнать verification scope."
+        )
         return "\n".join(lines)
     if task.type is TaskType.SCRAPING:
         plan = task_planner.build_plan(task)
@@ -259,7 +283,9 @@ def format_structured_task_plan(task: StructuredTask) -> str:
         lines.append(f"Порог confidence: <code>{agent_loop.min_confidence:.2f}</code>")
         lines.append("")
         for step in plan.steps:
-            marker = "✅" if step.status is SkillStatus.AVAILABLE else "🧩" if step.status is SkillStatus.PLANNED else "⚠️"
+            marker = (
+                "✅" if step.status is SkillStatus.AVAILABLE else "🧩" if step.status is SkillStatus.PLANNED else "⚠️"
+            )
             fallback = f" (fallback for {step.selected_for})" if step.selected_for else ""
             lines.append(
                 f"{step.index}. {marker} <code>{html.escape(step.skill_id)}</code>{html.escape(fallback)} "
@@ -320,7 +346,9 @@ def build_repair_diagnostic_report(task: StructuredTask) -> str:
     if params.get("last_error_text"):
         lines.append(f"last_error_text: <code>{html.escape(str(params['last_error_text'])[:500])}</code>")
     if params.get("last_validation_warnings"):
-        lines.append(f"last_validation_warnings: <code>{html.escape(str(params['last_validation_warnings'])[:500])}</code>")
+        lines.append(
+            f"last_validation_warnings: <code>{html.escape(str(params['last_validation_warnings'])[:500])}</code>"
+        )
     suggested_tests = _repair_suggested_tests(task)
     if suggested_tests:
         lines.append(f"suggested_tests: <code>{html.escape(', '.join(suggested_tests))}</code>")
@@ -341,7 +369,11 @@ async def handle_scraping_task(message: types.Message, task: StructuredTask) -> 
 
     await parser_lock.acquire()
     try:
-        mode = "с пагинацией" if task.parameters.get("pagination") or task.parameters.get("scope") == "all_pages" else "первой страницы"
+        mode = (
+            "с пагинацией"
+            if task.parameters.get("pagination") or task.parameters.get("scope") == "all_pages"
+            else "первой страницы"
+        )
         await message.answer(f"Проверяю структуру страницы перед scraping {mode}...")
         preflight = await run_scraping_preflight(task)
         if not preflight.allowed:
@@ -358,12 +390,16 @@ async def handle_scraping_task(message: types.Message, task: StructuredTask) -> 
                 error_type="ScrapingPreflightBlocked",
                 validation_warnings=[*preflight.warnings, preflight.reason],
             )
-            await message.answer(format_scraping_preflight_decision(preflight), parse_mode="HTML", disable_web_page_preview=True)
+            await message.answer(
+                format_scraping_preflight_decision(preflight), parse_mode="HTML", disable_web_page_preview=True
+            )
             return
         if preflight.fetcher == "browser":
             task.parameters["browser_fallback"] = True
             task.parameters["next_strategy"] = "browser"
-        await message.answer(format_scraping_preflight_decision(preflight), parse_mode="HTML", disable_web_page_preview=True)
+        await message.answer(
+            format_scraping_preflight_decision(preflight), parse_mode="HTML", disable_web_page_preview=True
+        )
         await message.answer(f"Запускаю scraping {mode} и готовлю CSV...")
         result = await run_scraping_task(task)
         caption = (
@@ -408,6 +444,7 @@ async def _handle_ozon_scraping(message: types.Message, task: StructuredTask) ->
         query = task.parameters.get("query", "")
         if not query:
             from urllib.parse import urlparse
+
             parsed = urlparse(task.target_url)
             path_parts = parsed.path.strip("/").split("/")
             if "product" in path_parts:
@@ -430,8 +467,7 @@ async def _handle_ozon_scraping(message: types.Message, task: StructuredTask) ->
 
         if not results:
             await message.answer(
-                "😔 Не удалось найти товар через Ozon API. "
-                "Попробуйте изменить запрос или отправить ссылку на товар."
+                "😔 Не удалось найти товар через Ozon API. Попробуйте изменить запрос или отправить ссылку на товар."
             )
             return
 
@@ -456,11 +492,13 @@ async def _handle_ozon_scraping(message: types.Message, task: StructuredTask) ->
         writer = csv.DictWriter(output, fieldnames=["name", "price", "url"])
         writer.writeheader()
         for r in results[:10]:
-            writer.writerow({
-                "name": r.get("name", ""),
-                "price": r.get("price", ""),
-                "url": r.get("url", ""),
-            })
+            writer.writerow(
+                {
+                    "name": r.get("name", ""),
+                    "price": r.get("price", ""),
+                    "url": r.get("url", ""),
+                }
+            )
 
         csv_bytes = output.getvalue().encode("utf-8")
         filename = f"ozon_search_{query[:30].replace(' ', '_')}.csv"

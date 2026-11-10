@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "MarketMind: тест текущего Python-файла",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "pytest", "-q", "${file}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "MarketMind: тесты Web/Health и Proxy",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "pytest", "-q", "tests/test_web_health.py", "tests/test_system_proxy.py", "--tb=short"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "MarketMind: полный набор тестов",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "pytest", "tests/", "-q", "--tb=short"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "MarketMind: безопасная проверка Ruff",
+      "type": "shell",
+      "command": "env",
+      "args": ["RUFF_CACHE_DIR=/tmp/marketmind-ai-core-ruff", "${workspaceFolder}/.venv/bin/python", "-m", "ruff", "check", "app", "tests", "--select", "F821,F401,F841"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "MarketMind: проверка Skillpack",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["project_skills/validate_skills.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

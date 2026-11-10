@@ -59,7 +59,13 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
 
         content = f"Название,Цена,Ссылка\n{title},100,https://example.test/{title}\n".encode()
         stored = store_source_file(project_id, filename, content)
-        preview = analyze_import_file(path=stored.absolute_path, original_filename=stored.original_filename, sha256=stored.sha256, size_bytes=stored.size_bytes, file_format=stored.file_format)
+        preview = analyze_import_file(
+            path=stored.absolute_path,
+            original_filename=stored.original_filename,
+            sha256=stored.sha256,
+            size_bytes=stored.size_bytes,
+            file_format=stored.file_format,
+        )
         products, errors = build_products_from_preview(preview, mapping=preview.suggested_mapping)
         self.assertFalse(errors)
         file_record, _ = await ProjectService(self.db).record_source_file(
@@ -74,7 +80,9 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
                 product.source_url or f"https://example.test/{title}/{index}",
                 product.to_dict(),
             )
-            await ProjectService(self.db).link_imported_product(project_id, saved, product, source_file_id=file_record.file_id, source_row_index=index)
+            await ProjectService(self.db).link_imported_product(
+                project_id, saved, product, source_file_id=file_record.file_id, source_row_index=index
+            )
 
     async def test_repeated_work_start_preserves_projects(self):
         project_id = await self._create_project("Persistent")
@@ -105,6 +113,24 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(component["technology"].startswith("FastAPI") for component in status["stack"]))
         self.assertTrue(any(check["key"] == "database-backend" for check in status["readiness"]))
         self.assertFalse([item for item in status["warnings"] if "/tmp" in item])
+
+    async def test_system_status_masks_database_url_credentials(self):
+        from app.runtime_paths import system_status
+
+        database_url = (
+            "postgresql+asyncpg://db-user:db-password@db.example:5432/market"
+            "?password=query-password&ssl=true"
+        )
+        with (
+            patch("app.runtime_paths.DATABASE_URL", database_url),
+            patch("app.runtime_paths.sqlite_database_path", return_value=None),
+        ):
+            status = await system_status(self.db)
+
+        self.assertIn("db.example", status["database_path"])
+        self.assertNotIn("db-user", status["database_path"])
+        self.assertNotIn("db-password", status["database_path"])
+        self.assertNotIn("query-password", status["database_path"])
 
     async def test_backup_checksum_restore_and_protective_copy(self):
         project_id = await self._create_project("Before restore")
@@ -197,10 +223,14 @@ class L2ProductionModeTests(unittest.IsolatedAsyncioTestCase):
         archive = await ProjectArchiveService(self.db).create_project_archive(project_a)
         with zipfile.ZipFile(archive["absolute_path"]) as zip_file:
             names = zip_file.namelist()
-            payload = "\n".join(names) + "\n" + "\n".join(
-                zip_file.read(name).decode("utf-8", errors="ignore")
-                for name in names
-                if name.endswith(".json") or name.endswith(".csv") or name.endswith(".html")
+            payload = (
+                "\n".join(names)
+                + "\n"
+                + "\n".join(
+                    zip_file.read(name).decode("utf-8", errors="ignore")
+                    for name in names
+                    if name.endswith(".json") or name.endswith(".csv") or name.endswith(".html")
+                )
             )
         self.assertIn("manifest.json", names)
         self.assertIn(project_a, payload)

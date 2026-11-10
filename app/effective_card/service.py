@@ -61,7 +61,9 @@ class EffectiveProductCardService:
             version = await self._latest_version(session, project_product)
             return self._build_card(project_product, version)
 
-    async def list_effective_cards(self, project_id: str, *, limit: int = 100, offset: int = 0) -> list[EffectiveProductCard]:
+    async def list_effective_cards(
+        self, project_id: str, *, limit: int = 100, offset: int = 0
+    ) -> list[EffectiveProductCard]:
         async with self._db.session() as session:
             result = await session.execute(
                 select(ProjectProduct)
@@ -76,17 +78,21 @@ class EffectiveProductCardService:
                 cards.append(self._build_card(project_product, version))
             return cards
 
-    async def list_effective_cards_with_seo_summary(self, project_id: str, *, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    async def list_effective_cards_with_seo_summary(
+        self, project_id: str, *, limit: int = 100, offset: int = 0
+    ) -> list[dict[str, Any]]:
         cards = await self.list_effective_cards(project_id, limit=limit, offset=offset)
         result = []
         for card in cards:
             seo = audit_unified_product_seo(_unified_from_snapshot(card.effective_snapshot, card.product_id))
-            result.append({
-                "card": card,
-                "seo_score": seo.score,
-                "seo_tier": seo.tier,
-                "seo_ready": seo.ready,
-            })
+            result.append(
+                {
+                    "card": card,
+                    "seo_score": seo.score,
+                    "seo_tier": seo.tier,
+                    "seo_ready": seo.ready,
+                }
+            )
         return result
 
     async def quality(self, project_id: str, product_id: int) -> dict[str, Any]:
@@ -165,8 +171,7 @@ class EffectiveProductCardService:
         applied = _without_internal_fields(json.loads(version.snapshot_json)) if version is not None else None
         effective = applied or source
         overridden = sorted(
-            field for field in set(source) | set(effective)
-            if source.get(field) != effective.get(field)
+            field for field in set(source) | set(effective) if source.get(field) != effective.get(field)
         )
         provenance = _build_provenance(project_product, source, effective, version, source_provenance)
         warnings = []
@@ -183,8 +188,12 @@ class EffectiveProductCardService:
             latest_version_number=version.version_number if version is not None else None,
             overridden_fields=overridden,
             is_manually_modified=bool(applied),
-            source_updated_at=project_product.source_updated_at.isoformat() if project_product.source_updated_at else None,
-            effective_updated_at=project_product.effective_updated_at.isoformat() if project_product.effective_updated_at else None,
+            source_updated_at=project_product.source_updated_at.isoformat()
+            if project_product.source_updated_at
+            else None,
+            effective_updated_at=project_product.effective_updated_at.isoformat()
+            if project_product.effective_updated_at
+            else None,
             warnings=warnings,
             provenance=provenance,
         )
@@ -398,11 +407,8 @@ def _remove_forbidden_words(text: str) -> str:
 def _extract_keywords_from_name(name: str) -> list[str]:
     """Извлекает ключевые слова из названия товара."""
     import re
+
     tokens = re.findall(r"[A-Za-zА-Яа-яЁё0-9]{3,}", name.lower())
     return [
-        t
-        for t in tokens
-        if t not in GENERIC_PRODUCT_TYPES
-        and t not in FORBIDDEN_MARKETING_WORDS
-        and not t.isdigit()
+        t for t in tokens if t not in GENERIC_PRODUCT_TYPES and t not in FORBIDDEN_MARKETING_WORDS and not t.isdigit()
     ][:6]

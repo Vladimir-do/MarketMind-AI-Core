@@ -6,7 +6,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent
 MARKDOWN_PATH = ROOT / "skills_database.md"
 INDEX_PATH = ROOT / "skills_index.json"
@@ -170,4 +169,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

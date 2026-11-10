@@ -25,7 +25,9 @@ class NormalizeTextTests(unittest.TestCase):
 
     def test_normalizes_description(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
+            name="X",
+            source_id="1",
+            source_type="test",
             description="  long   description   with   spaces  ",
         )
         pipeline = ImportPipeline(strategy=None)
@@ -34,7 +36,9 @@ class NormalizeTextTests(unittest.TestCase):
 
     def test_normalizes_brand(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
+            name="X",
+            source_id="1",
+            source_type="test",
             brand="  Some   Brand  ",
         )
         pipeline = ImportPipeline(strategy=None)
@@ -43,7 +47,9 @@ class NormalizeTextTests(unittest.TestCase):
 
     def test_normalizes_category(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
+            name="X",
+            source_id="1",
+            source_type="test",
             category="  Electronics  /  Phones  ",
         )
         pipeline = ImportPipeline(strategy=None)
@@ -74,8 +80,12 @@ class FillMissingDataTests(unittest.TestCase):
 
     def test_derives_discount_pct(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
-            price=800, old_price=1000, discount_pct=None,
+            name="X",
+            source_id="1",
+            source_type="test",
+            price=800,
+            old_price=1000,
+            discount_pct=None,
         )
         pipeline = ImportPipeline(strategy=None)
         result = pipeline._fill_missing_data(product)
@@ -83,8 +93,12 @@ class FillMissingDataTests(unittest.TestCase):
 
     def test_does_not_override_existing_discount(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
-            price=800, old_price=1000, discount_pct=15,
+            name="X",
+            source_id="1",
+            source_type="test",
+            price=800,
+            old_price=1000,
+            discount_pct=15,
         )
         pipeline = ImportPipeline(strategy=None)
         result = pipeline._fill_missing_data(product)
@@ -92,8 +106,12 @@ class FillMissingDataTests(unittest.TestCase):
 
     def test_no_discount_when_old_price_less_than_price(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
-            price=1000, old_price=800, discount_pct=None,
+            name="X",
+            source_id="1",
+            source_type="test",
+            price=1000,
+            old_price=800,
+            discount_pct=None,
         )
         pipeline = ImportPipeline(strategy=None)
         result = pipeline._fill_missing_data(product)
@@ -101,8 +119,12 @@ class FillMissingDataTests(unittest.TestCase):
 
     def test_no_discount_when_price_is_none(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
-            price=None, old_price=1000, discount_pct=None,
+            name="X",
+            source_id="1",
+            source_type="test",
+            price=None,
+            old_price=1000,
+            discount_pct=None,
         )
         pipeline = ImportPipeline(strategy=None)
         result = pipeline._fill_missing_data(product)
@@ -110,8 +132,12 @@ class FillMissingDataTests(unittest.TestCase):
 
     def test_no_discount_when_old_price_is_none(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
-            price=1000, old_price=None, discount_pct=None,
+            name="X",
+            source_id="1",
+            source_type="test",
+            price=1000,
+            old_price=None,
+            discount_pct=None,
         )
         pipeline = ImportPipeline(strategy=None)
         result = pipeline._fill_missing_data(product)
@@ -119,8 +145,12 @@ class FillMissingDataTests(unittest.TestCase):
 
     def test_rounds_discount_correctly(self):
         product = UnifiedProduct(
-            name="X", source_id="1", source_type="test",
-            price=667, old_price=1000, discount_pct=None,
+            name="X",
+            source_id="1",
+            source_type="test",
+            price=667,
+            old_price=1000,
+            discount_pct=None,
         )
         pipeline = ImportPipeline(strategy=None)
         result = pipeline._fill_missing_data(product)
@@ -133,8 +163,12 @@ class EnrichmentFailureTests(unittest.TestCase):
     def test_enrichment_failure_returns_no_draft(self):
         """When build_ozon_card_draft raises, enricher returns no draft."""
         product = UnifiedProduct(
-            name="Test Product", source_id="123", source_type="test",
-            price=1000, description="desc", category="Cat",
+            name="Test Product",
+            source_id="123",
+            source_type="test",
+            price=1000,
+            description="desc",
+            category="Cat",
         )
 
         strategy = OzonEnrichmentStrategy()
@@ -147,8 +181,12 @@ class EnrichmentFailureTests(unittest.TestCase):
     def test_pipeline_enrichment_failure_returns_zero_score(self):
         """Pipeline returns EnrichedProduct with score=0 when enrichment fails."""
         product = UnifiedProduct(
-            name="Test Product", source_id="123", source_type="test",
-            price=1000, description="desc", category="Cat",
+            name="Test Product",
+            source_id="123",
+            source_type="test",
+            price=1000,
+            description="desc",
+            category="Cat",
         )
 
         pipeline = ImportPipeline()
@@ -169,6 +207,7 @@ class LimitParameterTests(unittest.TestCase):
     def test_limit_on_run_file(self):
         csv_content = "name,source_id,price\nA,1,100\nB,2,200\nC,3,300\n"
         from pathlib import Path
+
         csv_path = Path("/tmp/test_limit.csv")
         csv_path.write_text(csv_content, encoding="utf-8")
         try:
@@ -181,6 +220,7 @@ class LimitParameterTests(unittest.TestCase):
     def test_limit_override_in_run_file(self):
         csv_content = "name,source_id,price\nA,1,100\nB,2,200\nC,3,300\n"
         from pathlib import Path
+
         csv_path = Path("/tmp/test_limit_override.csv")
         csv_path.write_text(csv_content, encoding="utf-8")
         try:
@@ -193,6 +233,7 @@ class LimitParameterTests(unittest.TestCase):
     def test_limit_none_returns_all(self):
         csv_content = "name,source_id,price\nA,1,100\nB,2,200\n"
         from pathlib import Path
+
         csv_path = Path("/tmp/test_limit_none.csv")
         csv_path.write_text(csv_content, encoding="utf-8")
         try:
@@ -205,6 +246,7 @@ class LimitParameterTests(unittest.TestCase):
     def test_limit_larger_than_products_returns_all(self):
         csv_content = "name,source_id,price\nA,1,100\nB,2,200\n"
         from pathlib import Path
+
         csv_path = Path("/tmp/test_limit_big.csv")
         csv_path.write_text(csv_content, encoding="utf-8")
         try:
@@ -246,6 +288,7 @@ class PluggableStrategyTests(unittest.TestCase):
         class DummyStrategy:
             def enrich(self, product):
                 from app.enrichers import EnrichmentResult
+
                 return EnrichmentResult(product=product, metadata={"quality_score": 42})
 
         product = UnifiedProduct(name="X", source_id="1", source_type="test", price=100)

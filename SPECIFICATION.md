@@ -541,8 +541,8 @@ erDiagram
 
 ### 6.5 Batch Mode
 
-- Вход: список URL/текстов (до 300 штук, `MAX_BATCH_CARD_SOURCES`)
-- Обработка: последовательная с отчётом прогресса
+- Вход: список URL/текстов (до 30 штук, `MAX_BATCH_CARD_SOURCES`)
+- Обработка: последовательная с сообщением прогресса каждые 5 товаров; поиск Яндекса — для первых 3 товаров пачки
 - Результат: `OzonCardBatchItem` { draft, source, status, message }
 - Экспорт: JSON / XLSX
 
@@ -579,13 +579,13 @@ class StructuredTask:
     target_url: str | None
     target_urls: list[str]
     query: str | None
-    fields: list[str]        # требуемые поля
-    output: str | None       # формат вывода
+    fields: list[str]  # требуемые поля
+    output: str | None  # формат вывода
     requirements: list[str]  # дополнительные требования
-    parameters: dict         # произвольные параметры
+    parameters: dict  # произвольные параметры
     payload: str | list[str] | None
-    confidence: float        # 0.0–1.0
-    plan: list[str]          # шаги плана
+    confidence: float  # 0.0–1.0
+    plan: list[str]  # шаги плана
 ```
 
 ### 7.3 Task Planner
@@ -695,7 +695,7 @@ stateDiagram-v2
 ### 8.4 Контекстные сессии
 
 ```python
-CHAT_PROFILES: dict[int, str]       # chat_id → имя профиля
+CHAT_PROFILES: dict[int, str]  # chat_id → имя профиля
 CHAT_CONTEXTS: dict[int, ContextSession]  # chat_id → контекст
 ```
 
@@ -842,7 +842,7 @@ CHAT_CONTEXTS: dict[int, ContextSession]  # chat_id → контекст
 | Секреты в .env | `BOT_TOKEN`, `ADMIN_IDS`, `AI_API_KEY` — только в `.env` |
 | Нет hardcoded tokens | Все API-ключи через переменные окружения |
 | Валидация URL | `is_supported_marketplace_url()` перед парсингом |
-| Лимиты | `MAX_NATURAL_TASKS=300`, `MAX_BATCH_CARD_SOURCES=300` |
+| Лимиты | `MAX_NATURAL_TASKS=300`, `MAX_BATCH_CARD_SOURCES=30` |
 | Access control | `ADMIN_IDS` фильтр для Telegram-команд |
 | XSS protection | `html.escape()` при выводе пользовательского контента |
 | SQL injection | SQLAlchemy ORM, параметризованные запросы |

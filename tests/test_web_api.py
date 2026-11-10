@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 from tests.helpers import reload_app_modules
 
@@ -47,8 +48,27 @@ class WebApiTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_app_creation(self):
         from app.web.app import create_app
+
         app = create_app()
         self.assertIsNotNone(app)
+
+    async def test_lifespan_closes_ai_clients(self):
+        from app.web.app import create_app
+
+        app = create_app()
+        fake_db = Mock()
+        fake_db.init = AsyncMock()
+        fake_db._engine.dispose = AsyncMock()
+        close_clients = AsyncMock()
+        with (
+            patch("app.database.Database", return_value=fake_db),
+            patch("app.ai_client.close_ai_clients", close_clients),
+        ):
+            async with app.router.lifespan_context(app):
+                self.assertIs(app.state.db, fake_db)
+
+        close_clients.assert_awaited_once()
+        fake_db._engine.dispose.assert_awaited_once()
 
     async def test_dashboard_endpoint(self):
         resp = await self.client.get("/api/dashboard")

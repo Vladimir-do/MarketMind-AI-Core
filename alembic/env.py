@@ -3,10 +3,11 @@ import os
 import sys
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
+from alembic import context
 
 # Add project root to sys.path so we can import app modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -89,6 +90,7 @@ def run_async_migrations_sync() -> None:
         # We're inside an already running event loop (e.g. from app.main)
         # Use nest_asyncio or create a task
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, run_async_migrations())
             future.result()

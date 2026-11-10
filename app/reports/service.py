@@ -47,10 +47,7 @@ class ClientDeliveryReportService:
                 tags=unified.tags,
                 brand=unified.brand,
             )
-            for unified in [
-                _unified_from_snapshot(card.effective_snapshot, card.product_id)
-                for card in cards
-            ]
+            for unified in [_unified_from_snapshot(card.effective_snapshot, card.product_id) for card in cards]
         ]
         source_scores = [item["source"]["score"] for item in qualities]
         effective_scores = [item["effective"]["score"] for item in qualities]
@@ -96,18 +93,12 @@ class ClientDeliveryReportService:
                 "weak": tier_counts.get("weak", 0),
             },
             "worst_cards": worst_seo,
-            "top_problems": [
-                {"rule": rule, "count": count}
-                for rule, count in problem_counter.most_common(10)
-            ],
+            "top_problems": [{"rule": rule, "count": count} for rule, count in problem_counter.most_common(10)],
             "semantic": {
                 "average_coverage_score": _avg_float([s.coverage_score for s in semantic_results]),
                 "average_junk_ratio": _avg_float([s.junk_ratio for s in semantic_results]),
                 "cards_without_primary_terms": sum(1 for s in semantic_results if not s.primary_terms),
-                "top_terms": [
-                    {"term": term, "count": count}
-                    for term, count in semantic_term_counter.most_common(10)
-                ],
+                "top_terms": [{"term": term, "count": count} for term, count in semantic_term_counter.most_common(10)],
             },
         }
         return {
@@ -193,26 +184,33 @@ def _fix_summary(card) -> str:
 
 
 def _html(summary: dict[str, Any]) -> str:
-    problems = "".join(f"<li>{escape(item)}</li>" for item in summary["top_problems"]) or "<li>Критичных проблем не найдено</li>"
-    fixes = "".join(f"<li>{escape(item)}</li>" for item in summary["applied_fixes"]) or "<li>Ручные изменения не применялись</li>"
-    review = "".join(
-        f"<li>{escape(item['title'])}</li>" for item in summary["requires_review"]
-    ) or "<li>Нет карточек, требующих ручной проверки</li>"
+    problems = (
+        "".join(f"<li>{escape(item)}</li>" for item in summary["top_problems"])
+        or "<li>Критичных проблем не найдено</li>"
+    )
+    fixes = (
+        "".join(f"<li>{escape(item)}</li>" for item in summary["applied_fixes"])
+        or "<li>Ручные изменения не применялись</li>"
+    )
+    review = (
+        "".join(f"<li>{escape(item['title'])}</li>" for item in summary["requires_review"])
+        or "<li>Нет карточек, требующих ручной проверки</li>"
+    )
     return f"""<!doctype html>
 <html lang="ru">
 <head><meta charset="utf-8"><title>Отчёт проекта</title></head>
 <body>
-<h1>Отчёт по проекту: {escape(summary['project_name'])}</h1>
-<p>Заказчик: {escape(summary.get('client_name') or 'не указан')}</p>
-<p>Дата обработки: {escape(summary['generated_at'])}</p>
-<p>Исходный файл: {escape(summary.get('source_file') or 'не указан')}</p>
+<h1>Отчёт по проекту: {escape(summary["project_name"])}</h1>
+<p>Заказчик: {escape(summary.get("client_name") or "не указан")}</p>
+<p>Дата обработки: {escape(summary["generated_at"])}</p>
+<p>Исходный файл: {escape(summary.get("source_file") or "не указан")}</p>
 <ul>
-  <li>Товаров: {summary['total_products']}</li>
-  <li>Успешно обработано: {summary['processed_products']}</li>
-  <li>С ошибками: {summary['products_with_errors']}</li>
-  <li>Средний Quality Score до: {summary['average_source_quality_score']}</li>
-  <li>Средний Quality Score после: {summary['average_effective_quality_score']}</li>
-  <li>Изменённых карточек: {summary['changed_cards']}</li>
+  <li>Товаров: {summary["total_products"]}</li>
+  <li>Успешно обработано: {summary["processed_products"]}</li>
+  <li>С ошибками: {summary["products_with_errors"]}</li>
+  <li>Средний Quality Score до: {summary["average_source_quality_score"]}</li>
+  <li>Средний Quality Score после: {summary["average_effective_quality_score"]}</li>
+  <li>Изменённых карточек: {summary["changed_cards"]}</li>
 </ul>
 <h2>Основные проблемы</h2><ul>{problems}</ul>
 <h2>Выполненные исправления</h2><ul>{fixes}</ul>

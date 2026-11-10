@@ -11,11 +11,11 @@ MarketMind MCP Server — парсинг товаров с маркетплей�
 
 Протокол: JSON-RPC 2.0 over stdin/stdout (MCP stdio transport).
 """
+
 from __future__ import annotations
 
 import json
 import sys
-import threading
 from typing import Any
 
 
@@ -169,15 +169,21 @@ def handle_message(line: str) -> None:
         result = fetch_product_sync(url, marketplace=marketplace, task=task)
 
         if "error" in result:
-            write_response(msg_id, {
-                "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
-                "isError": True,
-            })
+            write_response(
+                msg_id,
+                {
+                    "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
+                    "isError": True,
+                },
+            )
         else:
-            write_response(msg_id, {
-                "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
-                "structuredContent": result,
-            })
+            write_response(
+                msg_id,
+                {
+                    "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
+                    "structuredContent": result,
+                },
+            )
         return
 
     if msg_id is not None:

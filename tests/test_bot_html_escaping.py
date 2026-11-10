@@ -23,7 +23,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from app.telegram_messages import format_product_list
+from app.telegram_messages import availability_icon, format_product_list
 
 
 class FakeUser:
@@ -143,16 +143,51 @@ class BotHtmlEscapingTests(unittest.TestCase):
         self.assertNotIn("Cable & Wire <5m>", combined)
         self.assertNotIn("Looks <suspicious> & odd", combined)
 
+    def test_availability_icon_distinguishes_unknown_from_out_of_stock(self):
+        self.assertEqual(availability_icon("in_stock"), "✅")
+        self.assertEqual(availability_icon("out_of_stock"), "❌")
+        self.assertEqual(availability_icon("unknown"), "❔")
+        self.assertEqual(availability_icon(None), "❔")
+
+    def test_format_product_list_does_not_mark_unknown_as_out_of_stock(self):
+        product = type("P", (), {"id": 1, "url": "https://example.com/a", "name": "Unknown stock"})()
+        price = type("PH", (), {"price": 150, "availability_status": "unknown"})()
+
+        result = format_product_list([product], {1: price})
+
+        self.assertIn("❔", result)
+        self.assertNotIn("❌", result)
+
     def test_format_product_list_escapes_product_name(self):
-        product = type(
-            "P", (), {"id": 1, "url": "https://example.com/a", "name": "Tea & Coffee <Set>"}
-        )()
+        product = type("P", (), {"id": 1, "url": "https://example.com/a", "name": "Tea & Coffee <Set>"})()
         price = type("PH", (), {"price": 150, "availability_status": "in_stock"})()
 
         result = format_product_list([product], {1: price})
 
         self.assertIn("Tea &amp; Coffee &lt;Set&gt;", result)
         self.assertNotIn("Tea & Coffee <Set>", result)
+
+    def test_format_product_list_escapes_url_attribute(self):
+        product = type(
+            "P", (), {"id": 1, "url": "https://example.com/' onmouseover='alert(1)", "name": "Safe name"}
+        )()
+        result = format_product_list([product], {})
+        self.assertNotIn("onmouseover='alert(1)'", result)
+        self.assertIn("&#x27;", result)
+
+    def test_compare_prices_escapes_product_name_and_ai_response(self):
+        from app.agent import PriceAgent
+
+        agent = PriceAgent.__new__(PriceAgent)
+        agent._ask_claude = AsyncMock(return_value="Buy <here> & now")
+
+        async def run():
+            return await agent.compare_prices("Phone <script>", 100, 120)
+
+        result = asyncio.run(run())
+        self.assertIn("Phone &lt;script&gt;", result)
+        self.assertIn("Buy &lt;here&gt; &amp; now", result)
+        self.assertNotIn("<script>", result)
 
     def test_market_overview_escapes_names_and_ai_comment(self):
         from app.ai_analyzer import DeepAnalyzer

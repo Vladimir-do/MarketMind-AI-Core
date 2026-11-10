@@ -2,9 +2,11 @@
 telegram_humanize.py — Делает ответы бота живыми и человечными.
 Вместо сухих «Метрик нет» → «Пока ничего не парсили, запустите /update».
 """
+
 import random
 
 # ── Приветствия и заглушки ────────────────────────────────────────────────────
+
 
 def greeting() -> str:
     """Живое приветствие при /start."""
@@ -196,9 +198,7 @@ def natural_response(intent: str, **kwargs) -> str:
         "nothing_found": lambda: nothing_found(kwargs.get("query")),
         "search_started": lambda: search_started(kwargs.get("query", "")),
         "update_started": lambda: update_started(kwargs.get("count", 0)),
-        "update_finished": lambda: update_finished(
-            kwargs.get("success", 0), kwargs.get("failed", 0)
-        ),
+        "update_finished": lambda: update_finished(kwargs.get("success", 0), kwargs.get("failed", 0)),
         "add_started": lambda: add_started(kwargs.get("count", 0)),
         "add_finished": lambda: add_finished(kwargs.get("count", 0)),
         "card_generating": lambda: card_generating(),

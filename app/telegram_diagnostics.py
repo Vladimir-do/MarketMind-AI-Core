@@ -49,10 +49,7 @@ async def probe_https(host: str) -> tuple[bool, str]:
             timeout=7.0,
         )
         request = (
-            f"HEAD / HTTP/1.1\r\n"
-            f"Host: {host}\r\n"
-            "User-Agent: parser-agent-netdiag/1.0\r\n"
-            "Connection: close\r\n\r\n"
+            f"HEAD / HTTP/1.1\r\nHost: {host}\r\nUser-Agent: parser-agent-netdiag/1.0\r\nConnection: close\r\n\r\n"
         )
         writer.write(request.encode("ascii"))
         await writer.drain()

@@ -55,7 +55,8 @@ class UnifiedFromSnapshotDirectInputTests(unittest.TestCase):
         url = "https://example.com/a.jpg"
         product = _unified_from_snapshot({"image_urls": url}, 1)
         self.assertNotEqual(
-            product.image_urls, [url],
+            product.image_urls,
+            [url],
             "this assertion documents the bug: a raw string is NOT treated as "
             "a single URL, it is exploded into one-character 'URLs' instead",
         )

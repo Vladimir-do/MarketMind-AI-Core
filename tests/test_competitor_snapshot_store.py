@@ -68,19 +68,28 @@ class CompetitorSnapshotStoreTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_reviews_of_returns_empty_list_when_none(self):
         _, records = await self.store.save_batch(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            search_query="q", products=[("wildberries", _product(reviews=None))],
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            search_query="q",
+            products=[("wildberries", _product(reviews=None))],
         )
         self.assertEqual(self.store.reviews_of(records[0]), [])
 
     async def test_new_batch_replaces_latest_but_keeps_history(self):
         first_batch_id, _ = await self.store.save_batch(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            search_query="q", products=[("wildberries", _product(name="Старый конкурент"))],
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            search_query="q",
+            products=[("wildberries", _product(name="Старый конкурент"))],
         )
         second_batch_id, _ = await self.store.save_batch(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            search_query="q", products=[("wildberries", _product(name="Новый конкурент"))],
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            search_query="q",
+            products=[("wildberries", _product(name="Новый конкурент"))],
         )
         self.assertNotEqual(first_batch_id, second_batch_id)
 
@@ -98,8 +107,11 @@ class CompetitorSnapshotStoreTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_batches_isolated_per_project_product(self):
         await self.store.save_batch(
-            project_id="proj-1", project_product_id="pp-1", product_id=1,
-            search_query="q", products=[("wildberries", _product())],
+            project_id="proj-1",
+            project_product_id="pp-1",
+            product_id=1,
+            search_query="q",
+            products=[("wildberries", _product())],
         )
         latest_other = await self.store.get_latest_batch(project_id="proj-1", project_product_id="pp-2")
         self.assertEqual(latest_other, [])

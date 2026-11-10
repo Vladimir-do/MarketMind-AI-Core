@@ -32,8 +32,7 @@ BRD_SERVICE_COLUMNS = [
 ]
 CHECKPOINT_SUFFIX = ".checkpoint.json"
 USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
 )
 
 
@@ -289,10 +288,15 @@ def fetch_brd_source(url: str, article: str) -> BrdSource:
     soup = BeautifulSoup(html, "lxml")
     for tag in soup(["script", "style", "noscript", "svg"]):
         tag.decompose()
-    title = _first_text(
-        soup.select_one("meta[property='og:title']"),
-        attr="content",
-    ) or _first_text(soup.select_one("h1")) or _first_text(soup.select_one("title")) or url
+    title = (
+        _first_text(
+            soup.select_one("meta[property='og:title']"),
+            attr="content",
+        )
+        or _first_text(soup.select_one("h1"))
+        or _first_text(soup.select_one("title"))
+        or url
+    )
     image_url = _first_text(soup.select_one("meta[property='og:image']"), attr="content")
     if image_url:
         image_url = urljoin(url, image_url)
@@ -415,7 +419,9 @@ def _choose_summary(sources: list[BrdSource]) -> str:
     for source in sources:
         for line in source.text.splitlines():
             line = _clean_text(line)
-            if 80 <= len(line) <= 700 and any(word in line.lower() for word in ("brady", "label", "printer", "марки", "этикет", "лента")):
+            if 80 <= len(line) <= 700 and any(
+                word in line.lower() for word in ("brady", "label", "printer", "марки", "этикет", "лента")
+            ):
                 candidates.append(line)
     if candidates:
         return candidates[0]
@@ -427,8 +433,21 @@ def _extract_specs(sources: list[BrdSource], article: str) -> list[str]:
     specs = [f"Артикул: {normalize_brd_article(article)}", "Производитель: Brady"]
     seen = {spec.lower() for spec in specs}
     spec_keywords = (
-        "material", "color", "colour", "width", "height", "length", "size", "compatible",
-        "материал", "цвет", "ширина", "высота", "длина", "размер", "совместим",
+        "material",
+        "color",
+        "colour",
+        "width",
+        "height",
+        "length",
+        "size",
+        "compatible",
+        "материал",
+        "цвет",
+        "ширина",
+        "высота",
+        "длина",
+        "размер",
+        "совместим",
     )
     for source in sources:
         for line in source.text.splitlines():

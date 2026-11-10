@@ -87,7 +87,9 @@ def market_analysis_filename(query: str, marketplace: str) -> str:
     return f"market_analysis_{safe_marketplace}_{safe_query or 'query'}.csv"
 
 
-async def run_market_analysis(query: str, *, marketplace: str = "wildberries", max_results: int = 12) -> MarketAnalysisResult:
+async def run_market_analysis(
+    query: str, *, marketplace: str = "wildberries", max_results: int = 12
+) -> MarketAnalysisResult:
     normalized_query = re.sub(r"\s+", " ", (query or "").strip())
     if not normalized_query:
         raise ValueError("Укажите поисковый запрос для анализа рынка")
@@ -171,7 +173,7 @@ def needs_ai_query_expansion(raw_query: str) -> bool:
 
 async def generate_search_queries_with_ai(raw_query: str, marketplace: str) -> list[str]:
     """Использует AI для генерации конкретных поисковых запросов из свободного текста."""
-    from app.ai_client import ask_ai
+    from app.ai_client import AIClientError, ask_ai
 
     marketplace_names = {
         "wildberries": "Wildberries",
@@ -183,7 +185,7 @@ async def generate_search_queries_with_ai(raw_query: str, marketplace: str) -> l
 
     prompt = (
         f"Пользователь хочет найти товары для продажи на {mp_name}. "
-        f"Его запрос: \"{raw_query}\"\n\n"
+        f'Его запрос: "{raw_query}"\n\n'
         f"Сгенерируй ровно 5 конкретных поисковых запросов для поиска товаров на {mp_name}. "
         "Запросы должны быть:\n"
         "- на русском языке\n"
@@ -191,12 +193,13 @@ async def generate_search_queries_with_ai(raw_query: str, marketplace: str) -> l
         "- разными (не повторяться)\n"
         "- пригодными для поиска на маркетплейсе\n\n"
         "Верни ТОЛЬКО JSON-массив строк, без пояснений. Пример:\n"
-        '[\"органайзер для проводов\", \"кабель менеджмент\", \"клипса для кабеля\"]'
+        '["органайзер для проводов", "кабель менеджмент", "клипса для кабеля"]'
     )
 
     try:
-        response = await ask_ai(prompt, max_tokens=300)
-        if response.startswith("AI error:"):
+        try:
+            response = await ask_ai(prompt, max_tokens=300)
+        except AIClientError:
             return []
         cleaned = response.strip()
         if cleaned.startswith("```"):
@@ -221,9 +224,7 @@ async def _search_marketplace(query: str, marketplace: str, *, max_results: int)
     if marketplace == "wildberries":
         return await WildberriesParser().search(query, max_results=max_results)
     exclusions = tuple(
-        name
-        for name in ("wildberries", "ozon", "yandex_market")
-        if marketplace != "all" and name != marketplace
+        name for name in ("wildberries", "ozon", "yandex_market") if marketplace != "all" and name != marketplace
     )
     grouped = await search_all_marketplaces(
         query,
@@ -273,11 +274,15 @@ def product_matches_market_query(product: ProductData, query: str) -> bool:
     query_tokens = _meaningful_token_keys(query)
     if not query_tokens:
         return False
-    product_tokens = _meaningful_token_keys(" ".join([
-        product.name or "",
-        product.brand or "",
-        product.category or "",
-    ]))
+    product_tokens = _meaningful_token_keys(
+        " ".join(
+            [
+                product.name or "",
+                product.brand or "",
+                product.category or "",
+            ]
+        )
+    )
     return bool(query_tokens & product_tokens)
 
 

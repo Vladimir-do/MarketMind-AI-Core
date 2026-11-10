@@ -19,7 +19,12 @@ def _is_vague_product_reference(payload: str) -> bool:
     normalized = re.sub(r"\s+", " ", (payload or "").strip().lower())
     normalized = re.sub(r"\b(?:цена|стоимость|за|по)\s*[\d\s]{1,8}\s*(?:₽|руб\.?|р\.?)?", "", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
-    return bool(re.fullmatch(r"(?:мо[йяе]|моего|мою|мой|этот|эта|это|эту|данный|данную|данное|тот|та|то|его|её|ее)(?:\s+товар\w*)?", normalized))
+    return bool(
+        re.fullmatch(
+            r"(?:мо[йяе]|моего|мою|мой|этот|эта|это|эту|данный|данную|данное|тот|та|то|его|её|ее)(?:\s+товар\w*)?",
+            normalized,
+        )
+    )
 
 
 def _mentions_card(text: str) -> bool:
@@ -36,7 +41,13 @@ def _is_meta_task_instruction(text: str) -> bool:
 
 
 def _mentions_wildberries(text: str) -> bool:
-    return bool(re.search(r"(wildberries\.ru|wb\.ru|wildberries|(?<![a-zа-я0-9])wb(?![a-zа-я0-9])|вайлдберриз|\bвб\b)", text or "", flags=re.I))
+    return bool(
+        re.search(
+            r"(wildberries\.ru|wb\.ru|wildberries|(?<![a-zа-я0-9])wb(?![a-zа-я0-9])|вайлдберриз|\bвб\b)",
+            text or "",
+            flags=re.I,
+        )
+    )
 
 
 def _clean_marketplace_search_query(text: str) -> str:
@@ -205,7 +216,17 @@ def _is_training_protocol_fragment(text: str) -> bool:
         "почему ты так решил",
     }:
         return True
-    protocol_tokens = {"status", "warnings", "task_type", "page_structure", "confidence", "intent", "action", "url", "http_status"}
+    protocol_tokens = {
+        "status",
+        "warnings",
+        "task_type",
+        "page_structure",
+        "confidence",
+        "intent",
+        "action",
+        "url",
+        "http_status",
+    }
     if re.search(r"[а-яё]", raw, flags=re.I):
         return False
     tokens = set(re.findall(r"[a-z_]+", raw))
@@ -213,6 +234,51 @@ def _is_training_protocol_fragment(text: str) -> bool:
 
 
 def _looks_like_single_technical_spec(text: str) -> bool:
+    # Product card briefs are one structured task, not one task per field.
+    # This also covers the common Telegram flow where the FSM state was lost
+    # after /ozon_card and the catch-all handler receives the multiline text.
+    product_field_lines = 0
+    has_product_name = False
+    for line in (text or "").splitlines():
+        match = re.match(r"^\s*([а-яёa-z_ ]+)\s*[:=]\s*.+$", line, flags=re.I)
+        if not match:
+            continue
+        field = re.sub(r"\s+", " ", match.group(1).strip().lower())
+        if field in {
+            "товар",
+            "название товара",
+            "название",
+            "product",
+            "product name",
+            "бренд",
+            "brand",
+            "категория",
+            "category",
+            "цена",
+            "price",
+            "цвет",
+            "color",
+            "материал",
+            "material",
+            "вес",
+            "weight",
+            "размер",
+            "size",
+            "подключение",
+            "connection",
+            "характеристики",
+            "параметры",
+            "модель",
+            "артикул",
+            "комплектация",
+            "назначение",
+        }:
+            product_field_lines += 1
+            if field in {"товар", "название товара", "product", "product name"}:
+                has_product_name = True
+    if has_product_name or product_field_lines >= 2:
+        return True
+
     if _looks_like_training_prompt(text):
         return True
 

@@ -1,17 +1,106 @@
 import json
+import os
 import ssl
+from typing import Any
 
 import aiohttp
+import httpx
 
-from app.config import AI_PROVIDER, ANTHROPIC_API_KEY, GEMINI_API_KEY, GROK_API_KEY, GROQ_API_KEY, logger
-
-DEFAULT_SYSTEM_PROMPT = (
-    "Ты эксперт по анализу цен на маркетплейсах. "
-    "Отвечай кратко, по делу, на русском языке."
+from app.config import (
+    AI_ENABLED,
+    AI_PROVIDER,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    GROK_API_KEY,
+    GROQ_API_KEY,
+    logger,
 )
+
+DEFAULT_SYSTEM_PROMPT = "Ты эксперт по анализу цен на маркетплейсах. Отвечай кратко, по делу, на русском языке."
+
+_aiohttp_session: aiohttp.ClientSession | None = None
+_anthropic_client: Any = None
+_anthropic_client_config: tuple[str, str | None] | None = None
+
+
+class AIClientError(RuntimeError):
+    """A provider request failed and did not produce usable AI content."""
+
+
+def _resolve_ai_proxy() -> str | None:
+    configured_proxy = os.environ.get("AI_HTTP_PROXY", "").strip()
+    if configured_proxy:
+        if configured_proxy.lower() in {"direct", "none", "off"}:
+            return None
+        return configured_proxy
+    for key in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+        value = os.environ.get(key, "").strip()
+        if value and value.lower() not in {"direct", "none", "off"}:
+            return value
+    return None
+
+
+async def _get_aiohttp_session() -> aiohttp.ClientSession:
+    global _aiohttp_session
+    if _aiohttp_session is None or getattr(_aiohttp_session, "closed", False):
+        _aiohttp_session = aiohttp.ClientSession()
+    return _aiohttp_session
+
+
+async def _get_anthropic_client() -> Any:
+    global _anthropic_client, _anthropic_client_config
+    config = (ANTHROPIC_API_KEY, _resolve_ai_proxy())
+    if _anthropic_client is not None and _anthropic_client_config == config:
+        return _anthropic_client
+
+    await _close_anthropic_client()
+    import anthropic
+
+    http_client = httpx.AsyncClient(proxy=config[1], trust_env=False)
+    try:
+        _anthropic_client = anthropic.AsyncAnthropic(
+            api_key=ANTHROPIC_API_KEY,
+            http_client=http_client,
+        )
+        _anthropic_client_config = config
+    except Exception:
+        await http_client.aclose()
+        raise
+    return _anthropic_client
+
+
+async def _close_anthropic_client() -> None:
+    global _anthropic_client, _anthropic_client_config
+    client = _anthropic_client
+    _anthropic_client = None
+    _anthropic_client_config = None
+    if client is not None:
+        try:
+            await client.close()
+        except Exception:
+            logger.warning("Failed to close Anthropic client", exc_info=True)
+
+
+async def close_ai_clients() -> None:
+    """Close lazily initialized provider clients during application shutdown."""
+    global _aiohttp_session
+    session = _aiohttp_session
+    _aiohttp_session = None
+    if session is not None and not getattr(session, "closed", False):
+        try:
+            close = getattr(session, "close", None)
+            if close is not None:
+                await close()
+        except Exception:
+            logger.warning("Failed to close AI aiohttp session", exc_info=True)
+    await _close_anthropic_client()
 
 
 def ai_is_available() -> bool:
+    if not AI_ENABLED:
+        return False
     provider = AI_PROVIDER.strip().lower()
     if provider == "claude":
         return bool(ANTHROPIC_API_KEY)
@@ -25,6 +114,8 @@ def ai_is_available() -> bool:
 
 
 def ai_missing_message() -> str:
+    if not AI_ENABLED:
+        return "AI недоступен: задайте AI_ENABLED=true в .env для включения AI-слоя"
     provider = AI_PROVIDER.strip().lower()
     if provider == "claude":
         return "AI недоступен: добавьте ANTHROPIC_API_KEY в .env"
@@ -43,36 +134,40 @@ async def ask_ai(
     system: str = DEFAULT_SYSTEM_PROMPT,
     max_tokens: int = 800,
 ) -> str:
+    if not AI_ENABLED:
+        raise AIClientError(ai_missing_message())
+    if not ai_is_available():
+        raise AIClientError(ai_missing_message())
     provider = AI_PROVIDER.strip().lower()
     if provider == "claude":
-        return await _ask_claude(prompt, system=system, max_tokens=max_tokens)
-    if provider == "grok":
-        return await _ask_grok(prompt, system=system, max_tokens=max_tokens)
-    if provider == "gemini":
-        return await _ask_gemini(prompt, system=system, max_tokens=max_tokens)
-    if provider == "groq":
-        return await _ask_groq(prompt, system=system, max_tokens=max_tokens)
+        response = await _ask_claude(prompt, system=system, max_tokens=max_tokens)
+    elif provider == "grok":
+        response = await _ask_grok(prompt, system=system, max_tokens=max_tokens)
+    elif provider == "gemini":
+        response = await _ask_gemini(prompt, system=system, max_tokens=max_tokens)
+    elif provider == "groq" or GROQ_API_KEY:
+        response = await _ask_groq(prompt, system=system, max_tokens=max_tokens)
+    elif GROK_API_KEY:
+        response = await _ask_grok(prompt, system=system, max_tokens=max_tokens)
+    elif ANTHROPIC_API_KEY:
+        response = await _ask_claude(prompt, system=system, max_tokens=max_tokens)
+    elif GEMINI_API_KEY:
+        response = await _ask_gemini(prompt, system=system, max_tokens=max_tokens)
+    else:
+        return ai_missing_message()
 
-    if GROQ_API_KEY:
-        return await _ask_groq(prompt, system=system, max_tokens=max_tokens)
-    if GROK_API_KEY:
-        return await _ask_grok(prompt, system=system, max_tokens=max_tokens)
-    if ANTHROPIC_API_KEY:
-        return await _ask_claude(prompt, system=system, max_tokens=max_tokens)
-    if GEMINI_API_KEY:
-        return await _ask_gemini(prompt, system=system, max_tokens=max_tokens)
-    return ai_missing_message()
+    if response.startswith("AI error:"):
+        raise AIClientError(response.removeprefix("AI error:").strip())
+    return response
 
 
 async def _ask_claude(prompt: str, *, system: str, max_tokens: int) -> str:
     if not ANTHROPIC_API_KEY:
         return ai_missing_message()
     try:
-        import anthropic
-
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        client = await _get_anthropic_client()
         response = await client.messages.create(
-            model="claude-3-5-sonnet-latest",
+            model=ANTHROPIC_MODEL,
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": prompt}],
@@ -100,25 +195,26 @@ async def _ask_grok(prompt: str, *, system: str, max_tokens: int) -> str:
             "max_tokens": max_tokens,
             "temperature": 0.3,
         }
-        async with aiohttp.ClientSession(headers=headers) as session:  # noqa: SIM117
-            async with session.post(
-                "https://api.x.ai/v1/chat/completions",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp:
-                data = await resp.json(content_type=None)
-                if resp.status >= 400:
-                    message = None
-                    if isinstance(data, dict):
-                        error = data.get("error")
-                        if isinstance(error, dict):
-                            message = error.get("message")
-                        elif isinstance(error, str):
-                            message = error
-                    return f"AI error: {message or resp.status}"
-                if not isinstance(data, dict):
-                    return f"AI error: unexpected response type {type(data).__name__}"
-                return data["choices"][0]["message"]["content"]
+        session = await _get_aiohttp_session()
+        async with session.post(
+            "https://api.x.ai/v1/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=60),
+        ) as resp:
+            data = await resp.json(content_type=None)
+            if resp.status >= 400:
+                message = None
+                if isinstance(data, dict):
+                    error = data.get("error")
+                    if isinstance(error, dict):
+                        message = error.get("message")
+                    elif isinstance(error, str):
+                        message = error
+                return f"AI error: {message or resp.status}"
+            if not isinstance(data, dict):
+                return f"AI error: unexpected response type {type(data).__name__}"
+            return data["choices"][0]["message"]["content"]
     except Exception as e:
         logger.error("Grok API error: %r", e, exc_info=True)
         return f"AI error: {type(e).__name__}: {e}" if str(e) else f"AI error: {type(e).__name__}"
@@ -127,8 +223,7 @@ async def _ask_grok(prompt: str, *, system: str, max_tokens: int) -> str:
 async def _ask_groq(prompt: str, *, system: str, max_tokens: int) -> str:
     if not GROQ_API_KEY:
         return ai_missing_message()
-    import os
-    proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or None
+    proxy_url = _resolve_ai_proxy()
     try:
         headers = {
             "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -143,26 +238,27 @@ async def _ask_groq(prompt: str, *, system: str, max_tokens: int) -> str:
             "max_tokens": max_tokens,
             "temperature": 0.3,
         }
-        async with aiohttp.ClientSession(headers=headers) as session:  # noqa: SIM117
-            async with session.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=60),
-                proxy=proxy_url,
-            ) as resp:
-                data = await resp.json(content_type=None)
-                if resp.status >= 400:
-                    message = None
-                    if isinstance(data, dict):
-                        error = data.get("error")
-                        if isinstance(error, dict):
-                            message = error.get("message")
-                        elif isinstance(error, str):
-                            message = error
-                    return f"AI error: {message or resp.status}"
-                if not isinstance(data, dict):
-                    return f"AI error: unexpected response type {type(data).__name__}"
-                return data["choices"][0]["message"]["content"]
+        session = await _get_aiohttp_session()
+        async with session.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=60),
+            proxy=proxy_url,
+        ) as resp:
+            data = await resp.json(content_type=None)
+            if resp.status >= 400:
+                message = None
+                if isinstance(data, dict):
+                    error = data.get("error")
+                    if isinstance(error, dict):
+                        message = error.get("message")
+                    elif isinstance(error, str):
+                        message = error
+                return f"AI error: {message or resp.status}"
+            if not isinstance(data, dict):
+                return f"AI error: unexpected response type {type(data).__name__}"
+            return data["choices"][0]["message"]["content"]
     except Exception as e:
         logger.error("Groq API error: %r", e, exc_info=True)
         return f"AI error: {type(e).__name__}: {e}" if str(e) else f"AI error: {type(e).__name__}"
@@ -182,32 +278,33 @@ async def _ask_gemini(prompt: str, *, system: str, max_tokens: int) -> str:
             "generationConfig": {
                 "maxOutputTokens": max_tokens,
                 "temperature": 0.3,
+                "responseMimeType": "application/json" if "required_json_schema" in prompt else "text/plain",
             },
         }
         headers["x-goog-api-key"] = GEMINI_API_KEY
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/"
-            "models/gemini-2.0-flash:generateContent"
-        )
-        async with aiohttp.ClientSession(headers=headers) as session:  # noqa: SIM117
-            async with session.post(
-                url,
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp:
-                body_text = await resp.text()
-                data = _safe_json_loads(body_text)
-                if resp.status >= 400:
-                    return _gemini_http_error_message(resp.status, data, body_text, resp)
-                if not isinstance(data, dict):
-                    return f"AI error: unexpected response type {type(data).__name__}"
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    return "AI error: no candidates in response"
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if not parts:
-                    return "AI error: no parts in response"
-                return parts[0].get("text", "")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+        proxy_url = _resolve_ai_proxy()
+        session = await _get_aiohttp_session()
+        async with session.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=60),
+            proxy=proxy_url,
+        ) as resp:
+            body_text = await resp.text()
+            data = _safe_json_loads(body_text)
+            if resp.status >= 400:
+                return _gemini_http_error_message(resp.status, data, body_text, resp)
+            if not isinstance(data, dict):
+                return f"AI error: unexpected response type {type(data).__name__}"
+            candidates = data.get("candidates", [])
+            if not candidates:
+                return "AI error: no candidates in response"
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts:
+                return "AI error: no parts in response"
+            return parts[0].get("text", "")
     except TimeoutError as e:
         logger.error("Gemini API timeout: %r", e, exc_info=True)
         return _gemini_timeout_message(e)

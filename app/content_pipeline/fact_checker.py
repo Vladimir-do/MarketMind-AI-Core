@@ -34,10 +34,14 @@ def extract_claims(text: str) -> list[Claim]:
     claims: list[Claim] = []
 
     for match in _WEIGHT_RE.finditer(text):
-        claims.append(Claim(text=match.group(0), claim_type="weight", value=match.group(1), unit=match.group(2).lower()))
+        claims.append(
+            Claim(text=match.group(0), claim_type="weight", value=match.group(1), unit=match.group(2).lower())
+        )
 
     for match in _DIMENSION_RE.finditer(text):
-        claims.append(Claim(text=match.group(0), claim_type="dimension", value=match.group(1), unit=match.group(2).lower()))
+        claims.append(
+            Claim(text=match.group(0), claim_type="dimension", value=match.group(1), unit=match.group(2).lower())
+        )
 
     for match in _PERCENT_RE.finditer(text):
         claims.append(Claim(text=match.group(0), claim_type="percent", value=match.group(1), unit="%"))
@@ -46,7 +50,9 @@ def extract_claims(text: str) -> list[Claim]:
         claims.append(Claim(text=match.group(0), claim_type="quantity", value=match.group(1), unit=None))
 
     for match in _WARRANTY_RE.finditer(text):
-        claims.append(Claim(text=match.group(0), claim_type="warranty", value=match.group(1), unit=match.group(2).lower()))
+        claims.append(
+            Claim(text=match.group(0), claim_type="warranty", value=match.group(1), unit=match.group(2).lower())
+        )
 
     lowered = text.lower()
     for key in _MATERIAL_KEYS:

@@ -9,6 +9,7 @@ def reload_app_modules(database_url: str | None = None):
 
     for name in [
         "app.config",
+        "app.ai_client",
         "app.database",
         "app.runtime_paths",
         "app.backups.service",
@@ -39,7 +40,9 @@ def reload_app_modules(database_url: str | None = None):
         "app.reporter",
         "app.agent",
         "app.ai_analyzer",
-        "app.ai_client",
+        "app.card_filler",
+        "app.card_research",
+        "app.market_analysis",
     ]:
         if name in sys.modules:
             importlib.reload(sys.modules[name])

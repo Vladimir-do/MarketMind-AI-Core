@@ -99,10 +99,7 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         return response.json()["project_id"]
 
     async def _import_csv(self, project_id: str, title: str, price: int = 1000) -> dict:
-        csv_text = (
-            "название,цена,ссылка,маркетплейс\n"
-            f"{title},{price},https://example.test/shared-product,ozon\n"
-        )
+        csv_text = f"название,цена,ссылка,маркетплейс\n{title},{price},https://example.test/shared-product,ozon\n"
         response = await self.client.post(
             f"/api/projects/{project_id}/imports",
             files={"file": ("../опасный.csv", csv_text.encode("utf-8"), "text/csv")},
@@ -146,7 +143,7 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Проект создан", response.text)
         self.assertRegex(response.text, r"Создан: \d{2}\.\d{2}\.\d{4} \d{2}:\d{2}")
 
-        project_id = response.text.split('/projects/')[1].split('/market-analysis')[0]
+        project_id = response.text.split("/projects/")[1].split("/market-analysis")[0]
         list_page = await self.client.get("/projects")
         self.assertEqual(list_page.status_code, 200)
         self.assertRegex(list_page.text, r"Создан: \d{2}\.\d{2}\.\d{4} \d{2}:\d{2}")
@@ -253,7 +250,9 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first["effective_snapshot"]["category"], "кабельный органайзер")
         self.assertEqual(first["effective_snapshot"]["sku"], "111111")
         self.assertEqual(first["effective_snapshot"]["external_product_id"], "111111")
-        self.assertEqual(first["effective_snapshot"]["source_url"], "https://www.wildberries.ru/catalog/111111/detail.aspx")
+        self.assertEqual(
+            first["effective_snapshot"]["source_url"], "https://www.wildberries.ru/catalog/111111/detail.aspx"
+        )
         self.assertEqual(first["effective_snapshot"]["image_urls"], ["https://img.test/111.webp"])
         self.assertEqual(first["effective_snapshot"]["availability"], "out_of_stock")
         self.assertNotIn("Скидка", first["effective_snapshot"]["description"])
@@ -284,7 +283,13 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         # Without mocking it here, this test depends on a live call to whatever
         # AI_PROVIDER/API key happens to be configured in .env.
         ai_queries = json.dumps(
-            ["органайзер для проводов", "кабель менеджмент", "клипса для кабеля", "чехол для проводов", "держатель кабеля"],
+            [
+                "органайзер для проводов",
+                "кабель менеджмент",
+                "клипса для кабеля",
+                "чехол для проводов",
+                "держатель кабеля",
+            ],
             ensure_ascii=False,
         )
         with (
@@ -333,10 +338,7 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_import_preview_supports_bom_semicolon_multiline_and_mapping(self):
         project_id = await self._create_project("Preview")
-        csv_text = (
-            "\ufeffНазвание;Цена;Комментарий клиента\n"
-            '"Товар с\nпереносом";123;"оставить как атрибут"\n'
-        )
+        csv_text = '\ufeffНазвание;Цена;Комментарий клиента\n"Товар с\nпереносом";123;"оставить как атрибут"\n'
         preview = await self.client.post(
             f"/api/projects/{project_id}/imports/preview",
             files={"file": ("source.csv", csv_text.encode("utf-8"), "text/csv")},
@@ -406,7 +408,13 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
         mismatch = await self.client.post(
             f"/api/projects/{project_id}/imports/preview",
-            files={"file": ("fake.xlsx", b"not an xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            files={
+                "file": (
+                    "fake.xlsx",
+                    b"not an xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
         )
         self.assertEqual(mismatch.status_code, 422)
 
@@ -445,7 +453,13 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
 
         preview = await self.client.post(
             f"/api/projects/{project_id}/imports/preview",
-            files={"file": ("multi.xlsx", workbook_path.read_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            files={
+                "file": (
+                    "multi.xlsx",
+                    workbook_path.read_bytes(),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
         )
 
         self.assertEqual(preview.status_code, 200)
@@ -465,7 +479,9 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         workbook.save(workbook_path)
         response = await self.client.post(
             f"/api/projects/{project_id}/imports/preview",
-            files={"file": ("macro.xlsm", workbook_path.read_bytes(), "application/vnd.ms-excel.sheet.macroEnabled.12")},
+            files={
+                "file": ("macro.xlsm", workbook_path.read_bytes(), "application/vnd.ms-excel.sheet.macroEnabled.12")
+            },
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["preview"]["file_format"], "xlsm")
@@ -516,8 +532,12 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         product_a = await self._product_id(project_a)
         product_b = await self._product_id(project_b)
 
-        self.assertEqual((await self.client.get(f"/api/projects/{project_a}/products/{product_b}/effective-card")).status_code, 404)
-        self.assertEqual((await self.client.get(f"/api/projects/{project_a}/imports")).json()["items"][0]["project_id"], project_a)
+        self.assertEqual(
+            (await self.client.get(f"/api/projects/{project_a}/products/{product_b}/effective-card")).status_code, 404
+        )
+        self.assertEqual(
+            (await self.client.get(f"/api/projects/{project_a}/imports")).json()["items"][0]["project_id"], project_a
+        )
         self.assertEqual((await self.client.get(f"/api/projects/{project_a}/exports")).json()["items"], [])
         self.assertEqual((await self.client.get(f"/api/projects/{project_a}/reports")).json()["items"], [])
 
@@ -892,7 +912,9 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         product_id = await self._product_id(project_id)
         draft = await self.client.post(
             f"/api/projects/{project_id}/products/{product_id}/drafts",
-            json={"payload": {"title": "Итоговая карточка\nс переносом", "description": "Длинное описание \"с кавычками\""}},
+            json={
+                "payload": {"title": "Итоговая карточка\nс переносом", "description": 'Длинное описание "с кавычками"'}
+            },
         )
         await self.client.post(
             f"/api/projects/{project_id}/products/{product_id}/drafts/{draft.json()['draft_id']}/apply",
@@ -1127,7 +1149,9 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
             json={"file_format": "xlsx"},
         )
         self.assertEqual(xlsx_export.status_code, 200)
-        path = Path(os.environ["MARKETMIND_WORKSPACE_DIR"]) / "projects" / project_id / xlsx_export.json()["relative_path"]
+        path = (
+            Path(os.environ["MARKETMIND_WORKSPACE_DIR"]) / "projects" / project_id / xlsx_export.json()["relative_path"]
+        )
         wb = openpyxl.load_workbook(path)
         headers = [cell.value for cell in wb.active[1]]
         self.assertIn("seo_score", headers)
@@ -1159,6 +1183,7 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_seo_recommendations_formula_values_are_sanitized(self):
         """Значения с формулами в SEO-рекомендациях санитизируются."""
         from app.exports.safety import sanitize_spreadsheet_cell
+
         self.assertEqual(sanitize_spreadsheet_cell("=HOOK()"), "'=HOOK()")
         self.assertEqual(sanitize_spreadsheet_cell("+CMD()"), "'+CMD()")
         self.assertEqual(sanitize_spreadsheet_cell("-EXEC()"), "'-EXEC()")
@@ -1336,8 +1361,7 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(queued.status_code, 200)
         pending = await self.client.get("/api/suggestions?status=pending")
         title_item = next(
-            item for item in pending.json()
-            if item["product_id"] == str(product_id) and item["field"] == "title"
+            item for item in pending.json() if item["product_id"] == str(product_id) and item["field"] == "title"
         )
 
         approved = await self.client.post(f"/suggestions/{title_item['approval_id']}/approve")
@@ -1364,7 +1388,8 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first_queue.status_code, 200)
         pending_after_first = await self.client.get("/api/suggestions?status=pending")
         first_title = next(
-            item for item in pending_after_first.json()
+            item
+            for item in pending_after_first.json()
             if item["product_id"] == str(product_id) and item["field"] == "title"
         )
 
@@ -1372,7 +1397,8 @@ class ClientProjectWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second_queue.status_code, 200)
         pending_after_second = await self.client.get("/api/suggestions?status=pending")
         second_title = next(
-            item for item in pending_after_second.json()
+            item
+            for item in pending_after_second.json()
             if item["product_id"] == str(product_id)
             and item["field"] == "title"
             and item["approval_id"] != first_title["approval_id"]

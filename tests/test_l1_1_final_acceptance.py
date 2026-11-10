@@ -91,7 +91,9 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
     async def _import_basic_csv(self, project_id: str) -> int:
         response = await self.client.post(
             f"/api/projects/{project_id}/imports",
-            files={"file": ("basic.csv", "Название,Цена,Ссылка\nТовар,100,https://example.test/p\n".encode(), "text/csv")},
+            files={
+                "file": ("basic.csv", "Название,Цена,Ссылка\nТовар,100,https://example.test/p\n".encode(), "text/csv")
+            },
         )
         self.assertEqual(response.status_code, 200)
         products = await self.client.get(f"/api/projects/{project_id}/products")
@@ -218,10 +220,18 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         await self._import_basic_csv(project_a)
         await self._import_basic_csv(project_b)
         export_csv = (await self.client.post(f"/api/projects/{project_a}/exports", json={"file_format": "csv"})).json()
-        export_json = (await self.client.post(f"/api/projects/{project_a}/exports", json={"file_format": "json"})).json()
-        export_xlsx = (await self.client.post(f"/api/projects/{project_a}/exports", json={"file_format": "xlsx"})).json()
-        report_html = (await self.client.post(f"/api/projects/{project_a}/reports", json={"file_format": "html"})).json()
-        report_json = (await self.client.post(f"/api/projects/{project_a}/reports", json={"file_format": "json"})).json()
+        export_json = (
+            await self.client.post(f"/api/projects/{project_a}/exports", json={"file_format": "json"})
+        ).json()
+        export_xlsx = (
+            await self.client.post(f"/api/projects/{project_a}/exports", json={"file_format": "xlsx"})
+        ).json()
+        report_html = (
+            await self.client.post(f"/api/projects/{project_a}/reports", json={"file_format": "html"})
+        ).json()
+        report_json = (
+            await self.client.post(f"/api/projects/{project_a}/reports", json={"file_format": "json"})
+        ).json()
         report_csv = (await self.client.post(f"/api/projects/{project_a}/reports", json={"file_format": "csv"})).json()
 
         from fastapi import HTTPException
@@ -275,8 +285,8 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
 
         exports_page = await self.client.get(f"/projects/{project_id}/exports")
         self.assertEqual(exports_page.status_code, 200)
-        self.assertIn('/static/vendor/htmx.min.js', exports_page.text)
-        self.assertNotIn('https://unpkg.com/htmx.org@1.9.12', exports_page.text)
+        self.assertIn("/static/vendor/htmx.min.js", exports_page.text)
+        self.assertNotIn("https://unpkg.com/htmx.org@1.9.12", exports_page.text)
         assert_plain_creation_forms(self, exports_page.text, f"/projects/{project_id}/exports", 3)
         for hx_attr in ("hx-post", "hx-target", "hx-swap", "hx-trigger"):
             self.assertNotIn(f"{hx_attr}=", exports_page.text)
@@ -319,7 +329,7 @@ class L11FinalAcceptanceTests(unittest.IsolatedAsyncioTestCase):
 
         report_page = await self.client.get(f"/projects/{project_id}/reports")
         self.assertEqual(report_page.status_code, 200)
-        self.assertIn('/static/vendor/htmx.min.js', report_page.text)
+        self.assertIn("/static/vendor/htmx.min.js", report_page.text)
         assert_plain_creation_forms(self, report_page.text, f"/projects/{project_id}/reports", 3)
         for hx_attr in ("hx-post", "hx-target", "hx-swap", "hx-trigger"):
             self.assertNotIn(f"{hx_attr}=", report_page.text)

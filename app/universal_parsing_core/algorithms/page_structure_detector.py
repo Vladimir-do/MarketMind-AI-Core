@@ -48,11 +48,7 @@ def detect_page_structure_signals(html: str | None) -> tuple[PageStructure, Page
     prices = extract_price_candidates(body_text)
     links = [link.get("href", "") for link in body.find_all("a", href=True)]
     product_pods = body.select("article.product_pod")
-    card_like_elements = [
-        tag
-        for tag in body.find_all(True)
-        if _has_matching_class(tag.get("class"), _CARD_CLASS_RE)
-    ]
+    card_like_elements = [tag for tag in body.find_all(True) if _has_matching_class(tag.get("class"), _CARD_CLASS_RE)]
     detail_links = [href for href in links if _DETAIL_LINK_RE.search(href)]
     has_pagination = bool(
         body.select('[rel="next"], a.next, li.next')
@@ -62,9 +58,7 @@ def detect_page_structure_signals(html: str | None) -> tuple[PageStructure, Page
     has_article_marker = bool(body.find("article"))
     has_time_marker = bool(body.find("time"))
     has_author_marker = bool(
-        body.find(attrs={"rel": "author"})
-        or body.find(attrs={"name": "author"})
-        or body.find(class_=_AUTHOR_CLASS_RE)
+        body.find(attrs={"rel": "author"}) or body.find(attrs={"name": "author"}) or body.find(class_=_AUTHOR_CLASS_RE)
     )
 
     signals = PageStructureSignals(

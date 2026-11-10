@@ -1,7 +1,9 @@
 """
 worker.py - orchestration for marketplace parsing from bot commands.
 """
+
 import asyncio
+import html
 
 from app.config import PROXY, logger
 from app.database import Database
@@ -9,6 +11,7 @@ from app.parsers.router import MARKETPLACE_EMOJI, detect_marketplace
 from app.parsers.wildberries import WildberriesParser
 from app.parsers.yandex_market import YandexMarketParser
 from app.resilience import resilience
+from app.telegram_card_tasks import build_card_task_from_url, extract_ozon_product_identity
 from app.updater import OzonUpdater, _recommend_strategy
 from app.utils.error_research import research_parse_failure
 
@@ -19,10 +22,7 @@ async def _wait_marketplace_window(marketplace: str, notify) -> None:
     if resilience.is_open(marketplace):
         remaining = resilience.cooldown_remaining(marketplace)
         mins = max(1, remaining // 60)
-        await notify(
-            f"{marketplace.title()} cooldown: {mins} мин. "
-            "Жду окно, чтобы не усугублять блокировку."
-        )
+        await notify(f"{marketplace.title()} cooldown: {mins} мин. Жду окно, чтобы не усугублять блокировку.")
         await asyncio.sleep(max(1, remaining))
     await resilience.wait_rate_limit(marketplace)
 
@@ -31,15 +31,61 @@ async def _mark_block_and_alert(marketplace: str, notify) -> None:
     cooldown_sec = resilience.mark_block(marketplace)
     if cooldown_sec and resilience.should_emit_open_alert(marketplace):
         mins = max(1, cooldown_sec // 60)
-        await notify(
-            f"{marketplace.title()} ушел в защиту. "
-            f"Circuit breaker открыт на {mins} мин."
+        await notify(f"{marketplace.title()} ушел в защиту. Circuit breaker открыт на {mins} мин.")
+
+
+async def _save_ozon_provisional_url(db: Database, url: str, notify) -> bool:
+    """Persist an Ozon URL-derived draft without claiming the marketplace blocked it."""
+    try:
+        task = build_card_task_from_url(url)
+        title_line = next((line for line in task.splitlines() if line.lower().startswith("товар:")), "")
+        provisional_name = title_line.split(":", 1)[1].strip() if ":" in title_line else ""
+        if not provisional_name or provisional_name == "Новый товар":
+            return False
+        await db.save_product(
+            url,
+            {
+                "name": provisional_name,
+                "price": None,
+                "image_url": None,
+                "availability": "draft",
+            },
         )
+        _, ozon_id = extract_ozon_product_identity(url)
+        id_note = f" Артикул Ozon: <code>{ozon_id}</code>." if ozon_id else ""
+        await notify(
+            "📝 Ссылка сохранена в базе как черновик по данным URL. "
+            "Название не подтверждено, цена и фото пока неизвестны; "
+            f"проверить вручную.{id_note}"
+        )
+        # Search public alternative listings for a separately labelled reference offer.
+        # Never write cross-marketplace price/image into the original Ozon product row.
+        try:
+            from app.parsers.alt_sources import find_ozon_alternative_candidates
+
+            candidates = await find_ozon_alternative_candidates(url, max_results=10)
+            reference = next((item for item in candidates if item.get("is_strong_match")), None)
+            if reference:
+                price = f"{reference['price']} ₽" if reference.get("price") is not None else "цена не указана"
+                await notify(
+                    "🔎 Найдено сильное совпадение в другом магазине (справочно):\n"
+                    f"<b>{html.escape(reference['name'][:180])}</b>\n"
+                    f"Цена на Яндекс Маркете: {price}\n"
+                    f'<a href="{html.escape(reference["url"], quote=True)}">Открыть предложение</a>\n'
+                    "Это не цена Ozon; данные и фото оригинальной карточки не изменялись."
+                )
+        except Exception:
+            logger.info("Alternative reference search unavailable for Ozon URL: %s", url, exc_info=True)
+        return True
+    except Exception:
+        logger.warning("Could not save provisional Ozon URL record: %s", url, exc_info=True)
+        return False
 
 
 async def worker_add_urls(db: Database, urls: list[str], notify, proxy: str = None) -> str:
     added = 0
     errors = 0
+    fallback_saved = 0
 
     for url in urls:
         marketplace = detect_marketplace(url)
@@ -61,6 +107,8 @@ async def worker_add_urls(db: Database, urls: list[str], notify, proxy: str = No
                     )
                 except Exception:
                     logger.debug("Telemetry write skipped", exc_info=True)
+                if marketplace == "ozon" and await _save_ozon_provisional_url(db, url, notify):
+                    fallback_saved += 1
                 errors += 1
                 continue
             if decision.get("skip_api") and marketplace != "ozon":
@@ -103,6 +151,9 @@ async def worker_add_urls(db: Database, urls: list[str], notify, proxy: str = No
                 added += result
                 if result <= 0:
                     await _mark_block_and_alert("ozon", notify)
+                    # Keep the submitted Ozon URL even when direct parsing fails.
+                    if await _save_ozon_provisional_url(db, url, notify):
+                        fallback_saved += 1
                 else:
                     resilience.mark_success("ozon")
 
@@ -152,6 +203,8 @@ async def worker_add_urls(db: Database, urls: list[str], notify, proxy: str = No
                 await _mark_block_and_alert(marketplace, notify)
 
     result = f"Добавлено: <b>{added}</b> товаров"
+    if fallback_saved:
+        result += f" | Ссылок сохранено как черновик: <b>{fallback_saved}</b>"
     if errors:
         result += f" | Ошибок: {errors}"
     await notify(result)
@@ -208,6 +261,7 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         logger.debug("Telemetry write skipped", exc_info=True)
                     return updated, changes
                 try:
+
                     async def record_wb_attempt(**kwargs):
                         await db.record_scrape_attempt(product_id=product.id, **kwargs)
 
@@ -219,12 +273,14 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         updated = 1
                         resilience.mark_success("wildberries")
                         if price_changed:
-                            changes.append({
-                                "name": data.name,
-                                "price": data.price,
-                                "availability": data.availability,
-                                "marketplace": "wildberries",
-                            })
+                            changes.append(
+                                {
+                                    "name": data.name,
+                                    "price": data.price,
+                                    "availability": data.availability,
+                                    "marketplace": "wildberries",
+                                }
+                            )
                             await notify(f"WB {data.name[:50]}: {data.price} RUB")
                     else:
                         await _mark_block_and_alert("wildberries", notify)
@@ -319,6 +375,7 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         logger.debug("Telemetry write skipped", exc_info=True)
                     return updated, changes
                 try:
+
                     async def record_attempt(**kwargs):
                         await db.record_scrape_attempt(product_id=product.id, **kwargs)
 
@@ -330,12 +387,14 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
                         updated = 1
                         resilience.mark_success("yandex_market")
                         if price_changed:
-                            changes.append({
-                                "name": data.name,
-                                "price": data.price,
-                                "availability": data.availability,
-                                "marketplace": "yandex_market",
-                            })
+                            changes.append(
+                                {
+                                    "name": data.name,
+                                    "price": data.price,
+                                    "availability": data.availability,
+                                    "marketplace": "yandex_market",
+                                }
+                            )
                             await notify(f"Yandex Market {data.name[:50]}: {data.price} RUB")
                     else:
                         await _mark_block_and_alert("yandex_market", notify)
@@ -359,7 +418,9 @@ async def worker_update_all(db: Database, notify, proxy: str = None) -> str:
         return updated, changes
 
     results = await asyncio.gather(
-        update_wildberries(), update_ozon(), update_yandex_market(),
+        update_wildberries(),
+        update_ozon(),
+        update_yandex_market(),
         return_exceptions=True,
     )
     processed = []

@@ -62,9 +62,7 @@ class CompetitorSnapshotStore:
                 await s.refresh(record)
         return batch_id, records
 
-    async def get_latest_batch(
-        self, *, project_id: str, project_product_id: str
-    ) -> list[CompetitorSnapshot]:
+    async def get_latest_batch(self, *, project_id: str, project_product_id: str) -> list[CompetitorSnapshot]:
         async with self._db.session() as s:
             latest_batch_id = await s.scalar(
                 select(CompetitorSnapshot.batch_id)

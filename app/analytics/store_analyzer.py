@@ -84,9 +84,7 @@ class StoreAnalyzer:
         analyses = self._analyze_products(products)
         return self._build_score_distribution(analyses)
 
-    async def get_top_issues(
-        self, marketplace: str | None = None, limit: int = 10
-    ) -> list[IssueCount]:
+    async def get_top_issues(self, marketplace: str | None = None, limit: int = 10) -> list[IssueCount]:
         products = await self._load_products(marketplace)
         analyses = self._analyze_products(products)
         return self._aggregate_issues(analyses, limit=limit)
@@ -123,15 +121,11 @@ class StoreAnalyzer:
         products = await self._load_products(marketplace)
         return self._compute_price_stats(products)
 
-    async def get_import_history(
-        self, marketplace: str | None = None, days: int = 30
-    ) -> list[ImportDay]:
+    async def get_import_history(self, marketplace: str | None = None, days: int = 30) -> list[ImportDay]:
         since = datetime.now(UTC) - timedelta(days=days)
         # SQLite stores naive datetimes; strip tz for comparison
         since_naive = since.replace(tzinfo=None)
-        attempts = await self._db.get_recent_scrape_attempts(
-            limit=10_000, marketplace=marketplace
-        )
+        attempts = await self._db.get_recent_scrape_attempts(limit=10_000, marketplace=marketplace)
         recent = [a for a in attempts if a.recorded_at and a.recorded_at >= since_naive]
 
         by_day: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "ok": 0})
@@ -182,9 +176,7 @@ class StoreAnalyzer:
 
     # ── private helpers ────────────────────────────────────────────────
 
-    async def _load_products(
-        self, marketplace: str | None
-    ) -> list[tuple[Product, PriceHistory | None]]:
+    async def _load_products(self, marketplace: str | None) -> list[tuple[Product, PriceHistory | None]]:
         all_products = await self._db.get_all_products()
         pairs: list[tuple[Product, PriceHistory | None]] = []
         for p in all_products:
@@ -195,9 +187,7 @@ class StoreAnalyzer:
             pairs.append((p, last_price))
         return pairs
 
-    def _analyze_products(
-        self, products: list[tuple[Product, PriceHistory | None]]
-    ) -> list[AnalysisResult]:
+    def _analyze_products(self, products: list[tuple[Product, PriceHistory | None]]) -> list[AnalysisResult]:
         results: list[AnalysisResult] = []
         for product, last_price in products:
             unified = _build_unified(product, last_price)
@@ -216,13 +206,9 @@ class StoreAnalyzer:
         avg = round(sum(a.score for a in analyses) / total, 1)
         distribution = dict(dist)
         percentage = {k: round(v / total * 100, 1) for k, v in distribution.items()}
-        return ScoreDistribution(
-            total=total, average_score=avg, distribution=distribution, percentage=percentage
-        )
+        return ScoreDistribution(total=total, average_score=avg, distribution=distribution, percentage=percentage)
 
-    def _aggregate_issues(
-        self, analyses: list[AnalysisResult], limit: int = 10
-    ) -> list[IssueCount]:
+    def _aggregate_issues(self, analyses: list[AnalysisResult], limit: int = 10) -> list[IssueCount]:
         issue_map: dict[tuple, dict] = {}
         for a in analyses:
             for f in a.findings:
@@ -252,9 +238,7 @@ class StoreAnalyzer:
             for i in items
         ]
 
-    def _compute_price_stats(
-        self, products: list[tuple[Product, PriceHistory | None]]
-    ) -> PriceStats:
+    def _compute_price_stats(self, products: list[tuple[Product, PriceHistory | None]]) -> PriceStats:
         prices = [p.price for _, p in products if p and p.price is not None]
         if not prices:
             return PriceStats(

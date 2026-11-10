@@ -24,7 +24,7 @@ signal.signal(signal.SIGINT, _shutdown_handler)
 **Стало:**
 ```python
 signal.signal(signal.SIGINT, _shutdown_handler)
-if hasattr(signal, 'SIGTERM'):
+if hasattr(signal, "SIGTERM"):
     signal.signal(signal.SIGTERM, _shutdown_handler)
 ```
 

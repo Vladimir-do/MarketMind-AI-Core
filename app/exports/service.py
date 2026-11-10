@@ -91,7 +91,9 @@ class ProjectExportService:
         safe_format = file_format.lower()
         now = datetime.now(UTC)
         export_id = f"export_{uuid.uuid4().hex[:12]}"
-        filename = f"project_{project_id}_{marketplace_profile}_{now.strftime('%Y%m%d_%H%M%S')}_{export_id[-6:]}.{safe_format}"
+        filename = (
+            f"project_{project_id}_{marketplace_profile}_{now.strftime('%Y%m%d_%H%M%S')}_{export_id[-6:]}.{safe_format}"
+        )
         target, relative_path = project_artifact_path(project_id, "exports", filename)
         if safe_format == "csv":
             target.write_bytes(_csv_bytes(rows))
@@ -121,11 +123,7 @@ class ProjectExportService:
                 "product_count": len(rows),
                 "warning_count": 0,
                 "error_count": 0,
-                "effective_versions": [
-                    row.get("latest_version_id")
-                    for row in rows
-                    if row.get("latest_version_id")
-                ],
+                "effective_versions": [row.get("latest_version_id") for row in rows if row.get("latest_version_id")],
                 "checksum": checksum,
             }
             record = ProjectExport(
@@ -166,7 +164,9 @@ class ProjectExportService:
         return result
 
 
-def _export_row(card: EffectiveProductCard, quality: dict[str, Any], marketplace_profile: str, seo: Any) -> dict[str, Any]:
+def _export_row(
+    card: EffectiveProductCard, quality: dict[str, Any], marketplace_profile: str, seo: Any
+) -> dict[str, Any]:
     snapshot = card.effective_snapshot
     critical = sum(1 for f in seo.findings if f.severity == "critical")
     warning = sum(1 for f in seo.findings if f.severity == "warning")

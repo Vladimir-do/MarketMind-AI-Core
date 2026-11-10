@@ -46,7 +46,12 @@ def upgrade() -> None:
     op.create_table(
         "client_project_files",
         sa.Column("file_id", sa.String(length=64), primary_key=True),
-        sa.Column("project_id", sa.String(length=64), sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "project_id",
+            sa.String(length=64),
+            sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("original_filename", sa.Text(), nullable=False),
         sa.Column("stored_filename", sa.Text(), nullable=False),
         sa.Column("relative_path", sa.Text(), nullable=False),
@@ -65,9 +70,19 @@ def upgrade() -> None:
     op.create_table(
         "project_products",
         sa.Column("project_product_id", sa.String(length=64), primary_key=True),
-        sa.Column("project_id", sa.String(length=64), sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "project_id",
+            sa.String(length=64),
+            sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("product_id", sa.Integer(), sa.ForeignKey("products.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("source_file_id", sa.String(length=64), sa.ForeignKey("client_project_files.file_id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "source_file_id",
+            sa.String(length=64),
+            sa.ForeignKey("client_project_files.file_id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("source_row_index", sa.Integer(), nullable=True),
         sa.Column("source_snapshot_json", sa.Text(), nullable=False),
         sa.Column("source_snapshot_hash", sa.String(length=64), nullable=False),
@@ -86,7 +101,12 @@ def upgrade() -> None:
     op.create_table(
         "project_exports",
         sa.Column("export_id", sa.String(length=64), primary_key=True),
-        sa.Column("project_id", sa.String(length=64), sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "project_id",
+            sa.String(length=64),
+            sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("export_type", sa.String(length=32), nullable=False),
         sa.Column("marketplace_profile", sa.String(length=32), nullable=False),
         sa.Column("file_format", sa.String(length=16), nullable=False),
@@ -101,7 +121,12 @@ def upgrade() -> None:
     op.create_table(
         "project_reports",
         sa.Column("report_id", sa.String(length=64), primary_key=True),
-        sa.Column("project_id", sa.String(length=64), sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "project_id",
+            sa.String(length=64),
+            sa.ForeignKey("client_projects.project_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("report_type", sa.String(length=32), nullable=False),
         sa.Column("file_format", sa.String(length=16), nullable=False),
         sa.Column("relative_path", sa.Text(), nullable=False),
