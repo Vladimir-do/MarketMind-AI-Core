@@ -4,8 +4,10 @@ universal.py — Универсальный парсер для обработк
 а возвращать корректный ParseResult с предложением следующей стратегии.
 """
 
+import json
 import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 
 from bs4 import BeautifulSoup
 
@@ -42,9 +44,15 @@ class UniversalParser(BaseParser):
 
     def _detect_page_structure(self, html: str) -> str:
         """Определяет структуру страницы на основе HTML."""
-        html_lower = html.lower()
-        if "загрузка..." in html_lower or "loading" in html_lower or "<div>" not in html:
+        if not html or not html.strip():
             return "EMPTY"
+
+        soup = BeautifulSoup(html, "lxml")
+        visible_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True)).casefold()
+        if not visible_text or visible_text in {"loading", "loading...", "загрузка", "загрузка..."}:
+            return "EMPTY"
+
+        html_lower = html.lower()
         if "product" in html_lower and ("price" in html_lower or "цена" in html_lower):
             return "PRODUCT"
         if "catalog" in html_lower or "category" in html_lower:
@@ -87,39 +95,60 @@ class UniversalParser(BaseParser):
         # ── 1. JSON-LD (Schema.org Product) ──────────────────────────────────
         for script in soup.find_all("script", type="application/ld+json"):
             try:
-                import json
+                payload = json.loads(script.string or script.get_text() or "")
+            except (json.JSONDecodeError, TypeError):
+                continue
 
-                ld = json.loads(script.string or "")
-                if isinstance(ld, list):
-                    ld = next((item for item in ld if item.get("@type") == "Product"), None)
-                elif ld.get("@type") != "Product":
-                    ld = None
-                if ld:
-                    name = ld.get("name")
-                    description = ld.get("description")
-                    img = ld.get("image")
-                    if isinstance(img, list):
-                        img = img[0] if img else None
+            if isinstance(payload, dict):
+                candidates = payload.get("@graph", [])
+                if not isinstance(candidates, list):
+                    candidates = []
+                candidates = [payload, *candidates]
+            elif isinstance(payload, list):
+                candidates = payload
+            else:
+                candidates = []
+
+            for ld in candidates:
+                if not isinstance(ld, dict):
+                    continue
+                product_types = ld.get("@type", [])
+                if isinstance(product_types, str):
+                    product_types = [product_types]
+                if not isinstance(product_types, list) or "Product" not in product_types:
+                    continue
+
+                name = ld.get("name") or name
+                description = ld.get("description") or description
+                img = ld.get("image")
+                if isinstance(img, list):
+                    img = img[0] if img else None
+                if isinstance(img, dict):
+                    img = img.get("url") or img.get("contentUrl")
+                if isinstance(img, str):
                     image_url = img
-                    offers = ld.get("offers")
-                    if isinstance(offers, list):
-                        offers = offers[0] if offers else None
-                    if offers:
-                        raw_price = offers.get("price") or offers.get("lowPrice")
-                        if raw_price:
-                            price = _parse_int_price(raw_price)
-                        high = offers.get("highPrice")
-                        if high:
-                            old_price = _parse_int_price(high)
-                        avail = (offers.get("availability") or "").lower()
-                        if "instock" in avail or "in_stock" in avail:
-                            availability = "in_stock"
-                        elif "outofstock" in avail or "out_of_stock" in avail:
-                            availability = "out_of_stock"
-                        elif "discontinued" in avail:
-                            availability = "deleted"
-            except Exception:
-                pass
+
+                offers = ld.get("offers")
+                if isinstance(offers, list):
+                    offers = next((offer for offer in offers if isinstance(offer, dict)), None)
+                if isinstance(offers, dict):
+                    raw_price = offers.get("price") or offers.get("lowPrice")
+                    if raw_price is not None:
+                        price = _parse_int_price(raw_price)
+                    high = offers.get("highPrice")
+                    if high is not None:
+                        old_price = _parse_int_price(high)
+                    avail = str(offers.get("availability") or "").lower()
+                    if "instock" in avail or "in_stock" in avail:
+                        availability = "in_stock"
+                    elif "outofstock" in avail or "out_of_stock" in avail:
+                        availability = "out_of_stock"
+                    elif "discontinued" in avail:
+                        availability = "deleted"
+                if name or price is not None:
+                    break
+            if name or price is not None:
+                break
 
         # ── 2. Open Graph ────────────────────────────────────────────────────
         if not name:
@@ -245,21 +274,40 @@ class UniversalParser(BaseParser):
 
 
 def _parse_int_price(raw) -> int | None:
-    """Извлекает целое число цены из строки или числа."""
+    """Извлекает целую цену, корректно обрабатывая RU/EU/US разделители."""
     if raw is None:
         return None
-    if isinstance(raw, (int, float)):
-        return int(raw)
-    text = str(raw).strip()
-    text = re.sub(r"[^\d.,]", "", text)
-    text = text.replace(",", "")
-    text = re.sub(r"\.(?=.*\d{3})", "", text)
-    if not text:
-        return None
     try:
-        value = int(float(text))
+        if isinstance(raw, (int, float, Decimal)):
+            value = int(Decimal(str(raw)))
+        else:
+            text = re.sub(r"[^\d.,]", "", str(raw).replace(" ", "").replace("\u00a0", ""))
+            if not text:
+                return None
+
+            dot = text.rfind(".")
+            comma = text.rfind(",")
+            if dot >= 0 and comma >= 0:
+                decimal_separator = "." if dot > comma else ","
+                thousands_separator = "," if decimal_separator == "." else "."
+                decimals = len(text) - max(dot, comma) - 1
+                if 1 <= decimals <= 2:
+                    text = text.replace(thousands_separator, "")
+                    if decimal_separator == ",":
+                        text = text.replace(",", ".")
+                else:
+                    text = text.replace(".", "").replace(",", "")
+            elif dot >= 0 or comma >= 0:
+                separator = "." if dot >= 0 else ","
+                decimals = len(text) - text.rfind(separator) - 1
+                if decimals in (1, 2):
+                    text = text.replace(",", ".")
+                else:
+                    text = text.replace(".", "").replace(",", "")
+
+            value = int(Decimal(text))
         if 1 <= value <= 100_000_000:
             return value
-    except (ValueError, OverflowError):
+    except (InvalidOperation, ValueError, OverflowError):
         pass
     return None
