@@ -94,18 +94,27 @@ class ProductValidator:
                 severity="warning",
             ))
 
-        # url_valid
+        # url_valid: source links must be absolute HTTP(S) URLs with a host.
         if product.source_url:
             try:
-                result = urlparse(product.source_url)
-                if not all([result.scheme, result.netloc]):
-                    raise ValueError("Invalid URL")
-            except Exception:
+                result = urlparse(product.source_url.strip())
+                valid = (
+                    result.scheme.lower() in {"http", "https"}
+                    and bool(result.hostname)
+                    and result.username is None
+                    and result.password is None
+                    and not any(char.isspace() for char in product.source_url)
+                )
+                # Accessing .port validates malformed/out-of-range port values.
+                _ = result.port
+                if not valid:
+                    raise ValueError("URL must be an absolute HTTP(S) URL without credentials")
+            except (ValueError, AttributeError):
                 errors.append(ValidationError(
                     product_index=idx,
                     rule="url_valid",
                     field="source_url",
-                    message=f"Invalid URL: {product.source_url}",
+                    message="Source URL must be a valid absolute HTTP(S) URL without credentials",
                     severity="error",
                 ))
 
