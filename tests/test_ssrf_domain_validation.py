@@ -12,10 +12,20 @@ known marketplace hosts must be accepted.
 
 import unittest
 
+from app.parsers.ozon import OzonParser
 from app.parsers.funpay import is_funpay_offer_url
 from app.parsers.router import detect_marketplace
 from app.telegram_url_utils import is_supported_marketplace_url
 from app.utils.urls import is_ozon_url, is_wildberries_url, is_yandex_market_url
+
+
+class OzonParserCanHandleDomainTests(unittest.TestCase):
+    def test_ozon_parser_rejects_lookalike_domains(self):
+        self.assertFalse(OzonParser.can_handle("https://ozon.ru.evil.com/product/123"))
+        self.assertFalse(OzonParser.can_handle("https://not-ozon.ru/product/123"))
+
+    def test_ozon_parser_accepts_valid_domain(self):
+        self.assertTrue(OzonParser.can_handle("https://www.ozon.ru/product/123"))
 
 
 class UrlUtilsDomainMatchingTests(unittest.TestCase):

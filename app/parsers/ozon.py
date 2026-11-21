@@ -24,6 +24,7 @@ from app.updater import (
     parse_ozon_html,
 )
 from app.utils.error_research import research_parse_failure
+from app.utils.urls import is_ozon_url
 
 OZON_API_URLS = [
     "https://www.ozon.ru/api/composer-api.bx/page/json/v2?url={encoded}",
@@ -50,7 +51,7 @@ class OzonParser(BaseParser):
 
     @classmethod
     def can_handle(cls, url: str) -> bool:
-        return "ozon.ru" in url
+        return is_ozon_url(url)
 
     async def start(self):
         from playwright.async_api import async_playwright
