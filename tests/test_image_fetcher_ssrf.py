@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from unittest.mock import patch
 from urllib.error import URLError
+from urllib.request import Request
 
 from app.importers.image_fetcher import (
-    _SafeRedirectHandler,
     _is_safe_public_http_url,
     _normalize_url,
+    _SafeRedirectHandler,
     resolve_image_url_from_source,
 )
 
@@ -71,7 +72,7 @@ def test_redirect_handler_rejects_private_network_target():
     with patch("app.importers.image_fetcher.socket.getaddrinfo", side_effect=_private_dns):
         try:
             handler.redirect_request(
-                req=__import__("urllib.request").request.Request("https://shop.example/product"),
+                req=Request("https://shop.example/product"),
                 fp=None,
                 code=302,
                 msg="Found",
@@ -85,6 +86,6 @@ def test_redirect_handler_rejects_private_network_target():
 
 
 def test_private_source_url_is_rejected_before_fetch():
-    with patch("app.importers.image_fetcher.urlopen") as legacy_urlopen:
+    with patch("app.importers.image_fetcher.build_opener") as build_opener:
         assert resolve_image_url_from_source("http://127.0.0.1/admin") is None
-        legacy_urlopen.assert_not_called()
+        build_opener.assert_not_called()
