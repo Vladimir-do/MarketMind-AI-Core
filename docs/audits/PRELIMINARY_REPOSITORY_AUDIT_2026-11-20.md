@@ -43,3 +43,11 @@ The configured provider path and fallback path differ: explicit provider selecti
 
 ## Safety
 This audit branch is additive and does not change main. Findings are provisional until tests and contextual inspection confirm them.
+
+
+## Follow-up work completed in audit branch
+
+- Fixed Ozon parser URL selection by replacing substring matching with shared hostname validator `is_ozon_url`.
+- Added regression tests for valid Ozon URLs and lookalike-host rejection.
+- Added a 10 MiB maximum upload limit to the web file-import endpoint, read in bounded chunks, and replaced raw exception details in the user-facing error message with a generic message.
+- These changes have not yet been executed locally or verified by CI. They remain pending runtime test validation.
