@@ -17,7 +17,7 @@ router = APIRouter()
 
 SAMPLES_DIR = Path(__file__).resolve().parents[3] / "samples"
 
-TEMPLATE_HEADERS = [
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MiB; bounded before pipeline processing\nUPLOAD_CHUNK_BYTES = 1024 * 1024\n\nTEMPLATE_HEADERS = [
     "название", "бренд", "цена", "старая цена", "скидка",
     "описание", "категория", "артикул", "вес", "ширина", "высота",
     "глубина", "фото", "валюта",
@@ -89,7 +89,17 @@ async def import_file(request: Request, file: UploadFile = File(...)):
     suffix = Path(file.filename or "upload.csv").suffix or ".csv"
     tmp = Path(tempfile.gettempdir()) / f"web_import_{uuid.uuid4().hex}{suffix}"
     try:
-        content = await file.read()
+        content = bytearray()
+        while chunk := await file.read(UPLOAD_CHUNK_BYTES):
+            if len(content) + len(chunk) > MAX_UPLOAD_BYTES:
+                return _import_result_response(request, ImportResult(
+                    task_id=uuid.uuid4().hex[:12],
+                    status="failed",
+                    total_products=0,
+                    errors=1,
+                    message="Файл превышает допустимый размер 10 МБ.",
+                ), error=True)
+            content.extend(chunk)
         tmp.write_bytes(content)
 
         from app.pipeline import ImportPipeline
@@ -112,7 +122,7 @@ async def import_file(request: Request, file: UploadFile = File(...)):
             status="failed",
             total_products=0,
             errors=1,
-            message=f"Ошибка импорта: {exc}",
+            message="Не удалось обработать файл. Проверьте формат и содержимое и повторите попытку.",
         ), error=True)
     finally:
         tmp.unlink(missing_ok=True)
